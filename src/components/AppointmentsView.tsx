@@ -16,8 +16,10 @@ import {
   LayoutGrid,
   List
 } from 'lucide-react';
-import { Agendamento, Paciente, StatusAgendamento } from '../types';
+import { Agendamento, Paciente, StatusAgendamento, UsuarioEquipe } from '../types';
 import { CalendarGridView } from './CalendarGridView';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
+import { Trash2 } from 'lucide-react';
 
 interface AppointmentsViewProps {
   agendamentos: Agendamento[];
@@ -26,6 +28,8 @@ interface AppointmentsViewProps {
   onUpdateStatus: (id: string, status: StatusAgendamento) => void;
   onViewPatient: (paciente: Paciente) => void;
   onOpenCompleteModal?: (agendamento: Agendamento) => void;
+  onDeleteAppointment?: (id: string) => void;
+  currentUser?: UsuarioEquipe;
 }
 
 export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
@@ -35,10 +39,14 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
   onUpdateStatus,
   onViewPatient,
   onOpenCompleteModal,
+  onDeleteAppointment,
+  currentUser,
 }) => {
+  const isAdmin = !currentUser || currentUser.role === 'admin';
   const [viewFormat, setViewFormat] = useState<'cards' | 'calendario'>('cards');
   const [filterStatus, setFilterStatus] = useState<string>('todos');
   const [search, setSearch] = useState('');
+  const [appointmentToDelete, setAppointmentToDelete] = useState<Agendamento | null>(null);
 
   const filtered = agendamentos.filter(ag => {
     const matchesStatus = filterStatus === 'todos' || ag.status === filterStatus;
@@ -263,6 +271,15 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                           Cancelar
                         </button>
                       )}
+                      {isAdmin && onDeleteAppointment && (
+                        <button
+                          onClick={() => setAppointmentToDelete(ag)}
+                          className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer ml-1"
+                          title="Excluir agendamento do sistema (Admin)"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -270,6 +287,24 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
             })}
           </div>
         </>
+      )}
+
+      {/* Delete Appointment Confirmation Modal */}
+      {appointmentToDelete && (
+        <DeleteConfirmModal
+          isOpen={!!appointmentToDelete}
+          onClose={() => setAppointmentToDelete(null)}
+          onConfirm={() => {
+            if (appointmentToDelete && onDeleteAppointment) {
+              onDeleteAppointment(appointmentToDelete.id);
+            }
+            setAppointmentToDelete(null);
+          }}
+          title="Excluir Agendamento"
+          itemType="Agendamento da Agenda"
+          itemName={`${appointmentToDelete.paciente?.nome || 'Paciente'} - ${appointmentToDelete.procedimento} (${formatDateTime(appointmentToDelete.data_hora).date} às ${formatDateTime(appointmentToDelete.data_hora).time})`}
+          description="A exclusão deste agendamento liberará o horário na grade e removerá este atendimento do histórico."
+        />
       )}
 
     </div>

@@ -21,14 +21,17 @@ import {
   Eye,
   EyeOff,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Trash2
 } from 'lucide-react';
 import { TransacaoFinanceira, FormaPagamento, StatusPagamento, UsuarioEquipe } from '../types';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
 
 interface FinancialViewProps {
   transacoes: TransacaoFinanceira[];
   onAddTransaction: (nova: Partial<TransacaoFinanceira>) => void;
   onUpdateTransactionStatus: (id: string, status: StatusPagamento) => void;
+  onDeleteTransaction?: (id: string) => void;
   currentUser?: UsuarioEquipe;
 }
 
@@ -36,6 +39,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
   transacoes,
   onAddTransaction,
   onUpdateTransactionStatus,
+  onDeleteTransaction,
   currentUser,
 }) => {
   const isAdmin = !currentUser || currentUser.role === 'admin';
@@ -46,6 +50,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
   const [search, setSearch] = useState('');
   const [isNewTxModalOpen, setIsNewTxModalOpen] = useState(false);
   const [selectedTxForReceipt, setSelectedTxForReceipt] = useState<TransacaoFinanceira | null>(null);
+  const [txToDelete, setTxToDelete] = useState<TransacaoFinanceira | null>(null);
 
   // New Transaction Form State
   const [novoPacienteNome, setNovoPacienteNome] = useState('');
@@ -415,13 +420,25 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
                         </button>
                       </td>
                       <td className="p-3.5 text-right pr-5 whitespace-nowrap">
-                        <button
-                          onClick={() => setSelectedTxForReceipt(tx)}
-                          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-md text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors"
-                        >
-                          <Receipt className="w-3 h-3 text-indigo-600" />
-                          <span>Recibo</span>
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => setSelectedTxForReceipt(tx)}
+                            className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-md text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            <Receipt className="w-3 h-3 text-indigo-600" />
+                            <span>Recibo</span>
+                          </button>
+
+                          {isAdmin && onDeleteTransaction && (
+                            <button
+                              onClick={() => setTxToDelete(tx)}
+                              className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                              title="Excluir lançamento financeiro (Admin)"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -653,6 +670,24 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
 
           </div>
         </div>
+      )}
+
+      {/* Delete Transaction Confirmation Modal */}
+      {txToDelete && (
+        <DeleteConfirmModal
+          isOpen={!!txToDelete}
+          onClose={() => setTxToDelete(null)}
+          onConfirm={() => {
+            if (txToDelete && onDeleteTransaction) {
+              onDeleteTransaction(txToDelete.id);
+            }
+            setTxToDelete(null);
+          }}
+          title="Excluir Lançamento Financeiro"
+          itemType="Lançamento Financeiro"
+          itemName={`${txToDelete.tipo === 'receita' ? 'Receita' : 'Despesa'}: ${txToDelete.paciente_nome} - ${formatCurrency(txToDelete.valor)} (${txToDelete.procedimento})`}
+          description="A exclusão deste lançamento removerá este registro contábil do histórico financeiro e recalculará os saldos da clínica."
+        />
       )}
 
     </div>

@@ -480,6 +480,23 @@ export default function App() {
     showToast(`Paciente ${createdPatient.nome} cadastrado(a) com sucesso!`);
   };
 
+  const handleDeletePatient = (id: string) => {
+    if (currentUser.role !== 'admin') {
+      showToast('Apenas administradores têm permissão para excluir pacientes.', 'info');
+      return;
+    }
+    const patientName = pacientes.find(p => p.id === id)?.nome || 'Paciente';
+    setPacientes(prev => prev.filter(p => p.id !== id));
+    setAgendamentos(prev => prev.filter(a => a.paciente_id !== id));
+    if (selectedPatientForDetails?.id === id) {
+      setSelectedPatientForDetails(null);
+    }
+    if (patientForPackages?.id === id) {
+      setPatientForPackages(null);
+    }
+    showToast(`Cadastro de ${patientName} e registros vinculados foram excluídos com sucesso.`);
+  };
+
   const handleUpdatePatientHistory = (
     pacienteId: string, 
     novoHistorico: string, 
@@ -514,6 +531,16 @@ export default function App() {
     showToast(`Insumo "${createdItem.nome_item}" cadastrado no estoque!`);
   };
 
+  const handleDeleteInventoryItem = (id: string) => {
+    if (currentUser.role !== 'admin') {
+      showToast('Apenas administradores têm permissão para excluir insumos do estoque.', 'info');
+      return;
+    }
+    const item = estoque.find(i => i.id === id);
+    setEstoque(prev => prev.filter(i => i.id !== id));
+    showToast(`Insumo "${item?.nome_item || 'Item'}" removido do estoque com sucesso.`);
+  };
+
   const handleUpdateQuantity = (id: string, newQuantity: number) => {
     setEstoque(prev =>
       prev.map(item => (item.id === id ? { ...item, quantidade: newQuantity } : item))
@@ -535,6 +562,24 @@ export default function App() {
     };
     setTransacoes(prev => [created, ...prev]);
     showToast('Lançamento financeiro registrado com sucesso!');
+  };
+
+  const handleDeleteTransaction = (id: string) => {
+    if (currentUser.role !== 'admin') {
+      showToast('Apenas administradores têm permissão para excluir lançamentos financeiros.', 'info');
+      return;
+    }
+    setTransacoes(prev => prev.filter(t => t.id !== id));
+    showToast('Lançamento financeiro excluído com sucesso.');
+  };
+
+  const handleDeleteAppointment = (id: string) => {
+    if (currentUser.role !== 'admin') {
+      showToast('Apenas administradores têm permissão para excluir agendamentos.', 'info');
+      return;
+    }
+    setAgendamentos(prev => prev.filter(a => a.id !== id));
+    showToast('Agendamento excluído da agenda com sucesso.');
   };
 
   const handleUpdateTransactionStatus = (id: string, status: StatusPagamento) => {
@@ -627,6 +672,20 @@ export default function App() {
       })
     );
     showToast('Status do usuário atualizado.');
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    if (currentUser.role !== 'admin') {
+      showToast('Apenas administradores têm permissão para excluir usuários.', 'info');
+      return;
+    }
+    if (currentUser.id === userId) {
+      showToast('Não é possível excluir o usuário ativo da sessão atual.', 'info');
+      return;
+    }
+    const user = usuarios.find(u => u.id === userId);
+    setUsuarios(prev => prev.filter(u => u.id !== userId));
+    showToast(`Usuário "${user?.nome || 'Usuário'}" excluído do sistema.`);
   };
 
   // If user is not authenticated, display full secure Login screen
@@ -734,6 +793,8 @@ export default function App() {
               onUpdateStatus={handleUpdateStatus}
               onViewPatient={(p) => setSelectedPatientForDetails(p)}
               onOpenCompleteModal={(ag) => setAppointmentToComplete(ag)}
+              onDeleteAppointment={handleDeleteAppointment}
+              currentUser={currentUser}
             />
           )}
 
@@ -743,6 +804,8 @@ export default function App() {
               onOpenNewPatient={() => setIsNewPatientOpen(true)}
               onViewPatient={(p) => setSelectedPatientForDetails(p)}
               onOpenPackages={(p) => setPatientForPackages(p)}
+              onDeletePatient={handleDeletePatient}
+              currentUser={currentUser}
             />
           )}
 
@@ -760,6 +823,7 @@ export default function App() {
                 setIsNewProcedureOpen(true);
               }}
               onDeleteProcedure={handleDeleteProcedure}
+              onDeleteInventoryItem={handleDeleteInventoryItem}
               onUpdateQuantity={handleUpdateQuantity}
               currentUser={currentUser}
             />
@@ -791,6 +855,7 @@ export default function App() {
               transacoes={transacoes}
               onAddTransaction={handleAddTransaction}
               onUpdateTransactionStatus={handleUpdateTransactionStatus}
+              onDeleteTransaction={handleDeleteTransaction}
               currentUser={currentUser}
             />
           )}
@@ -825,6 +890,7 @@ export default function App() {
               onSwitchUser={(u) => handleRequestSwitchUser(u)}
               onOpenNewUser={() => setIsNewUserOpen(true)}
               onOpenEditUser={(user) => setUserToEdit(user)}
+              onDeleteUser={handleDeleteUser}
               onToggleUserStatus={handleToggleUserStatus}
               onOpenSqlGuide={() => setIsSqlModalOpen(true)}
             />
@@ -928,6 +994,8 @@ export default function App() {
         onClose={() => setSelectedPatientForDetails(null)}
         agendamentos={agendamentos}
         onUpdatePatientHistory={handleUpdatePatientHistory}
+        onDeletePatient={handleDeletePatient}
+        currentUser={currentUser}
       />
 
       <CompleteProcedureModal

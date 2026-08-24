@@ -23,6 +23,7 @@ import {
   Info
 } from 'lucide-react';
 import { EstoqueInsumo, ProcedimentoClinico, UsuarioEquipe } from '../types';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
 
 interface InventoryViewProps {
   estoque: EstoqueInsumo[];
@@ -32,6 +33,7 @@ interface InventoryViewProps {
   onOpenNewProcedure: () => void;
   onEditProcedure: (proc: ProcedimentoClinico) => void;
   onDeleteProcedure: (id: string) => void;
+  onDeleteInventoryItem?: (id: string) => void;
   onUpdateQuantity: (id: string, newQuantity: number) => void;
   onToggleProcedureStatus?: (id: string) => void;
 }
@@ -44,6 +46,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   onOpenNewProcedure,
   onEditProcedure,
   onDeleteProcedure,
+  onDeleteInventoryItem,
   onUpdateQuantity,
   onToggleProcedureStatus,
 }) => {
@@ -53,6 +56,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [categoryFilter, setCategoryFilter] = useState<string>('todos');
   const [filterMode, setFilterMode] = useState<'todos' | 'criticos' | 'ok'>('todos');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<EstoqueInsumo | null>(null);
 
   // Categories present in procedures
   const procedureCategories = ['todos', ...Array.from(new Set(procedimentos.map(p => p.categoria)))];
@@ -449,17 +453,33 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         {item.categoria || 'Insumo'}
                       </span>
 
-                      {isCritical ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60">
-                          <AlertTriangle className="w-3 h-3 text-amber-600" />
-                          Abaixo do Mínimo
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full border border-green-200/60">
-                          <CheckCircle2 className="w-3 h-3 text-green-600" />
-                          Regular
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        {isCritical ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60">
+                            <AlertTriangle className="w-3 h-3 text-amber-600" />
+                            Abaixo do Mínimo
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full border border-green-200/60">
+                            <CheckCircle2 className="w-3 h-3 text-green-600" />
+                            Regular
+                          </span>
+                        )}
+
+                        {isAdmin && onDeleteInventoryItem && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setItemToDelete(item);
+                            }}
+                            className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                            title="Excluir insumo do estoque (Admin)"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <h3 className="text-sm font-bold text-slate-900 mb-1 leading-snug">
@@ -537,6 +557,24 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             })}
           </div>
         </div>
+      )}
+
+      {/* Delete Inventory Item Confirmation Modal */}
+      {itemToDelete && (
+        <DeleteConfirmModal
+          isOpen={!!itemToDelete}
+          onClose={() => setItemToDelete(null)}
+          onConfirm={() => {
+            if (itemToDelete && onDeleteInventoryItem) {
+              onDeleteInventoryItem(itemToDelete.id);
+            }
+            setItemToDelete(null);
+          }}
+          title="Excluir Insumo do Estoque"
+          itemType="Insumo de Estoque"
+          itemName={`${itemToDelete.nome_item} (${itemToDelete.quantidade} ${itemToDelete.unidade_medida})`}
+          description="A exclusão deste insumo removerá seu saldo e rastreabilidade de lote do catálogo de estoque da clínica."
+        />
       )}
 
     </div>

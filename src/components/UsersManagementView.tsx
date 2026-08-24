@@ -27,9 +27,11 @@ import {
   RefreshCw,
   Clock,
   Edit3,
-  KeyRound
+  KeyRound,
+  Trash2
 } from 'lucide-react';
 import { UsuarioEquipe, UserRole } from '../types';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
 
 interface UsersManagementViewProps {
   usuarios: UsuarioEquipe[];
@@ -37,6 +39,7 @@ interface UsersManagementViewProps {
   onSwitchUser: (usuario: UsuarioEquipe) => void;
   onOpenNewUser: () => void;
   onOpenEditUser?: (usuario: UsuarioEquipe) => void;
+  onDeleteUser?: (id: string) => void;
   onToggleUserStatus?: (userId: string) => void;
   onOpenSqlGuide?: () => void;
 }
@@ -47,10 +50,12 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
   onSwitchUser,
   onOpenNewUser,
   onOpenEditUser,
+  onDeleteUser,
   onToggleUserStatus,
   onOpenSqlGuide,
 }) => {
   const [filterRole, setFilterRole] = useState<'todos' | UserRole>('todos');
+  const [userToDelete, setUserToDelete] = useState<UsuarioEquipe | null>(null);
 
   const filteredUsers = usuarios.filter(u => {
     if (filterRole === 'todos') return true;
@@ -379,6 +384,18 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                         <span>Editar Dados / Senha</span>
                       </button>
                     )}
+
+                    {!isCurrent && onDeleteUser && (
+                      <button
+                        type="button"
+                        onClick={() => setUserToDelete(user)}
+                        className="text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-2 py-1 rounded-md transition-colors cursor-pointer flex items-center gap-1"
+                        title="Excluir usuário do sistema (Admin)"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Excluir</span>
+                      </button>
+                    )}
                   </div>
 
                   {!isCurrent ? (
@@ -403,6 +420,24 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
         </div>
 
       </div>
+
+      {/* Delete User Confirmation Modal */}
+      {userToDelete && (
+        <DeleteConfirmModal
+          isOpen={!!userToDelete}
+          onClose={() => setUserToDelete(null)}
+          onConfirm={() => {
+            if (userToDelete && onDeleteUser) {
+              onDeleteUser(userToDelete.id);
+            }
+            setUserToDelete(null);
+          }}
+          title="Excluir Usuário do Sistema"
+          itemType="Usuário da Equipe"
+          itemName={`${userToDelete.nome} (${userToDelete.email}) - Perfil: ${userToDelete.cargo}`}
+          description="A exclusão deste usuário revogará permanentemente seu acesso e credenciais de login ao sistema."
+        />
+      )}
 
     </div>
   );

@@ -16,10 +16,12 @@ import {
   Printer,
   Sparkles,
   Sliders,
-  ShieldCheck
+  ShieldCheck,
+  Trash2
 } from 'lucide-react';
-import { Paciente, Agendamento, FotoAntesDepois, TermoConsentimento } from '../types';
+import { Paciente, Agendamento, FotoAntesDepois, TermoConsentimento, UsuarioEquipe } from '../types';
 import { MODELO_TERMO_CONSENTIMENTO } from '../data/mockData';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
 
 interface PatientDetailsModalProps {
   paciente: Paciente | null;
@@ -27,6 +29,8 @@ interface PatientDetailsModalProps {
   onClose: () => void;
   agendamentos: Agendamento[];
   onUpdatePatientHistory: (pacienteId: string, novoHistorico: string, dadosExtras?: Partial<Paciente>) => void;
+  onDeletePatient?: (id: string) => void;
+  currentUser?: UsuarioEquipe;
 }
 
 export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
@@ -35,7 +39,11 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
   onClose,
   agendamentos,
   onUpdatePatientHistory,
+  onDeletePatient,
+  currentUser,
 }) => {
+  const isAdmin = !currentUser || currentUser.role === 'admin';
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'anamnese' | 'procedimentos' | 'fotos' | 'termo'>('anamnese');
   
   // Anamnese fields state
@@ -719,12 +727,26 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
 
         {/* Footer */}
         <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-slate-600 hover:text-slate-900 text-xs font-semibold rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
-          >
-            Fechar Ficha
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-slate-600 hover:text-slate-900 text-xs font-semibold rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              Fechar Ficha
+            </button>
+
+            {isAdmin && onDeletePatient && (
+              <button
+                type="button"
+                onClick={() => setIsDeleteModalOpen(true)}
+                className="px-3 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 text-xs font-semibold rounded-lg border border-red-200 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                title="Excluir cadastro do paciente permanentemente"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Excluir Paciente</span>
+              </button>
+            )}
+          </div>
 
           <button
             onClick={handleSaveAll}
@@ -736,6 +758,26 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
         </div>
 
       </div>
+
+      {/* Delete Patient Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <DeleteConfirmModal
+          isOpen={isDeleteModalOpen}
+          onClose={() => setIsDeleteModalOpen(false)}
+          onConfirm={() => {
+            if (onDeletePatient) {
+              onDeletePatient(paciente.id);
+            }
+            setIsDeleteModalOpen(false);
+            onClose();
+          }}
+          title="Excluir Cadastro de Paciente"
+          itemType="Paciente"
+          itemName={paciente.nome}
+          description="A exclusão deste paciente removerá seu prontuário, histórico clínico, fotos e agendamentos relacionados do sistema."
+        />
+      )}
+
     </div>
   );
 };

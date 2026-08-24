@@ -10,15 +10,19 @@ import {
   AlertCircle, 
   ChevronRight,
   ShieldAlert,
-  Package
+  Package,
+  Trash2
 } from 'lucide-react';
-import { Paciente } from '../types';
+import { Paciente, UsuarioEquipe } from '../types';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
 
 interface PatientsViewProps {
   pacientes: Paciente[];
   onOpenNewPatient: () => void;
   onViewPatient: (paciente: Paciente) => void;
   onOpenPackages?: (paciente: Paciente) => void;
+  onDeletePatient?: (id: string) => void;
+  currentUser?: UsuarioEquipe;
 }
 
 export const PatientsView: React.FC<PatientsViewProps> = ({
@@ -26,8 +30,12 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
   onOpenNewPatient,
   onViewPatient,
   onOpenPackages,
+  onDeletePatient,
+  currentUser,
 }) => {
+  const isAdmin = !currentUser || currentUser.role === 'admin';
   const [search, setSearch] = useState('');
+  const [patientToDelete, setPatientToDelete] = useState<Paciente | null>(null);
 
   const filteredPacientes = pacientes.filter(p => {
     const q = search.toLowerCase();
@@ -132,15 +140,31 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
                     </div>
                   </div>
 
-                  {hasAlergy && (
-                    <span 
-                      title="Alergia relatada no histórico"
-                      className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200/60 text-[10px] font-semibold inline-flex items-center gap-1"
-                    >
-                      <ShieldAlert className="w-3 h-3 text-amber-600" />
-                      Alergia
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {hasAlergy && (
+                      <span 
+                        title="Alergia relatada no histórico"
+                        className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200/60 text-[10px] font-semibold inline-flex items-center gap-1"
+                      >
+                        <ShieldAlert className="w-3 h-3 text-amber-600" />
+                        Alergia
+                      </span>
+                    )}
+
+                    {isAdmin && onDeletePatient && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPatientToDelete(paciente);
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                        title="Excluir paciente (Admin)"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-2.5 mb-4 text-xs">
@@ -207,6 +231,24 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
           );
         })}
       </div>
+
+      {/* Delete Patient Confirmation Modal */}
+      {patientToDelete && (
+        <DeleteConfirmModal
+          isOpen={!!patientToDelete}
+          onClose={() => setPatientToDelete(null)}
+          onConfirm={() => {
+            if (patientToDelete && onDeletePatient) {
+              onDeletePatient(patientToDelete.id);
+            }
+            setPatientToDelete(null);
+          }}
+          title="Excluir Cadastro de Paciente"
+          itemType="Paciente"
+          itemName={patientToDelete.nome}
+          description="A exclusão deste paciente removerá seu prontuário, histórico clínico, fotos e agendamentos relacionados do sistema."
+        />
+      )}
 
     </div>
   );

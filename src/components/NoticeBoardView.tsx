@@ -17,6 +17,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { AvisoQuadro, PrioridadeAviso, UsuarioEquipe } from '../types';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
 
 interface NoticeBoardViewProps {
   avisos: AvisoQuadro[];
@@ -36,6 +37,7 @@ export const NoticeBoardView: React.FC<NoticeBoardViewProps> = ({
   const [filterPriority, setFilterPriority] = useState<string>('todos');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [isNewNoticeModalOpen, setIsNewNoticeModalOpen] = useState(false);
+  const [avisoToDelete, setAvisoToDelete] = useState<AvisoQuadro | null>(null);
 
   // Form State
   const [novoTitulo, setNovoTitulo] = useState('');
@@ -303,7 +305,7 @@ export const NoticeBoardView: React.FC<NoticeBoardViewProps> = ({
                     {isAdmin && onDeleteAviso && (
                       <button
                         type="button"
-                        onClick={() => onDeleteAviso(aviso.id)}
+                        onClick={() => setAvisoToDelete(aviso)}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                         title="Excluir Aviso (Admin)"
                       >
@@ -465,6 +467,24 @@ export const NoticeBoardView: React.FC<NoticeBoardViewProps> = ({
 
           </div>
         </div>
+      )}
+
+      {/* Delete Notice Confirmation Modal */}
+      {avisoToDelete && (
+        <DeleteConfirmModal
+          isOpen={!!avisoToDelete}
+          onClose={() => setAvisoToDelete(null)}
+          onConfirm={() => {
+            if (avisoToDelete && onDeleteAviso) {
+              onDeleteAviso(avisoToDelete.id);
+            }
+            setAvisoToDelete(null);
+          }}
+          title="Excluir Comunicado do Quadro"
+          itemType="Aviso / Comunicado"
+          itemName={avisoToDelete.titulo}
+          description="A exclusão deste aviso o removerá do mural de recados e cancelará qualquer pop-up configurado para a equipe."
+        />
       )}
 
     </div>
