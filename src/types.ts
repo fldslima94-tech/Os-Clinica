@@ -16,6 +16,7 @@ export interface UsuarioEquipe {
   id: string;
   nome: string;
   email: string;
+  senha?: string;
   cargo: string;
   role: UserRole;
   telefone?: string;

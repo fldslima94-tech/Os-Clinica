@@ -12,7 +12,8 @@ import {
   HeartPulse,
   UserCheck,
   Shield,
-  Lock
+  Lock,
+  LogOut
 } from 'lucide-react';
 import { TabType, UsuarioEquipe } from '../types';
 
@@ -22,6 +23,7 @@ interface SidebarProps {
   lowStockCount: number;
   pendingCount: number;
   currentUser: UsuarioEquipe;
+  onLogout?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -30,6 +32,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   lowStockCount,
   pendingCount,
   currentUser,
+  onLogout,
 }) => {
   const isAdmin = currentUser.role === 'admin';
 
@@ -150,7 +153,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* User profile footer */}
-      <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+      <div className="p-3 border-t border-slate-100 bg-slate-50/50 space-y-2">
         <button
           onClick={() => setActiveTab('usuarios')}
           className="w-full flex items-center gap-3 p-1.5 rounded-lg hover:bg-white transition-colors text-left cursor-pointer border border-transparent hover:border-slate-200"
@@ -167,6 +170,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </span>
           </div>
         </button>
+
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-red-600 hover:bg-red-50/80 border border-slate-200 transition-colors cursor-pointer"
+            title="Encerrar sessão atual e voltar para a tela de login"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Sair da Sessão</span>
+          </button>
+        )}
       </div>
 
     </aside>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   MOCK_PACIENTES, 
   MOCK_AGENDAMENTOS, 
@@ -30,23 +30,94 @@ import { FinancialView } from './components/FinancialView';
 import { WhatsAppAutomationView } from './components/WhatsAppAutomationView';
 import { SupabaseGuideView } from './components/SupabaseGuideView';
 import { UsersManagementView } from './components/UsersManagementView';
+import { LoginView } from './components/LoginView';
 import { NewAppointmentModal } from './components/NewAppointmentModal';
 import { NewPatientModal } from './components/NewPatientModal';
 import { NewInventoryModal } from './components/NewInventoryModal';
 import { NewUserModal } from './components/NewUserModal';
+import { EditUserModal } from './components/EditUserModal';
 import { PatientDetailsModal } from './components/PatientDetailsModal';
 import { SqlAndArchitectureModal } from './components/SqlAndArchitectureModal';
 import { CompleteProcedureModal } from './components/CompleteProcedureModal';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 
+// Storage Helper
+const getStoredData = <T,>(key: string, fallback: T): T => {
+  try {
+    const item = localStorage.getItem(`esteticaos_${key}`);
+    return item ? JSON.parse(item) : fallback;
+  } catch (e) {
+    console.warn(`Erro ao carregar chave ${key} do localStorage`, e);
+    return fallback;
+  }
+};
+
 export default function App() {
-  // Application State
-  const [pacientes, setPacientes] = useState<Paciente[]>(MOCK_PACIENTES);
-  const [agendamentos, setAgendamentos] = useState<Agendamento[]>(MOCK_AGENDAMENTOS);
-  const [estoque, setEstoque] = useState<EstoqueInsumo[]>(MOCK_ESTOQUE);
-  const [transacoes, setTransacoes] = useState<TransacaoFinanceira[]>(MOCK_TRANSACOES);
-  const [usuarios, setUsuarios] = useState<UsuarioEquipe[]>(MOCK_USUARIOS);
-  const [currentUser, setCurrentUser] = useState<UsuarioEquipe>(MOCK_USUARIOS[0]);
+  // Application State with localStorage Persistence
+  const [pacientes, setPacientes] = useState<Paciente[]>(() => 
+    getStoredData<Paciente[]>('pacientes', MOCK_PACIENTES)
+  );
+  const [agendamentos, setAgendamentos] = useState<Agendamento[]>(() => 
+    getStoredData<Agendamento[]>('agendamentos', MOCK_AGENDAMENTOS)
+  );
+  const [estoque, setEstoque] = useState<EstoqueInsumo[]>(() => 
+    getStoredData<EstoqueInsumo[]>('estoque', MOCK_ESTOQUE)
+  );
+  const [transacoes, setTransacoes] = useState<TransacaoFinanceira[]>(() => 
+    getStoredData<TransacaoFinanceira[]>('transacoes', MOCK_TRANSACOES)
+  );
+  const [usuarios, setUsuarios] = useState<UsuarioEquipe[]>(() => 
+    getStoredData<UsuarioEquipe[]>('usuarios', MOCK_USUARIOS)
+  );
+  const [currentUser, setCurrentUser] = useState<UsuarioEquipe>(() => 
+    getStoredData<UsuarioEquipe>('currentUser', MOCK_USUARIOS[0])
+  );
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => 
+    getStoredData<boolean>('isAuthenticated', true)
+  );
+
+  // Auto-persist state changes into localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('esteticaos_pacientes', JSON.stringify(pacientes));
+    } catch (e) {}
+  }, [pacientes]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('esteticaos_agendamentos', JSON.stringify(agendamentos));
+    } catch (e) {}
+  }, [agendamentos]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('esteticaos_estoque', JSON.stringify(estoque));
+    } catch (e) {}
+  }, [estoque]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('esteticaos_transacoes', JSON.stringify(transacoes));
+    } catch (e) {}
+  }, [transacoes]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('esteticaos_usuarios', JSON.stringify(usuarios));
+    } catch (e) {}
+  }, [usuarios]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('esteticaos_currentUser', JSON.stringify(currentUser));
+    } catch (e) {}
+  }, [currentUser]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('esteticaos_isAuthenticated', JSON.stringify(isAuthenticated));
+    } catch (e) {}
+  }, [isAuthenticated]);
 
   // UI Navigation & Search State
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
@@ -57,6 +128,7 @@ export default function App() {
   const [isNewPatientOpen, setIsNewPatientOpen] = useState(false);
   const [isNewInventoryOpen, setIsNewInventoryOpen] = useState(false);
   const [isNewUserOpen, setIsNewUserOpen] = useState(false);
+  const [userToEdit, setUserToEdit] = useState<UsuarioEquipe | null>(null);
   const [isSqlModalOpen, setIsSqlModalOpen] = useState(false);
   const [selectedPatientForDetails, setSelectedPatientForDetails] = useState<Paciente | null>(null);
   const [appointmentToComplete, setAppointmentToComplete] = useState<Agendamento | null>(null);
@@ -296,9 +368,30 @@ export default function App() {
     showToast(`Novo usuário ${created.nome} cadastrado com sucesso!`);
   };
 
+  const handleUpdateUser = (updated: UsuarioEquipe) => {
+    setUsuarios(prev =>
+      prev.map(u => (u.id === updated.id ? updated : u))
+    );
+    if (currentUser.id === updated.id) {
+      setCurrentUser(updated);
+    }
+    showToast(`Dados de ${updated.nome} atualizados com sucesso!`);
+  };
+
   const handleSwitchUser = (user: UsuarioEquipe) => {
     setCurrentUser(user);
     showToast(`Perfil alternado para: ${user.nome} (${user.role === 'admin' ? 'Administrador' : 'Operador'})`, 'info');
+  };
+
+  const handleLoginSuccess = (user: UsuarioEquipe) => {
+    setCurrentUser(user);
+    setIsAuthenticated(true);
+    showToast(`Bem-vindo(a), ${user.nome}! Sessão iniciada como ${user.role === 'admin' ? 'Administrador' : 'Operador Recepção'}.`);
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    showToast('Sessão encerrada com sucesso. Faça login para continuar.', 'info');
   };
 
   const handleToggleUserStatus = (userId: string) => {
@@ -313,6 +406,23 @@ export default function App() {
     );
     showToast('Status do usuário atualizado.');
   };
+
+  // If user is not authenticated, display full Login screen
+  if (!isAuthenticated) {
+    return (
+      <div className="antialiased">
+        {toastMessage && (
+          <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-4 duration-200">
+            <div className="flex items-center gap-2.5 px-4 py-3 bg-slate-900 text-white rounded-xl shadow-xl border border-slate-800 text-xs sm:text-sm font-medium">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{toastMessage.text}</span>
+            </div>
+          </div>
+        )}
+        <LoginView usuarios={usuarios} onLoginSuccess={handleLoginSuccess} />
+      </div>
+    );
+  }
 
   // Quick stats calculations
   const lowStockCount = estoque.filter(i => i.quantidade <= i.alerta_minimo).length;
@@ -343,6 +453,7 @@ export default function App() {
         currentUser={currentUser}
         usuarios={usuarios}
         onSwitchUser={handleSwitchUser}
+        onLogout={handleLogout}
       />
 
       {/* Main Layout Body */}
@@ -355,6 +466,7 @@ export default function App() {
           lowStockCount={lowStockCount}
           pendingCount={pendingCount}
           currentUser={currentUser}
+          onLogout={handleLogout}
         />
 
         {/* Content Area */}
@@ -425,6 +537,7 @@ export default function App() {
               currentUser={currentUser}
               onSwitchUser={handleSwitchUser}
               onOpenNewUser={() => setIsNewUserOpen(true)}
+              onOpenEditUser={(user) => setUserToEdit(user)}
               onToggleUserStatus={handleToggleUserStatus}
               onOpenSqlGuide={() => setIsSqlModalOpen(true)}
             />
@@ -462,6 +575,13 @@ export default function App() {
         isOpen={isNewUserOpen}
         onClose={() => setIsNewUserOpen(false)}
         onSaveUser={handleSaveUser}
+      />
+
+      <EditUserModal
+        isOpen={!!userToEdit}
+        usuario={userToEdit}
+        onClose={() => setUserToEdit(null)}
+        onSaveUser={handleUpdateUser}
       />
 
       <PatientDetailsModal

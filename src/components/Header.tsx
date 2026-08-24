@@ -12,7 +12,8 @@ import {
   UserCheck,
   ChevronDown,
   RefreshCw,
-  Users
+  Users,
+  LogOut
 } from 'lucide-react';
 import { TabType, UsuarioEquipe, UserRole } from '../types';
 
@@ -27,6 +28,7 @@ interface HeaderProps {
   currentUser: UsuarioEquipe;
   usuarios: UsuarioEquipe[];
   onSwitchUser: (user: UsuarioEquipe) => void;
+  onLogout?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -40,6 +42,7 @@ export const Header: React.FC<HeaderProps> = ({
   currentUser,
   usuarios,
   onSwitchUser,
+  onLogout,
 }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
@@ -174,13 +177,24 @@ export const Header: React.FC<HeaderProps> = ({
                   ))}
                 </div>
 
-                <div className="px-3 pt-2 mt-1 border-t border-slate-100">
+                <div className="px-2 pt-2 mt-1 border-t border-slate-100 space-y-1">
                   <button
                     onClick={() => setActiveTab('usuarios')}
-                    className="w-full text-center text-xs font-bold text-indigo-600 hover:text-indigo-800 py-1"
+                    className="w-full text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 px-2 py-1.5 rounded-md flex items-center gap-1.5"
                   >
-                    Gerenciar Permissões da Equipe →
+                    <Users className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Gerenciar Equipe</span>
                   </button>
+
+                  {onLogout && (
+                    <button
+                      onClick={onLogout}
+                      className="w-full text-left text-xs font-semibold text-red-600 hover:bg-red-50 px-2 py-1.5 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <LogOut className="w-3.5 h-3.5 text-red-500" />
+                      <span>Sair / Trocar Usuário (Login)</span>
+                    </button>
+                  )}
                 </div>
               </div>
             )}

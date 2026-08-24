@@ -19,6 +19,7 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
   const [role, setRole] = useState<UserRole>('operador');
   const [telefone, setTelefone] = useState('');
   const [registroProfissional, setRegistroProfissional] = useState('');
+  const [senha, setSenha] = useState('');
 
   // Default permissions based on role
   const [permissoes, setPermissoes] = useState<PermissoesUsuario>({
@@ -61,6 +62,7 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
     onSaveUser({
       nome: nome.trim(),
       email: email.trim(),
+      senha: senha.trim() || (role === 'admin' ? 'admin123' : 'recepcao123'),
       cargo: cargo.trim() || (role === 'admin' ? 'Profissional / Admin' : 'Recepção / Operador'),
       role,
       telefone: telefone.trim(),
@@ -72,6 +74,7 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
     // Reset and close
     setNome('');
     setEmail('');
+    setSenha('');
     setCargo('');
     setTelefone('');
     setRegistroProfissional('');
@@ -168,8 +171,8 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
             />
           </div>
 
-          {/* Email e Telefone */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Email, Senha e Telefone */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 E-mail de Acesso (Login) *
@@ -182,6 +185,22 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
                   placeholder="usuario@esteticaos.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-colors"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Senha Inicial
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="password"
+                  placeholder={role === 'admin' ? 'admin123' : 'recepcao123'}
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-colors"
                 />
               </div>
