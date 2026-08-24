@@ -7,13 +7,15 @@ import {
   Tag, 
   Plus, 
   Trash2, 
-  Info,
-  CheckCircle2,
-  Package,
-  Layers,
-  Image as ImageIcon
+  Info, 
+  CheckCircle2, 
+  Package, 
+  Layers, 
+  Image as ImageIcon,
+  Sliders,
+  Check
 } from 'lucide-react';
-import { ProcedimentoClinico, EstoqueInsumo, UnidadeMedida } from '../types';
+import { ProcedimentoClinico, EstoqueInsumo, UnidadeMedida, VariacaoProcedimento } from '../types';
 
 interface ProcedureModalProps {
   isOpen: boolean;
@@ -53,6 +55,31 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
   const [destaquePortal, setDestaquePortal] = useState(true);
   const [ativo, setAtivo] = useState(true);
 
+  // 3 Tabela de Valores Variáveis (Variações de Preço e Porte)
+  const [variacao1, setVariacao1] = useState<VariacaoProcedimento>({
+    id: 'v1',
+    nome: 'Variação 1 (Básico / 1 Área / Inicial)',
+    valor: 650,
+    duracao_minutos: 30,
+    descricao: 'Atendimento pontual ou área única',
+  });
+
+  const [variacao2, setVariacao2] = useState<VariacaoProcedimento>({
+    id: 'v2',
+    nome: 'Variação 2 (Intermediário / 2 Áreas)',
+    valor: 1100,
+    duracao_minutos: 45,
+    descricao: 'Atendimento médio com 2 regiões ou volume intermediário',
+  });
+
+  const [variacao3, setVariacao3] = useState<VariacaoProcedimento>({
+    id: 'v3',
+    nome: 'Variação 3 (Completo / 3 Áreas / Premium)',
+    valor: 1450,
+    duracao_minutos: 60,
+    descricao: 'Protocolo completo ou full face com acompanhamento',
+  });
+
   // Insumos vinculados (receita padrão)
   const [insumosVinculados, setInsumosVinculados] = useState<{
     insumo_id: string;
@@ -76,6 +103,35 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
       setDestaquePortal(procedimentoToEdit.destaque_portal ?? true);
       setAtivo(procedimentoToEdit.ativo ?? true);
       setInsumosVinculados(procedimentoToEdit.insumos_vinculados || []);
+
+      if (procedimentoToEdit.variacoes && procedimentoToEdit.variacoes.length >= 3) {
+        setVariacao1(procedimentoToEdit.variacoes[0]);
+        setVariacao2(procedimentoToEdit.variacoes[1]);
+        setVariacao3(procedimentoToEdit.variacoes[2]);
+      } else {
+        const baseVal = procedimentoToEdit.valor_tabela || 1200;
+        setVariacao1({
+          id: 'v1',
+          nome: 'Variação 1 (Básico / 1 Área)',
+          valor: Math.round(baseVal * 0.5),
+          duracao_minutos: Math.max(20, Math.round(procedimentoToEdit.duracao_minutos * 0.7)),
+          descricao: 'Atendimento inicial em 1 região',
+        });
+        setVariacao2({
+          id: 'v2',
+          nome: 'Variação 2 (Intermediário / 2 Áreas)',
+          valor: Math.round(baseVal * 0.8),
+          duracao_minutos: procedimentoToEdit.duracao_minutos,
+          descricao: 'Atendimento intermediário ou 2 regiões',
+        });
+        setVariacao3({
+          id: 'v3',
+          nome: 'Variação 3 (Completo / 3 Áreas / Premium)',
+          valor: baseVal,
+          duracao_minutos: Math.round(procedimentoToEdit.duracao_minutos * 1.2),
+          descricao: 'Protocolo completo e intensivo',
+        });
+      }
     } else {
       setNome('');
       setCategoria(CATEGORIAS_PADRAO[0]);
@@ -90,6 +146,27 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
       setDestaquePortal(true);
       setAtivo(true);
       setInsumosVinculados([]);
+      setVariacao1({
+        id: 'v1',
+        nome: 'Variação 1 (Básico / 1 Área / Inicial)',
+        valor: 650,
+        duracao_minutos: 30,
+        descricao: 'Atendimento pontual ou área única',
+      });
+      setVariacao2({
+        id: 'v2',
+        nome: 'Variação 2 (Intermediário / 2 Áreas)',
+        valor: 1100,
+        duracao_minutos: 45,
+        descricao: 'Atendimento médio com 2 regiões',
+      });
+      setVariacao3({
+        id: 'v3',
+        nome: 'Variação 3 (Completo / 3 Áreas / Premium)',
+        valor: 1450,
+        duracao_minutos: 60,
+        descricao: 'Protocolo completo com acompanhamento',
+      });
     }
   }, [procedimentoToEdit, isOpen]);
 
@@ -135,12 +212,37 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
       .map(s => s.trim())
       .filter(Boolean);
 
+    const variacoesFinais: VariacaoProcedimento[] = [
+      {
+        id: 'v1',
+        nome: variacao1.nome.trim() || 'Variação 1 (Básico)',
+        valor: Number(variacao1.valor) || 0,
+        duracao_minutos: Number(variacao1.duracao_minutos) || 30,
+        descricao: variacao1.descricao?.trim(),
+      },
+      {
+        id: 'v2',
+        nome: variacao2.nome.trim() || 'Variação 2 (Médio)',
+        valor: Number(variacao2.valor) || 0,
+        duracao_minutos: Number(variacao2.duracao_minutos) || 45,
+        descricao: variacao2.descricao?.trim(),
+      },
+      {
+        id: 'v3',
+        nome: variacao3.nome.trim() || 'Variação 3 (Completo)',
+        valor: Number(variacao3.valor) || 0,
+        duracao_minutos: Number(variacao3.duracao_minutos) || 60,
+        descricao: variacao3.descricao?.trim(),
+      },
+    ];
+
     onSave({
       nome: nome.trim(),
       categoria,
       duracao_minutos: Number(duracaoMinutos) || 45,
-      valor_tabela: Number(valorTabela) || 0,
+      valor_tabela: Number(valorTabela) || Number(variacao3.valor) || 0,
       valor_promocional: valorPromocional ? Number(valorPromocional) : undefined,
+      variacoes: variacoesFinais,
       descricao: descricao.trim(),
       areas_aplicacao: areas.length > 0 ? areas : undefined,
       indicacoes: indicacoes.length > 0 ? indicacoes : undefined,
@@ -156,7 +258,7 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-slate-200 overflow-hidden my-6 animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-white w-full max-w-3xl rounded-2xl shadow-xl border border-slate-200 overflow-hidden my-6 animate-in fade-in zoom-in-95 duration-150">
         
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70">
@@ -166,10 +268,10 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                {procedimentoToEdit ? 'Editar Procedimento Ofertado' : 'Cadastrar Novo Procedimento da Clínica'}
+                {procedimentoToEdit ? 'Editar Procedimento & Tabela de Valores' : 'Cadastrar Novo Procedimento & Tabela de Variações'}
               </h2>
               <p className="text-xs text-slate-500">
-                Tudo o que a clínica oferta para agendamentos e orçamentos do paciente.
+                Cadastre a precificação em 3 variações e os insumos de estoque consumidos.
               </p>
             </div>
           </div>
@@ -182,7 +284,7 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[78vh] overflow-y-auto">
           
           {/* Nome e Categoria */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -193,7 +295,7 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
               <input
                 type="text"
                 required
-                placeholder="Ex: Toxina Botulínica (3 Áreas) ou Preenchimento Labial 1ml"
+                placeholder="Ex: Toxina Botulínica ou Preenchimento Labial Ácido Hialurônico"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
@@ -216,12 +318,202 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
             </div>
           </div>
 
-          {/* Valores e Tempo */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-indigo-50/50 p-4 rounded-xl border border-indigo-100">
+          {/* TABELA DE VALORES VARIÁVEIS EM 3 VARIAÇÕES (Destaque Principal do Prompt) */}
+          <div className="bg-gradient-to-br from-indigo-50/70 via-slate-50 to-purple-50/40 p-4 rounded-xl border border-indigo-100 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-xs font-bold text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
+                  <Sliders className="w-3.5 h-3.5 text-indigo-600" />
+                  Tabela de Valores em 3 Variações (Área / Quantidade / Complexidade)
+                </h4>
+                <p className="text-[11px] text-slate-500">
+                  Defina 3 opções de preços para este procedimento (ex: 1 Área / 2 Áreas / 3 Áreas ou 0.5ml / 1.0ml / 1.5ml).
+                </p>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 bg-indigo-600 text-white rounded-full uppercase tracking-wider">
+                3 Variações
+              </span>
+            </div>
+
+            {/* Variação 1 */}
+            <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-indigo-700 uppercase tracking-wide flex items-center gap-1">
+                  <span className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-extrabold">1</span>
+                  Variação 1 (Básico / 1 Área / Padrão)
+                </span>
+                <span className="text-[11px] text-slate-400 font-medium">Entrada / Porte Menor</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                <div className="sm:col-span-6">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Título da Variação 1</label>
+                  <input
+                    type="text"
+                    value={variacao1.nome}
+                    onChange={(e) => setVariacao1({ ...variacao1, nome: e.target.value })}
+                    placeholder="Ex: 1 Área (Testa ou Glabela)"
+                    className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-medium text-slate-800 focus:bg-white"
+                  />
+                </div>
+                <div className="sm:col-span-3">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Valor (R$)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="10"
+                    value={variacao1.valor}
+                    onChange={(e) => setVariacao1({ ...variacao1, valor: Number(e.target.value) })}
+                    className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-bold text-emerald-700 focus:bg-white"
+                  />
+                </div>
+                <div className="sm:col-span-3">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Duração (min)</label>
+                  <input
+                    type="number"
+                    min="10"
+                    step="5"
+                    value={variacao1.duracao_minutos || 30}
+                    onChange={(e) => setVariacao1({ ...variacao1, duracao_minutos: Number(e.target.value) })}
+                    className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-700 focus:bg-white"
+                  />
+                </div>
+                <div className="sm:col-span-12">
+                  <input
+                    type="text"
+                    value={variacao1.descricao || ''}
+                    onChange={(e) => setVariacao1({ ...variacao1, descricao: e.target.value })}
+                    placeholder="Descrição / especificação da variação 1 (opcional)..."
+                    className="w-full px-2.5 py-1 text-[11px] bg-slate-50 border border-slate-200 rounded-lg text-slate-600"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Variação 2 */}
+            <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-purple-700 uppercase tracking-wide flex items-center gap-1">
+                  <span className="w-4 h-4 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[10px] font-extrabold">2</span>
+                  Variação 2 (Intermediário / 2 Áreas / Médio)
+                </span>
+                <span className="text-[11px] text-slate-400 font-medium">Médio Porte</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                <div className="sm:col-span-6">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Título da Variação 2</label>
+                  <input
+                    type="text"
+                    value={variacao2.nome}
+                    onChange={(e) => setVariacao2({ ...variacao2, nome: e.target.value })}
+                    placeholder="Ex: 2 Áreas (Testa + Glabela)"
+                    className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-medium text-slate-800 focus:bg-white"
+                  />
+                </div>
+                <div className="sm:col-span-3">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Valor (R$)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="10"
+                    value={variacao2.valor}
+                    onChange={(e) => setVariacao2({ ...variacao2, valor: Number(e.target.value) })}
+                    className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-bold text-emerald-700 focus:bg-white"
+                  />
+                </div>
+                <div className="sm:col-span-3">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Duração (min)</label>
+                  <input
+                    type="number"
+                    min="10"
+                    step="5"
+                    value={variacao2.duracao_minutos || 45}
+                    onChange={(e) => setVariacao2({ ...variacao2, duracao_minutos: Number(e.target.value) })}
+                    className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-700 focus:bg-white"
+                  />
+                </div>
+                <div className="sm:col-span-12">
+                  <input
+                    type="text"
+                    value={variacao2.descricao || ''}
+                    onChange={(e) => setVariacao2({ ...variacao2, descricao: e.target.value })}
+                    placeholder="Descrição / especificação da variação 2 (opcional)..."
+                    className="w-full px-2.5 py-1 text-[11px] bg-slate-50 border border-slate-200 rounded-lg text-slate-600"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Variação 3 */}
+            <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-indigo-900 uppercase tracking-wide flex items-center gap-1">
+                  <span className="w-4 h-4 rounded-full bg-indigo-900 text-white flex items-center justify-center text-[10px] font-extrabold">3</span>
+                  Variação 3 (Completo / 3 Áreas / Premium)
+                </span>
+                <span className="text-[11px] text-indigo-600 font-semibold">Tabela Cheia / Máximo</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                <div className="sm:col-span-6">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Título da Variação 3</label>
+                  <input
+                    type="text"
+                    value={variacao3.nome}
+                    onChange={(e) => {
+                      setVariacao3({ ...variacao3, nome: e.target.value });
+                    }}
+                    placeholder="Ex: 3 Áreas Completas (Full Face)"
+                    className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-medium text-slate-800 focus:bg-white"
+                  />
+                </div>
+                <div className="sm:col-span-3">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Valor (R$)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="10"
+                    value={variacao3.valor}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setVariacao3({ ...variacao3, valor: val });
+                      setValorTabela(val);
+                    }}
+                    className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-bold text-emerald-700 focus:bg-white"
+                  />
+                </div>
+                <div className="sm:col-span-3">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Duração (min)</label>
+                  <input
+                    type="number"
+                    min="10"
+                    step="5"
+                    value={variacao3.duracao_minutos || 60}
+                    onChange={(e) => {
+                      const d = Number(e.target.value);
+                      setVariacao3({ ...variacao3, duracao_minutos: d });
+                      setDuracaoMinutos(d);
+                    }}
+                    className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-700 focus:bg-white"
+                  />
+                </div>
+                <div className="sm:col-span-12">
+                  <input
+                    type="text"
+                    value={variacao3.descricao || ''}
+                    onChange={(e) => setVariacao3({ ...variacao3, descricao: e.target.value })}
+                    placeholder="Descrição / especificação da variação 3 (opcional)..."
+                    className="w-full px-2.5 py-1 text-[11px] bg-slate-50 border border-slate-200 rounded-lg text-slate-600"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Valores Gerais & Promoção */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
             <div className="space-y-1">
-              <label className="text-xs font-bold text-indigo-950 uppercase tracking-wider flex items-center gap-1">
+              <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1">
                 <DollarSign className="w-3.5 h-3.5 text-indigo-600" />
-                Valor de Tabela (R$) *
+                Valor Base Principal (R$) *
               </label>
               <input
                 type="number"
@@ -230,7 +522,7 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
                 required
                 value={valorTabela}
                 onChange={(e) => setValorTabela(Number(e.target.value))}
-                className="w-full px-3 py-2 text-sm bg-white border border-indigo-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-bold text-slate-900"
+                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-bold text-slate-900"
               />
             </div>
 
@@ -245,19 +537,19 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
                 placeholder="Opcional"
                 value={valorPromocional}
                 onChange={(e) => setValorPromocional(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-semibold text-emerald-700"
+                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-semibold text-emerald-700"
               />
             </div>
 
             <div className="space-y-1">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5 text-slate-500" />
-                Duração Estimada
+                Duração Base (Minutos)
               </label>
               <select
                 value={duracaoMinutos}
                 onChange={(e) => setDuracaoMinutos(Number(e.target.value))}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium cursor-pointer"
+                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium cursor-pointer"
               >
                 <option value={20}>20 minutos</option>
                 <option value={30}>30 minutos</option>
@@ -273,7 +565,7 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
           {/* Descrição */}
           <div className="space-y-1">
             <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-              Descrição & Benefícios para o Paciente *
+              Descrição & Benefícios Clínicos *
             </label>
             <textarea
               required
@@ -439,7 +731,7 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
                 className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
               />
               <span className="text-xs font-medium text-slate-700">
-                Procedimento Ativo para Vendas
+                Procedimento Ativo para Vendas e Agendamento
               </span>
             </label>
           </div>

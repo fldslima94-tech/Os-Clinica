@@ -14,24 +14,32 @@ import {
   ShieldCheck,
   Check,
   ChevronRight,
-  Filter
+  Filter,
+  Trash2
 } from 'lucide-react';
-import { AlertaRetornoPos, Paciente } from '../types';
+import { AlertaRetornoPos, Paciente, UsuarioEquipe } from '../types';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
 
 interface PostCareReturnViewProps {
   alertas: AlertaRetornoPos[];
   onUpdateAlertaStatus: (alertaId: string, status: 'pendente' | 'agendado' | 'contatado') => void;
+  onDeleteAlerta?: (alertaId: string) => void;
   onViewPatientByName?: (nome: string) => void;
+  currentUser?: UsuarioEquipe;
 }
 
 export const PostCareReturnView: React.FC<PostCareReturnViewProps> = ({
   alertas,
   onUpdateAlertaStatus,
+  onDeleteAlerta,
   onViewPatientByName,
+  currentUser,
 }) => {
+  const isAdmin = !currentUser || currentUser.role === 'admin';
   const [filter, setFilter] = useState<'todos' | 'pendente' | 'contatado' | 'agendado'>('todos');
   const [search, setSearch] = useState('');
   const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
+  const [alertaToDelete, setAlertaToDelete] = useState<AlertaRetornoPos | null>(null);
 
   const filteredAlertas = alertas.filter(a => {
     const matchesFilter = filter === 'todos' || a.status === filter;
@@ -157,15 +165,28 @@ export const PostCareReturnView: React.FC<PostCareReturnViewProps> = ({
                     </div>
                   </div>
 
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase ${
-                    alerta.status === 'pendente'
-                      ? 'bg-amber-100 text-amber-800 border-amber-200'
-                      : alerta.status === 'contatado'
-                      ? 'bg-blue-100 text-blue-800 border-blue-200'
-                      : 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                  }`}>
-                    {alerta.status}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase ${
+                      alerta.status === 'pendente'
+                        ? 'bg-amber-100 text-amber-800 border-amber-200'
+                        : alerta.status === 'contatado'
+                        ? 'bg-blue-100 text-blue-800 border-blue-200'
+                        : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                    }`}>
+                      {alerta.status}
+                    </span>
+
+                    {isAdmin && onDeleteAlerta && (
+                      <button
+                        type="button"
+                        onClick={() => setAlertaToDelete(alerta)}
+                        className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                        title="Excluir alerta de retorno (Admin)"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Details */}
@@ -223,6 +244,24 @@ export const PostCareReturnView: React.FC<PostCareReturnViewProps> = ({
           <p className="text-sm font-bold text-slate-700">Nenhum alerta de retorno encontrado</p>
           <p className="text-xs text-slate-400 mt-1">Todos os pós-procedimentos já foram contatados ou agendados pela recepção.</p>
         </div>
+      )}
+
+      {/* Delete Return Alert Confirmation Modal */}
+      {alertaToDelete && (
+        <DeleteConfirmModal
+          isOpen={!!alertaToDelete}
+          onClose={() => setAlertaToDelete(null)}
+          onConfirm={() => {
+            if (alertaToDelete && onDeleteAlerta) {
+              onDeleteAlerta(alertaToDelete.id);
+            }
+            setAlertaToDelete(null);
+          }}
+          title="Excluir Alerta de Retorno"
+          itemType="Alerta de Retorno Pós-Procedimento"
+          itemName={`${alertaToDelete.paciente_nome} - ${alertaToDelete.procedimento_origem} (${alertaToDelete.motivo})`}
+          description="A exclusão deste alerta removerá este lembrete de acompanhamento pós-procedimento da central de retornos."
+        />
       )}
 
     </div>

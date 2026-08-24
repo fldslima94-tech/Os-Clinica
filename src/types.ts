@@ -20,6 +20,13 @@ export interface AvisoQuadro {
   lido_por?: string[];
 }
 
+export interface PacoteItemProcedimento {
+  procedimento_id: string;
+  procedimento_nome: string;
+  sessoes: number;
+  valor_unitario: number;
+}
+
 export interface PacoteTratamento {
   id: string;
   nome_pacote: string; // Ex: "Protocolo Glúteo Max (5 Sessões)" ou "Laser Lavieen (3 Sessões)"
@@ -27,6 +34,11 @@ export interface PacoteTratamento {
   total_sessoes: number;
   sessoes_realizadas: number;
   valor_total: number;
+  valor_original_sem_desconto?: number;
+  desconto_aplicado_percentual?: number;
+  desconto_valor?: number;
+  autorizado_por_admin?: boolean;
+  itens_procedimentos?: PacoteItemProcedimento[];
   status: 'em_andamento' | 'concluido' | 'cancelado';
   data_inicio: string;
   ultima_sessao?: string;
@@ -135,6 +147,13 @@ export interface Agendamento {
   paciente?: Paciente;
 }
 
+export interface VinculoProcedimentoInsumo {
+  procedimento_id: string;
+  procedimento_nome: string;
+  quantidade_por_procedimento: number;
+  unidade_medida: UnidadeMedida;
+}
+
 export interface EstoqueInsumo {
   id: string;
   nome_item: string;
@@ -144,8 +163,12 @@ export interface EstoqueInsumo {
   criado_em?: string;
   categoria?: string;
   lote?: string;
-  validade?: string;
+  validade?: string; // YYYY-MM-DD
   custo_unitario?: number;
+  procedimento_vinculado_id?: string;
+  procedimento_vinculado_nome?: string;
+  quantidade_por_procedimento?: number;
+  procedimentos_vinculados?: VinculoProcedimentoInsumo[];
 }
 
 export interface TransacaoFinanceira {
@@ -171,11 +194,19 @@ export type TabType =
   | 'financeiro' 
   | 'whatsapp'
   | 'whatsapp_automation' 
-  | 'retorno_pos'
+  | 'retorno_pos' 
   | 'portal_paciente'
   | 'quadro_avisos'
   | 'usuarios'
   | 'supabase_guide';
+
+export interface VariacaoProcedimento {
+  id: string; // 'v1' | 'v2' | 'v3'
+  nome: string; // Ex: "1 Área / Básico", "2 Áreas / Médio", "3 Áreas / Completo"
+  valor: number;
+  duracao_minutos?: number;
+  descricao?: string;
+}
 
 export interface ProcedimentoClinico {
   id: string;
@@ -184,6 +215,7 @@ export interface ProcedimentoClinico {
   duracao_minutos: number;
   valor_tabela: number;
   valor_promocional?: number;
+  variacoes?: VariacaoProcedimento[];
   descricao: string;
   areas_aplicacao?: string[];
   indicacoes?: string[];
@@ -198,6 +230,9 @@ export interface ProcedimentoClinico {
   destaque_portal?: boolean;
   imagem_url?: string;
   criado_em?: string;
+  cadastrado_por_admin?: boolean;
+  criado_por_usuario_id?: string;
+  criado_por_nome?: string;
 }
 
 export interface SolicitacaoOrcamento {

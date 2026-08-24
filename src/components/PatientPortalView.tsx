@@ -24,9 +24,11 @@ import {
   Phone,
   Mail,
   AlertCircle,
-  HelpCircle
+  HelpCircle,
+  Trash2
 } from 'lucide-react';
 import { ProcedimentoClinico, SolicitacaoOrcamento, PacienteGoogleProfile, UsuarioEquipe } from '../types';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
 
 interface PatientPortalViewProps {
   procedimentos: ProcedimentoClinico[];
@@ -34,6 +36,7 @@ interface PatientPortalViewProps {
   onCriarOrcamento: (novoOrcamento: Omit<SolicitacaoOrcamento, 'id' | 'data_solicitacao'>) => void;
   onAtualizarStatusOrcamento?: (id: string, status: SolicitacaoOrcamento['status'], resposta?: string) => void;
   onConverterEmAgendamento?: (orcamento: SolicitacaoOrcamento) => void;
+  onDeleteOrcamento?: (id: string) => void;
   currentUser: UsuarioEquipe;
 }
 
@@ -43,12 +46,15 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
   onCriarOrcamento,
   onAtualizarStatusOrcamento,
   onConverterEmAgendamento,
+  onDeleteOrcamento,
   currentUser,
 }) => {
+  const isAdmin = !currentUser || currentUser.role === 'admin';
   // Mode: Patient View (public simulator) vs Clinic Admin View (lead management)
   const [activeTab, setActiveTab] = useState<'simulador' | 'meus_orcamentos' | 'gestao_clinica'>('simulador');
   const [categoryFilter, setCategoryFilter] = useState('todos');
   const [search, setSearch] = useState('');
+  const [orcamentoToDelete, setOrcamentoToDelete] = useState<SolicitacaoOrcamento | null>(null);
 
   // Google Authentication State
   const [googleProfile, setGoogleProfile] = useState<PacienteGoogleProfile | null>(() => {
@@ -651,6 +657,17 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
                       <MessageCircle className="w-3.5 h-3.5" />
                       <span>Falar no WhatsApp</span>
                     </a>
+
+                    {onDeleteOrcamento && (
+                      <button
+                        type="button"
+                        onClick={() => setOrcamentoToDelete(quote)}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                        title="Cancelar / Excluir esta solicitação de orçamento"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
 
                 </div>
@@ -767,6 +784,17 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
                       >
                         <Calendar className="w-3.5 h-3.5" />
                         <span>Agendar</span>
+                      </button>
+                    )}
+
+                    {(isAdmin || currentUser.role !== 'cliente') && onDeleteOrcamento && (
+                      <button
+                        type="button"
+                        onClick={() => setOrcamentoToDelete(quote)}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                        title="Excluir solicitação de orçamento (Admin)"
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     )}
                   </div>
@@ -915,6 +943,24 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
 
           </div>
         </div>
+      )}
+
+      {/* Delete Quote / Lead Confirmation Modal */}
+      {orcamentoToDelete && (
+        <DeleteConfirmModal
+          isOpen={!!orcamentoToDelete}
+          onClose={() => setOrcamentoToDelete(null)}
+          onConfirm={() => {
+            if (orcamentoToDelete && onDeleteOrcamento) {
+              onDeleteOrcamento(orcamentoToDelete.id);
+            }
+            setOrcamentoToDelete(null);
+          }}
+          title="Excluir Orçamento / Lead"
+          itemType="Solicitação de Orçamento"
+          itemName={`${orcamentoToDelete.paciente_nome} - R$ ${orcamentoToDelete.valor_total_estimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+          description="Esta ação removerá a solicitação de orçamento do funil de atendimento e do histórico do paciente."
+        />
       )}
 
     </div>

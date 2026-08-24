@@ -302,12 +302,19 @@ export default function App() {
   // --- PROCEDURE MANAGEMENT ---
   const handleSaveProcedure = (procData: Omit<ProcedimentoClinico, 'id' | 'criado_em'> & { id?: string }) => {
     if (procData.id) {
-      setProcedimentos(prev => prev.map(p => p.id === procData.id ? { ...p, ...procData } as ProcedimentoClinico : p));
+      setProcedimentos(prev => prev.map(p => p.id === procData.id ? { 
+        ...p, 
+        ...procData,
+        cadastrado_por_admin: p.cadastrado_por_admin ?? (currentUser.role === 'admin')
+      } as ProcedimentoClinico : p));
       showToast('Procedimento atualizado com sucesso!');
     } else {
       const newProc: ProcedimentoClinico = {
         ...procData,
         id: `proc-${Date.now()}`,
+        cadastrado_por_admin: currentUser.role === 'admin',
+        criado_por_usuario_id: currentUser.id,
+        criado_por_nome: `${currentUser.nome} (${currentUser.role === 'admin' ? 'Admin' : 'Operador'})`,
         criado_em: new Date().toISOString(),
       };
       setProcedimentos(prev => [newProc, ...prev]);
@@ -344,6 +351,12 @@ export default function App() {
     setActiveTab('agendamentos');
     setIsNewAppointmentOpen(true);
     showToast(`Iniciando agendamento para ${orc.paciente_nome}`);
+  };
+
+  const handleDeleteOrcamento = (id: string) => {
+    const target = orcamentos.find(o => o.id === id);
+    setOrcamentos(prev => prev.filter(o => o.id !== id));
+    showToast(`Orçamento de "${target?.paciente_nome || 'Paciente'}" excluído com sucesso.`);
   };
 
   // --- APPOINTMENTS & INVENTORY HANDLERS ---
@@ -524,6 +537,12 @@ export default function App() {
       alerta_minimo: novo.alerta_minimo || 5,
       categoria: novo.categoria || 'Geral',
       lote: novo.lote,
+      validade: novo.validade,
+      custo_unitario: novo.custo_unitario,
+      procedimento_vinculado_id: novo.procedimento_vinculado_id,
+      procedimento_vinculado_nome: novo.procedimento_vinculado_nome,
+      quantidade_por_procedimento: novo.quantidade_por_procedimento,
+      procedimentos_vinculados: novo.procedimentos_vinculados,
       criado_em: new Date().toISOString(),
     };
 
@@ -600,6 +619,16 @@ export default function App() {
       prev.map(a => (a.id === alertaId ? { ...a, status } : a))
     );
     showToast(`Status do alerta atualizado para "${status}"!`);
+  };
+
+  const handleDeleteAlertaRetorno = (alertaId: string) => {
+    if (currentUser.role !== 'admin') {
+      showToast('Apenas administradores têm permissão para excluir alertas de retorno.', 'info');
+      return;
+    }
+    const alerta = alertasRetorno.find(a => a.id === alertaId);
+    setAlertasRetorno(prev => prev.filter(a => a.id !== alertaId));
+    showToast(`Alerta de retorno de "${alerta?.paciente_nome || 'Paciente'}" excluído com sucesso.`);
   };
 
   const handleUpdatePacienteObj = (updatedPaciente: Paciente) => {
@@ -836,6 +865,7 @@ export default function App() {
               onCriarOrcamento={handleCriarOrcamento}
               onAtualizarStatusOrcamento={handleAtualizarStatusOrcamento}
               onConverterEmAgendamento={handleConverterOrcamentoEmAgendamento}
+              onDeleteOrcamento={handleDeleteOrcamento}
               currentUser={currentUser}
             />
           )}
@@ -872,6 +902,8 @@ export default function App() {
             <PostCareReturnView
               alertas={alertasRetorno}
               onUpdateAlertaStatus={handleUpdateAlertaStatus}
+              onDeleteAlerta={handleDeleteAlertaRetorno}
+              currentUser={currentUser}
               onViewPatientByName={(nome) => {
                 const found = pacientes.find(p => p.nome.toLowerCase() === nome.toLowerCase());
                 if (found) {
@@ -942,6 +974,8 @@ export default function App() {
           onClose={() => setPatientForPackages(null)}
           paciente={patientForPackages}
           onUpdatePaciente={handleUpdatePacienteObj}
+          currentUser={currentUser}
+          procedimentos={procedimentos}
         />
       )}
 
@@ -949,6 +983,7 @@ export default function App() {
         isOpen={isNewAppointmentOpen}
         onClose={() => setIsNewAppointmentOpen(false)}
         pacientes={pacientes}
+        procedimentos={procedimentos}
         onSaveAppointment={handleSaveAppointment}
         onOpenNewPatient={() => setIsNewPatientOpen(true)}
       />

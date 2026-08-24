@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Calendar as CalendarIcon, 
@@ -8,15 +8,17 @@ import {
   Plus, 
   Check, 
   DollarSign, 
-  FileText
+  FileText,
+  ShieldCheck,
+  Layers
 } from 'lucide-react';
-import { Agendamento, Paciente, StatusAgendamento } from '../types';
-import { PROCEDIMENTOS_COMUNS } from '../data/mockData';
+import { Agendamento, Paciente, ProcedimentoClinico, StatusAgendamento } from '../types';
 
 interface NewAppointmentModalProps {
   isOpen: boolean;
   onClose: () => void;
   pacientes: Paciente[];
+  procedimentos?: ProcedimentoClinico[];
   onSaveAppointment: (novoAgendamento: Partial<Agendamento>) => void;
   onOpenNewPatient: () => void;
 }
@@ -25,18 +27,56 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
   isOpen,
   onClose,
   pacientes,
+  procedimentos = [],
   onSaveAppointment,
   onOpenNewPatient,
 }) => {
+  // Filter procedures registered by Admin only
+  const adminProcedures = procedimentos.filter(p => p.ativo !== false && (p.cadastrado_por_admin !== false));
+
   const [pacienteId, setPacienteId] = useState<string>(pacientes[0]?.id || '');
-  const [procedimento, setProcedimento] = useState<string>(PROCEDIMENTOS_COMUNS[0]);
-  const [customProc, setCustomProc] = useState<string>('');
+  const [selectedProcId, setSelectedProcId] = useState<string>(adminProcedures[0]?.id || '');
+  const [selectedVariationId, setSelectedVariationId] = useState<string>('');
   const [data, setData] = useState<string>(new Date().toISOString().split('T')[0]);
   const [hora, setHora] = useState<string>('14:00');
   const [duracao, setDuracao] = useState<number>(45);
   const [status, setStatus] = useState<StatusAgendamento>('confirmado');
   const [valor, setValor] = useState<string>('1200');
   const [observacoes, setObservacoes] = useState<string>('');
+
+  const currentProc = adminProcedures.find(p => p.id === selectedProcId) || adminProcedures[0];
+
+  useEffect(() => {
+    if (adminProcedures.length > 0 && !selectedProcId) {
+      setSelectedProcId(adminProcedures[0].id);
+    }
+  }, [adminProcedures, selectedProcId]);
+
+  useEffect(() => {
+    if (currentProc) {
+      setDuracao(currentProc.duracao_minutos || 45);
+      if (currentProc.variacoes && currentProc.variacoes.length > 0) {
+        const firstVar = currentProc.variacoes[0];
+        setSelectedVariationId(firstVar.id);
+        setValor(String(firstVar.valor));
+      } else {
+        setSelectedVariationId('');
+        const defaultVal = currentProc.valor_promocional || currentProc.valor_tabela || 0;
+        setValor(String(defaultVal));
+      }
+    }
+  }, [selectedProcId]);
+
+  const handleVariationChange = (varId: string) => {
+    setSelectedVariationId(varId);
+    if (currentProc?.variacoes) {
+      const v = currentProc.variacoes.find(x => x.id === varId);
+      if (v) {
+        setValor(String(v.valor));
+        if (v.duracao_minutos) setDuracao(v.duracao_minutos);
+      }
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -45,12 +85,19 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
     if (!pacienteId) return;
 
     const dataHoraIso = new Date(`${data}T${hora}:00`).toISOString();
-    const finalProc = customProc.trim() ? customProc.trim() : procedimento;
+    
+    let procedureName = currentProc?.nome || 'Procedimento Clínico';
+    if (selectedVariationId && currentProc?.variacoes) {
+      const v = currentProc.variacoes.find(x => x.id === selectedVariationId);
+      if (v) {
+        procedureName = `${currentProc.nome} (${v.nome})`;
+      }
+    }
 
     onSaveAppointment({
       paciente_id: pacienteId,
       data_hora: dataHoraIso,
-      procedimento: finalProc,
+      procedimento: procedureName,
       status: status,
       duracao_minutos: Number(duracao),
       valor_estimado: valor ? parseFloat(valor) : undefined,
@@ -67,15 +114,15 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
         {/* Header */}
         <div className="p-5 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-indigo-600 text-white">
+            <div className="p-2 rounded-lg bg-indigo-600 text-white shadow-xs">
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900">
                 Novo Agendamento
               </h3>
-              <p className="text-xs text-slate-400 font-medium">
-                Preencha os dados do atendimento para o balcão
+              <p className="text-xs text-slate-500 font-medium">
+                Catálogo exclusivo de procedimentos aprovados pela administração
               </p>
             </div>
           </div>
@@ -123,32 +170,68 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
             </select>
           </div>
 
-          {/* Procedimento */}
+          {/* Procedimento (Admin-only registered procedures) */}
           <div>
-            <label className="font-semibold text-slate-700 block mb-1.5">
-              Procedimento Estético *
-            </label>
-            <select
-              value={procedimento}
-              onChange={(e) => {
-                setProcedimento(e.target.value);
-                setCustomProc('');
-              }}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 mb-2"
-            >
-              {PROCEDIMENTOS_COMUNS.map((proc) => (
-                <option key={proc} value={proc}>
-                  {proc}
-                </option>
-              ))}
-            </select>
-            <input
-              type="text"
-              placeholder="Ou digite outro procedimento personalizado..."
-              value={customProc}
-              onChange={(e) => setCustomProc(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-xs"
-            />
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="font-semibold text-slate-700 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span>Procedimento do Catálogo Oficial (Admin) *</span>
+              </label>
+              <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-semibold border border-emerald-200">
+                {adminProcedures.length} disponíveis
+              </span>
+            </div>
+            
+            {adminProcedures.length === 0 ? (
+              <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-amber-800 text-xs">
+                Nenhum procedimento cadastrado por administradores foi encontrado no catálogo. Cadastre no módulo Estoque & Procedimentos.
+              </div>
+            ) : (
+              <select
+                value={selectedProcId}
+                onChange={(e) => setSelectedProcId(e.target.value)}
+                required
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 mb-2"
+              >
+                {adminProcedures.map((proc) => (
+                  <option key={proc.id} value={proc.id}>
+                    {proc.nome} — R$ {proc.valor_promocional || proc.valor_tabela} ({proc.categoria})
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* 3-Tier Variations Option if procedure has variations */}
+            {currentProc?.variacoes && currentProc.variacoes.length > 0 && (
+              <div className="p-3 bg-indigo-50/70 border border-indigo-100 rounded-xl space-y-1.5 mt-2">
+                <label className="text-[11px] font-bold text-indigo-900 flex items-center gap-1">
+                  <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                  Variação / Nível de Aplicação:
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {currentProc.variacoes.map((v) => {
+                    const isSelected = selectedVariationId === v.id;
+                    return (
+                      <button
+                        type="button"
+                        key={v.id}
+                        onClick={() => handleVariationChange(v.id)}
+                        className={`p-2 rounded-lg border text-left transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-300'
+                        }`}
+                      >
+                        <div className="text-[11px] font-bold truncate">{v.nome}</div>
+                        <div className={`text-xs font-mono font-semibold ${isSelected ? 'text-indigo-100' : 'text-emerald-700'}`}>
+                          R$ {v.valor}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Data & Horário */}
@@ -182,35 +265,50 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
             </div>
           </div>
 
-          {/* Status & Valor */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Status, Duração & Valor */}
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="font-semibold text-slate-700 block mb-1.5">
-                Status Inicial
+                Status
               </label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as StatusAgendamento)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 capitalize"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 capitalize text-xs"
               >
                 <option value="confirmado">Confirmado</option>
-                <option value="pendente">Pendente (Aguardando)</option>
+                <option value="pendente">Pendente</option>
+                <option value="em_espera">Na Espera</option>
                 <option value="concluido">Concluído</option>
                 <option value="cancelado">Cancelado</option>
               </select>
             </div>
 
             <div>
+              <label className="font-semibold text-slate-700 block mb-1.5">
+                Duração (min)
+              </label>
+              <input
+                type="number"
+                value={duracao}
+                onChange={(e) => setDuracao(Number(e.target.value))}
+                min={10}
+                step={5}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              />
+            </div>
+
+            <div>
               <label className="font-semibold text-slate-700 block mb-1.5 flex items-center gap-1">
                 <DollarSign className="w-3.5 h-3.5 text-green-600" />
-                Valor Estimado (R$)
+                Valor (R$)
               </label>
               <input
                 type="number"
                 value={valor}
                 onChange={(e) => setValor(e.target.value)}
                 placeholder="Ex: 1450"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               />
             </div>
           </div>

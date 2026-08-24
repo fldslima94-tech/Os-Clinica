@@ -123,6 +123,13 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
     setNovaFotoObs('');
   };
 
+  const handleDeletePhoto = (photoId: string) => {
+    if (!paciente) return;
+    const updated = fotosList.filter(f => f.id !== photoId);
+    setFotosList(updated);
+    onUpdatePatientHistory(paciente.id, historico, { fotos_antes_depois: updated });
+  };
+
   // Canvas Drawing Handlers
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -541,7 +548,19 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
                     <div key={item.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
                       <div className="flex items-center justify-between">
                         <h5 className="font-bold text-slate-900 text-xs sm:text-sm">{item.titulo}</h5>
-                        <span className="text-[11px] font-mono text-slate-500">{item.data}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-mono text-slate-500">{item.data}</span>
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePhoto(item.id)}
+                              className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                              title="Excluir registro fotográfico"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {item.foto_depois ? (
