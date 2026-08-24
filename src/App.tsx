@@ -1008,6 +1008,7 @@ export default function App() {
         }}
         onSave={handleSaveProcedure}
         procedimentoToEdit={procedureToEdit}
+        estoqueDisponivel={estoque}
       />
 
       <NewUserModal

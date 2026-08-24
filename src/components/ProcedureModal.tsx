@@ -22,7 +22,7 @@ interface ProcedureModalProps {
   onClose: () => void;
   onSave: (procedimento: Omit<ProcedimentoClinico, 'id'>, idToEdit?: string) => void;
   procedimentoToEdit?: ProcedimentoClinico | null;
-  estoqueDisponivel: EstoqueInsumo[];
+  estoqueDisponivel?: EstoqueInsumo[];
 }
 
 const CATEGORIAS_PADRAO = [
@@ -40,7 +40,7 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
   onClose,
   onSave,
   procedimentoToEdit,
-  estoqueDisponivel,
+  estoqueDisponivel = [],
 }) => {
   const [nome, setNome] = useState('');
   const [categoria, setCategoria] = useState(CATEGORIAS_PADRAO[0]);
