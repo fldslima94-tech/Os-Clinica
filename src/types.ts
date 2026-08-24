@@ -2,7 +2,23 @@ export type StatusAgendamento = 'pendente' | 'confirmado' | 'em_espera' | 'em_at
 export type UnidadeMedida = 'ml' | 'unidade' | 'seringa';
 export type FormaPagamento = 'pix' | 'cartao_credito' | 'cartao_debito' | 'dinheiro' | 'transferencia';
 export type StatusPagamento = 'pago' | 'pendente' | 'parcial';
-export type UserRole = 'admin' | 'operador';
+export type UserRole = 'admin' | 'operador' | 'cliente';
+
+export type PrioridadeAviso = 'urgente' | 'importante' | 'informativo';
+
+export interface AvisoQuadro {
+  id: string;
+  titulo: string;
+  mensagem: string;
+  prioridade: PrioridadeAviso;
+  autor_nome: string;
+  autor_role: UserRole;
+  data_criacao: string;
+  destinatarios: 'todos' | 'admin' | 'operador' | 'cliente';
+  ativo: boolean;
+  exibir_popup: boolean;
+  lido_por?: string[];
+}
 
 export interface PacoteTratamento {
   id: string;
@@ -156,5 +172,61 @@ export type TabType =
   | 'whatsapp'
   | 'whatsapp_automation' 
   | 'retorno_pos'
+  | 'portal_paciente'
+  | 'quadro_avisos'
   | 'usuarios'
   | 'supabase_guide';
+
+export interface ProcedimentoClinico {
+  id: string;
+  nome: string;
+  categoria: string;
+  duracao_minutos: number;
+  valor_tabela: number;
+  valor_promocional?: number;
+  descricao: string;
+  areas_aplicacao?: string[];
+  indicacoes?: string[];
+  insumos_vinculados?: {
+    insumo_id: string;
+    nome_item: string;
+    quantidade: number;
+    unidade_medida: UnidadeMedida;
+  }[];
+  cuidados_pos?: string;
+  ativo: boolean;
+  destaque_portal?: boolean;
+  imagem_url?: string;
+  criado_em?: string;
+}
+
+export interface SolicitacaoOrcamento {
+  id: string;
+  paciente_nome: string;
+  paciente_email: string;
+  paciente_telefone: string;
+  paciente_avatar_url?: string;
+  conta_google_vinculada: boolean;
+  procedimentos_selecionados: {
+    procedimento_id: string;
+    nome: string;
+    categoria: string;
+    valor_unitario: number;
+  }[];
+  valor_total_estimado: number;
+  queixa_principal?: string;
+  periodo_preferencia?: 'qualquer' | 'manha' | 'tarde' | 'noite' | 'sabado';
+  status: 'novo' | 'em_analise' | 'orcamento_enviado' | 'agendado';
+  data_solicitacao: string;
+  resposta_clinica?: string;
+}
+
+export interface PacienteGoogleProfile {
+  id: string;
+  nome: string;
+  email: string;
+  avatar_url: string;
+  telefone?: string;
+  data_nascimento?: string;
+}
+

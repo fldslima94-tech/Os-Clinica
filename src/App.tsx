@@ -3,9 +3,12 @@ import {
   MOCK_PACIENTES, 
   MOCK_AGENDAMENTOS, 
   MOCK_ESTOQUE, 
-  MOCK_TRANSACOES,
-  MOCK_USUARIOS,
-  MOCK_ALERTAS_RETORNO,
+  MOCK_TRANSACOES, 
+  MOCK_USUARIOS, 
+  MOCK_ALERTAS_RETORNO, 
+  MOCK_PROCEDIMENTOS, 
+  MOCK_ORCAMENTOS,
+  MOCK_AVISOS,
   RECEITA_INSUMOS_PADRAO
 } from './data/mockData';
 import { 
@@ -17,13 +20,17 @@ import {
   TransacaoFinanceira, 
   InsumoConsumido, 
   FormaPagamento, 
-  StatusPagamento,
-  UsuarioEquipe,
-  UserRole,
-  AlertaRetornoPos
+  StatusPagamento, 
+  UsuarioEquipe, 
+  UserRole, 
+  AlertaRetornoPos, 
+  ProcedimentoClinico, 
+  SolicitacaoOrcamento,
+  AvisoQuadro
 } from './types';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
+import { MobileNavigation } from './components/MobileNavigation';
 import { DashboardView } from './components/DashboardView';
 import { AppointmentsView } from './components/AppointmentsView';
 import { PatientsView } from './components/PatientsView';
@@ -33,10 +40,15 @@ import { WhatsAppAutomationView } from './components/WhatsAppAutomationView';
 import { PostCareReturnView } from './components/PostCareReturnView';
 import { SupabaseGuideView } from './components/SupabaseGuideView';
 import { UsersManagementView } from './components/UsersManagementView';
+import { PatientPortalView } from './components/PatientPortalView';
+import { NoticeBoardView } from './components/NoticeBoardView';
 import { LoginView } from './components/LoginView';
+import { UrgentAlertPopupModal } from './components/UrgentAlertPopupModal';
+import { SwitchUserPasswordModal } from './components/SwitchUserPasswordModal';
 import { NewAppointmentModal } from './components/NewAppointmentModal';
 import { NewPatientModal } from './components/NewPatientModal';
 import { NewInventoryModal } from './components/NewInventoryModal';
+import { ProcedureModal } from './components/ProcedureModal';
 import { NewUserModal } from './components/NewUserModal';
 import { EditUserModal } from './components/EditUserModal';
 import { PatientDetailsModal } from './components/PatientDetailsModal';
@@ -68,11 +80,20 @@ export default function App() {
   const [estoque, setEstoque] = useState<EstoqueInsumo[]>(() => 
     getStoredData<EstoqueInsumo[]>('estoque', MOCK_ESTOQUE)
   );
+  const [procedimentos, setProcedimentos] = useState<ProcedimentoClinico[]>(() =>
+    getStoredData<ProcedimentoClinico[]>('procedimentos', MOCK_PROCEDIMENTOS)
+  );
+  const [orcamentos, setOrcamentos] = useState<SolicitacaoOrcamento[]>(() =>
+    getStoredData<SolicitacaoOrcamento[]>('orcamentos', MOCK_ORCAMENTOS)
+  );
   const [transacoes, setTransacoes] = useState<TransacaoFinanceira[]>(() => 
     getStoredData<TransacaoFinanceira[]>('transacoes', MOCK_TRANSACOES)
   );
   const [usuarios, setUsuarios] = useState<UsuarioEquipe[]>(() => 
     getStoredData<UsuarioEquipe[]>('usuarios', MOCK_USUARIOS)
+  );
+  const [avisos, setAvisos] = useState<AvisoQuadro[]>(() => 
+    getStoredData<AvisoQuadro[]>('avisos', MOCK_AVISOS)
   );
   const [alertasRetorno, setAlertasRetorno] = useState<AlertaRetornoPos[]>(() => 
     getStoredData<AlertaRetornoPos[]>('alertas_retorno', MOCK_ALERTAS_RETORNO)
@@ -83,6 +104,48 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => 
     getStoredData<boolean>('isAuthenticated', true)
   );
+
+  // Quadro de Avisos / Pop-up Alerts State
+  const [activePopupAviso, setActivePopupAviso] = useState<AvisoQuadro | null>(null);
+  const [isPopupModalOpen, setIsPopupModalOpen] = useState(false);
+  const [acknowledgedAvisos, setAcknowledgedAvisos] = useState<string[]>(() => 
+    getStoredData<string[]>('acknowledged_avisos', [])
+  );
+
+  // Switch User with Password Modal State
+  const [isSwitchUserModalOpen, setIsSwitchUserModalOpen] = useState(false);
+  const [switchTargetUser, setSwitchTargetUser] = useState<UsuarioEquipe | null>(null);
+
+  // UI Navigation & Search State
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    const initialUser = getStoredData<UsuarioEquipe>('currentUser', MOCK_USUARIOS[0]);
+    return initialUser.role === 'cliente' ? 'portal_paciente' : 'dashboard';
+  });
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Modals State
+  const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
+  const [patientForPackages, setPatientForPackages] = useState<Paciente | null>(null);
+  const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState(false);
+  const [isNewPatientOpen, setIsNewPatientOpen] = useState(false);
+  const [isNewInventoryOpen, setIsNewInventoryOpen] = useState(false);
+  const [isNewProcedureOpen, setIsNewProcedureOpen] = useState(false);
+  const [procedureToEdit, setProcedureToEdit] = useState<ProcedimentoClinico | null>(null);
+  const [isNewUserOpen, setIsNewUserOpen] = useState(false);
+  const [userToEdit, setUserToEdit] = useState<UsuarioEquipe | null>(null);
+  const [isSqlModalOpen, setIsSqlModalOpen] = useState(false);
+  const [selectedPatientForDetails, setSelectedPatientForDetails] = useState<Paciente | null>(null);
+  const [appointmentToComplete, setAppointmentToComplete] = useState<Agendamento | null>(null);
+
+  // Toast notifications
+  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
+
+  const showToast = (text: string, type: 'success' | 'info' = 'success') => {
+    setToastMessage({ text, type });
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 4000);
+  };
 
   // Auto-persist state changes into localStorage
   useEffect(() => {
@@ -105,6 +168,18 @@ export default function App() {
 
   useEffect(() => {
     try {
+      localStorage.setItem('esteticaos_procedimentos', JSON.stringify(procedimentos));
+    } catch (e) {}
+  }, [procedimentos]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('esteticaos_orcamentos', JSON.stringify(orcamentos));
+    } catch (e) {}
+  }, [orcamentos]);
+
+  useEffect(() => {
+    try {
       localStorage.setItem('esteticaos_transacoes', JSON.stringify(transacoes));
     } catch (e) {}
   }, [transacoes]);
@@ -114,6 +189,12 @@ export default function App() {
       localStorage.setItem('esteticaos_usuarios', JSON.stringify(usuarios));
     } catch (e) {}
   }, [usuarios]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('esteticaos_avisos', JSON.stringify(avisos));
+    } catch (e) {}
+  }, [avisos]);
 
   useEffect(() => {
     try {
@@ -133,35 +214,139 @@ export default function App() {
     } catch (e) {}
   }, [isAuthenticated]);
 
-  // UI Navigation & Search State
-  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  useEffect(() => {
+    try {
+      localStorage.setItem('esteticaos_acknowledged_avisos', JSON.stringify(acknowledgedAvisos));
+    } catch (e) {}
+  }, [acknowledgedAvisos]);
 
-  // Modals State
-  const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
-  const [patientForPackages, setPatientForPackages] = useState<Paciente | null>(null);
-  const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState(false);
-  const [isNewPatientOpen, setIsNewPatientOpen] = useState(false);
-  const [isNewInventoryOpen, setIsNewInventoryOpen] = useState(false);
-  const [isNewUserOpen, setIsNewUserOpen] = useState(false);
-  const [userToEdit, setUserToEdit] = useState<UsuarioEquipe | null>(null);
-  const [isSqlModalOpen, setIsSqlModalOpen] = useState(false);
-  const [selectedPatientForDetails, setSelectedPatientForDetails] = useState<Paciente | null>(null);
-  const [appointmentToComplete, setAppointmentToComplete] = useState<Agendamento | null>(null);
+  // Role-based Access Control Route Guard
+  useEffect(() => {
+    if (currentUser.role === 'cliente') {
+      if (activeTab !== 'portal_paciente' && activeTab !== 'quadro_avisos') {
+        setActiveTab('portal_paciente');
+      }
+    } else if (currentUser.role === 'operador') {
+      if (activeTab === 'usuarios' || activeTab === 'supabase_guide') {
+        setActiveTab('dashboard');
+      }
+    }
+  }, [currentUser.role, activeTab]);
 
-  // Toast notifications
-  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
+  // Check for auto-triggering Urgent Alert Pop-ups on screen
+  useEffect(() => {
+    if (!isAuthenticated) return;
 
-  const showToast = (text: string, type: 'success' | 'info' = 'success') => {
-    setToastMessage({ text, type });
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 4000);
+    // Find any unacknowledged aviso with exibir_popup: true targeted to current user
+    const urgentPopupAviso = avisos.find(a => {
+      if (!a.ativo || !a.exibir_popup) return false;
+      // Target check
+      if (a.destinatarios !== 'todos' && a.destinatarios !== currentUser.role) return false;
+      // Check if user already acknowledged
+      const userAcknowledged = acknowledgedAvisos.includes(`${currentUser.id}_${a.id}`);
+      return !userAcknowledged;
+    });
+
+    if (urgentPopupAviso) {
+      setActivePopupAviso(urgentPopupAviso);
+      setIsPopupModalOpen(true);
+    }
+  }, [isAuthenticated, currentUser.id, currentUser.role, avisos, acknowledgedAvisos]);
+
+  // Count unread / relevant notices for current user
+  const unreadNoticesCount = avisos.filter(a => {
+    if (!a.ativo) return false;
+    if (a.destinatarios !== 'todos' && a.destinatarios !== currentUser.role && currentUser.role !== 'admin') return false;
+    return !acknowledgedAvisos.includes(`${currentUser.id}_${a.id}`);
+  }).length;
+
+  // --- NOTICE BOARD HANDLERS ---
+  const handleAddAviso = (novoAviso: Omit<AvisoQuadro, 'id' | 'data_criacao' | 'lido_por'>) => {
+    const created: AvisoQuadro = {
+      ...novoAviso,
+      id: `aviso-${Date.now()}`,
+      data_criacao: new Date().toISOString(),
+      lido_por: [currentUser.id],
+    };
+
+    setAvisos(prev => [created, ...prev]);
+    showToast('Novo comunicado publicado no Quadro de Avisos!');
+
+    if (created.exibir_popup) {
+      setActivePopupAviso(created);
+      setIsPopupModalOpen(true);
+    }
   };
 
-  // --- HANDLERS ---
+  const handleDeleteAviso = (id: string) => {
+    if (currentUser.role !== 'admin') {
+      showToast('Apenas administradores podem remover avisos do mural.', 'info');
+      return;
+    }
+    setAvisos(prev => prev.filter(a => a.id !== id));
+    showToast('Aviso removido do mural.');
+  };
 
-  // 1. Simple Update appointment status
+  const handleAcknowledgeAviso = (avisoId: string) => {
+    const ackKey = `${currentUser.id}_${avisoId}`;
+    if (!acknowledgedAvisos.includes(ackKey)) {
+      setAcknowledgedAvisos(prev => [...prev, ackKey]);
+    }
+  };
+
+  const handleTriggerPopup = (aviso: AvisoQuadro) => {
+    setActivePopupAviso(aviso);
+    setIsPopupModalOpen(true);
+  };
+
+  // --- PROCEDURE MANAGEMENT ---
+  const handleSaveProcedure = (procData: Omit<ProcedimentoClinico, 'id' | 'criado_em'> & { id?: string }) => {
+    if (procData.id) {
+      setProcedimentos(prev => prev.map(p => p.id === procData.id ? { ...p, ...procData } as ProcedimentoClinico : p));
+      showToast('Procedimento atualizado com sucesso!');
+    } else {
+      const newProc: ProcedimentoClinico = {
+        ...procData,
+        id: `proc-${Date.now()}`,
+        criado_em: new Date().toISOString(),
+      };
+      setProcedimentos(prev => [newProc, ...prev]);
+      showToast('Novo procedimento cadastrado no catálogo!');
+    }
+  };
+
+  const handleDeleteProcedure = (id: string) => {
+    if (currentUser.role !== 'admin') {
+      showToast('Apenas administradores podem excluir procedimentos.', 'info');
+      return;
+    }
+    setProcedimentos(prev => prev.filter(p => p.id !== id));
+    showToast('Procedimento removido do catálogo com sucesso.');
+  };
+
+  // --- QUOTES (PORTAL DO PACIENTE) ---
+  const handleCriarOrcamento = (novoOrcamentoData: Omit<SolicitacaoOrcamento, 'id' | 'data_solicitacao'>) => {
+    const newQuote: SolicitacaoOrcamento = {
+      ...novoOrcamentoData,
+      id: `orc-${Date.now()}`,
+      data_solicitacao: new Date().toISOString(),
+    };
+    setOrcamentos(prev => [newQuote, ...prev]);
+    showToast('Solicitação de orçamento enviada com sucesso!');
+  };
+
+  const handleAtualizarStatusOrcamento = (id: string, status: SolicitacaoOrcamento['status'], resposta?: string) => {
+    setOrcamentos(prev => prev.map(o => o.id === id ? { ...o, status, resposta_clinica: resposta || o.resposta_clinica } : o));
+    showToast('Status do orçamento atualizado!');
+  };
+
+  const handleConverterOrcamentoEmAgendamento = (orc: SolicitacaoOrcamento) => {
+    setActiveTab('agendamentos');
+    setIsNewAppointmentOpen(true);
+    showToast(`Iniciando agendamento para ${orc.paciente_nome}`);
+  };
+
+  // --- APPOINTMENTS & INVENTORY HANDLERS ---
   const handleUpdateStatus = (agendamentoId: string, novoStatus: StatusAgendamento) => {
     if (novoStatus === 'concluido') {
       const ag = agendamentos.find(a => a.id === agendamentoId);
@@ -186,7 +371,6 @@ export default function App() {
     showToast(statusLabels[novoStatus]);
   };
 
-  // 2. Complete procedure with automatic inventory deduction & financial entry
   const handleConfirmCompleteProcedure = (
     agendamentoId: string,
     insumosUsados: InsumoConsumido[],
@@ -216,7 +400,7 @@ export default function App() {
       });
     }
 
-    // 2. Mark appointment as completed with details
+    // 2. Mark appointment as completed
     setAgendamentos(prev =>
       prev.map(ag =>
         ag.id === agendamentoId
@@ -244,7 +428,7 @@ export default function App() {
       forma_pagamento: pagamento.forma,
       status: pagamento.status,
       data: new Date().toISOString(),
-      custo_insumos: insumosUsados.length * 65, // Estimativa de custo de reposição
+      custo_insumos: insumosUsados.length * 65,
       observacao: pagamento.observacao,
     };
 
@@ -256,7 +440,6 @@ export default function App() {
     );
   };
 
-  // 3. Create new appointment
   const handleSaveAppointment = (novo: Partial<Agendamento>) => {
     const patientObj = pacientes.find(p => p.id === novo.paciente_id);
     const createdAgendamento: Agendamento = {
@@ -276,7 +459,6 @@ export default function App() {
     showToast(`Agendamento de ${patientObj?.nome || 'paciente'} registrado!`);
   };
 
-  // 4. Create new patient
   const handleSavePatient = (novo: Partial<Paciente>) => {
     const createdPatient: Paciente = {
       id: `pac-${Date.now()}`,
@@ -298,7 +480,6 @@ export default function App() {
     showToast(`Paciente ${createdPatient.nome} cadastrado(a) com sucesso!`);
   };
 
-  // 5. Update patient history and clinical records
   const handleUpdatePatientHistory = (
     pacienteId: string, 
     novoHistorico: string, 
@@ -307,7 +488,6 @@ export default function App() {
     setPacientes(prev =>
       prev.map(p => (p.id === pacienteId ? { ...p, historico_clinico: novoHistorico, ...(dadosExtras || {}) } : p))
     );
-    // Also update populated reference in agendamentos
     setAgendamentos(prev =>
       prev.map(ag =>
         ag.paciente_id === pacienteId && ag.paciente
@@ -318,7 +498,6 @@ export default function App() {
     showToast('Prontuário clínico atualizado com sucesso!');
   };
 
-  // 6. Create new inventory item
   const handleSaveInventory = (novo: Partial<EstoqueInsumo>) => {
     const createdItem: EstoqueInsumo = {
       id: `est-${Date.now()}`,
@@ -335,7 +514,6 @@ export default function App() {
     showToast(`Insumo "${createdItem.nome_item}" cadastrado no estoque!`);
   };
 
-  // 7. Update inventory quantity
   const handleUpdateQuantity = (id: string, newQuantity: number) => {
     setEstoque(prev =>
       prev.map(item => (item.id === id ? { ...item, quantidade: newQuantity } : item))
@@ -343,7 +521,6 @@ export default function App() {
     showToast('Quantidade em estoque atualizada!');
   };
 
-  // 8. Financial handlers
   const handleAddTransaction = (nova: Partial<TransacaoFinanceira>) => {
     const created: TransacaoFinanceira = {
       id: nova.id || `tx-${Date.now()}`,
@@ -367,14 +544,12 @@ export default function App() {
     showToast(`Status da transação alterado para: ${status}`);
   };
 
-  // 9. Mark WhatsApp Reminder Sent
   const handleMarkReminderSent = (agendamentoId: string) => {
     setAgendamentos(prev =>
       prev.map(a => (a.id === agendamentoId ? { ...a, lembrete_enviado: true } : a))
     );
   };
 
-  // 10. Update Post Care Alert Status
   const handleUpdateAlertaStatus = (alertaId: string, status: 'pendente' | 'agendado' | 'contatado') => {
     setAlertasRetorno(prev =>
       prev.map(a => (a.id === alertaId ? { ...a, status } : a))
@@ -382,7 +557,6 @@ export default function App() {
     showToast(`Status do alerta atualizado para "${status}"!`);
   };
 
-  // 11. Update Patient Packages
   const handleUpdatePacienteObj = (updatedPaciente: Paciente) => {
     setPacientes(prev =>
       prev.map(p => (p.id === updatedPaciente.id ? updatedPaciente : p))
@@ -396,7 +570,7 @@ export default function App() {
     showToast('Pacote de sessões do paciente atualizado com sucesso!');
   };
 
-  // 12. User Management Handlers
+  // --- USER MANAGEMENT & AUTHENTICATION WITH PASSWORD PROTECTION ---
   const handleSaveUser = (novo: Omit<UsuarioEquipe, 'id' | 'created_at'>) => {
     const created: UsuarioEquipe = {
       ...novo,
@@ -418,15 +592,23 @@ export default function App() {
     showToast(`Dados de ${updated.nome} atualizados com sucesso!`);
   };
 
-  const handleSwitchUser = (user: UsuarioEquipe) => {
+  // User Switching requiring password
+  const handleRequestSwitchUser = (targetUser?: UsuarioEquipe) => {
+    setSwitchTargetUser(targetUser || null);
+    setIsSwitchUserModalOpen(true);
+  };
+
+  const handleConfirmSwitchUser = (user: UsuarioEquipe) => {
     setCurrentUser(user);
-    showToast(`Perfil alternado para: ${user.nome} (${user.role === 'admin' ? 'Administrador' : 'Operador'})`, 'info');
+    const roleLabel = user.role === 'admin' ? 'Admin' : user.role === 'operador' ? 'Operador' : 'Cliente';
+    showToast(`Sessão autenticada para: ${user.nome} (${roleLabel})`, 'info');
   };
 
   const handleLoginSuccess = (user: UsuarioEquipe) => {
     setCurrentUser(user);
     setIsAuthenticated(true);
-    showToast(`Bem-vindo(a), ${user.nome}! Sessão iniciada como ${user.role === 'admin' ? 'Administrador' : 'Operador Recepção'}.`);
+    const roleLabel = user.role === 'admin' ? 'Admin' : user.role === 'operador' ? 'Operador' : 'Cliente';
+    showToast(`Bem-vindo(a), ${user.nome}! Acesso concedido como ${roleLabel}.`);
   };
 
   const handleLogout = () => {
@@ -447,7 +629,7 @@ export default function App() {
     showToast('Status do usuário atualizado.');
   };
 
-  // If user is not authenticated, display full Login screen
+  // If user is not authenticated, display full secure Login screen
   if (!isAuthenticated) {
     return (
       <div className="antialiased">
@@ -488,31 +670,47 @@ export default function App() {
         onOpenNewAppointment={() => setIsNewAppointmentOpen(true)}
         onOpenSqlGuide={() => setIsSqlModalOpen(true)}
         onOpenGlobalSearch={() => setIsGlobalSearchOpen(true)}
+        onOpenNoticeBoard={() => setActiveTab('quadro_avisos')}
+        unreadNoticesCount={unreadNoticesCount}
         lowStockCount={lowStockCount}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         currentUser={currentUser}
         usuarios={usuarios}
-        onSwitchUser={handleSwitchUser}
+        onRequestSwitchUser={handleRequestSwitchUser}
         onLogout={handleLogout}
       />
 
       {/* Main Layout Body */}
-      <div className="flex-1 flex flex-col lg:flex-row w-full">
+      <div className="flex-1 flex flex-col lg:flex-row w-full relative">
         
-        {/* Left Sidebar */}
+        {/* Left Sidebar (Desktop) */}
         <Sidebar
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           lowStockCount={lowStockCount}
           pendingCount={pendingCount}
           currentUser={currentUser}
+          unreadNoticesCount={unreadNoticesCount}
+          onLogout={handleLogout}
+        />
+
+        {/* Mobile Navigation (Bottom Bar + Drawer) */}
+        <MobileNavigation
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          lowStockCount={lowStockCount}
+          pendingCount={pendingCount}
+          currentUser={currentUser}
+          unreadNoticesCount={unreadNoticesCount}
+          onRequestSwitchUser={() => handleRequestSwitchUser()}
           onLogout={handleLogout}
         />
 
         {/* Content Area */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-7xl">
-          {activeTab === 'dashboard' && (
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-7xl pb-24 lg:pb-8">
+          
+          {activeTab === 'dashboard' && currentUser.role !== 'cliente' && (
             <DashboardView
               agendamentos={agendamentos}
               estoque={estoque}
@@ -528,7 +726,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'agendamentos' && (
+          {activeTab === 'agendamentos' && currentUser.role !== 'cliente' && (
             <AppointmentsView
               agendamentos={agendamentos}
               pacientes={pacientes}
@@ -539,7 +737,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'pacientes' && (
+          {activeTab === 'pacientes' && currentUser.role !== 'cliente' && (
             <PatientsView
               pacientes={pacientes}
               onOpenNewPatient={() => setIsNewPatientOpen(true)}
@@ -548,15 +746,47 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'estoque' && (
+          {activeTab === 'estoque' && currentUser.role !== 'cliente' && (
             <InventoryView
               estoque={estoque}
+              procedimentos={procedimentos}
               onOpenNewInventory={() => setIsNewInventoryOpen(true)}
+              onOpenNewProcedure={() => {
+                setProcedureToEdit(null);
+                setIsNewProcedureOpen(true);
+              }}
+              onEditProcedure={(proc) => {
+                setProcedureToEdit(proc);
+                setIsNewProcedureOpen(true);
+              }}
+              onDeleteProcedure={handleDeleteProcedure}
               onUpdateQuantity={handleUpdateQuantity}
+              currentUser={currentUser}
             />
           )}
 
-          {activeTab === 'financeiro' && (
+          {activeTab === 'portal_paciente' && (
+            <PatientPortalView
+              procedimentos={procedimentos}
+              orçamentos={orcamentos}
+              onCriarOrcamento={handleCriarOrcamento}
+              onAtualizarStatusOrcamento={handleAtualizarStatusOrcamento}
+              onConverterEmAgendamento={handleConverterOrcamentoEmAgendamento}
+              currentUser={currentUser}
+            />
+          )}
+
+          {activeTab === 'quadro_avisos' && (
+            <NoticeBoardView
+              avisos={avisos}
+              currentUser={currentUser}
+              onAddAviso={handleAddAviso}
+              onDeleteAviso={handleDeleteAviso}
+              onTriggerPopup={handleTriggerPopup}
+            />
+          )}
+
+          {activeTab === 'financeiro' && currentUser.role !== 'cliente' && (
             <FinancialView
               transacoes={transacoes}
               onAddTransaction={handleAddTransaction}
@@ -565,7 +795,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'whatsapp' && (
+          {activeTab === 'whatsapp' && currentUser.role !== 'cliente' && (
             <WhatsAppAutomationView
               agendamentos={agendamentos}
               pacientes={pacientes}
@@ -573,7 +803,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'retorno_pos' && (
+          {activeTab === 'retorno_pos' && currentUser.role !== 'cliente' && (
             <PostCareReturnView
               alertas={alertasRetorno}
               onUpdateAlertaStatus={handleUpdateAlertaStatus}
@@ -588,11 +818,11 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'usuarios' && (
+          {activeTab === 'usuarios' && currentUser.role === 'admin' && (
             <UsersManagementView
               usuarios={usuarios}
               currentUser={currentUser}
-              onSwitchUser={handleSwitchUser}
+              onSwitchUser={(u) => handleRequestSwitchUser(u)}
               onOpenNewUser={() => setIsNewUserOpen(true)}
               onOpenEditUser={(user) => setUserToEdit(user)}
               onToggleUserStatus={handleToggleUserStatus}
@@ -600,12 +830,31 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'supabase_guide' && (
+          {activeTab === 'supabase_guide' && currentUser.role === 'admin' && (
             <SupabaseGuideView />
           )}
         </main>
 
       </div>
+
+      {/* POP-UP ALERTS MODAL */}
+      <UrgentAlertPopupModal
+        isOpen={isPopupModalOpen}
+        onClose={() => setIsPopupModalOpen(false)}
+        aviso={activePopupAviso}
+        onAcknowledge={handleAcknowledgeAviso}
+        onOpenNoticeBoard={() => setActiveTab('quadro_avisos')}
+        currentUser={currentUser}
+      />
+
+      {/* SWITCH USER PASSWORD MODAL */}
+      <SwitchUserPasswordModal
+        isOpen={isSwitchUserModalOpen}
+        onClose={() => setIsSwitchUserModalOpen(false)}
+        usuarios={usuarios}
+        targetUser={switchTargetUser}
+        onConfirmSwitch={handleConfirmSwitchUser}
+      />
 
       {/* MODALS */}
       <GlobalSearchModal
@@ -648,6 +897,16 @@ export default function App() {
         isOpen={isNewInventoryOpen}
         onClose={() => setIsNewInventoryOpen(false)}
         onSaveInventory={handleSaveInventory}
+      />
+
+      <ProcedureModal
+        isOpen={isNewProcedureOpen}
+        onClose={() => {
+          setIsNewProcedureOpen(false);
+          setProcedureToEdit(null);
+        }}
+        onSave={handleSaveProcedure}
+        procedimentoToEdit={procedureToEdit}
       />
 
       <NewUserModal

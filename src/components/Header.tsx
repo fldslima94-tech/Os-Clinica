@@ -4,16 +4,14 @@ import {
   Plus, 
   Search, 
   Sparkles, 
-  Database, 
-  Clock, 
-  PhoneCall,
-  BellRing,
-  Shield,
-  UserCheck,
-  ChevronDown,
-  RefreshCw,
-  Users,
-  LogOut
+  ChevronDown, 
+  KeyRound, 
+  Users, 
+  LogOut,
+  Bell,
+  Megaphone,
+  ShieldCheck,
+  UserCheck
 } from 'lucide-react';
 import { TabType, UsuarioEquipe, UserRole } from '../types';
 
@@ -23,12 +21,14 @@ interface HeaderProps {
   onOpenNewAppointment: () => void;
   onOpenSqlGuide: () => void;
   onOpenGlobalSearch?: () => void;
+  onOpenNoticeBoard?: () => void;
+  unreadNoticesCount?: number;
   lowStockCount: number;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   currentUser: UsuarioEquipe;
   usuarios: UsuarioEquipe[];
-  onSwitchUser: (user: UsuarioEquipe) => void;
+  onRequestSwitchUser: (targetUser?: UsuarioEquipe) => void;
   onLogout?: () => void;
 }
 
@@ -38,12 +38,14 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNewAppointment,
   onOpenSqlGuide,
   onOpenGlobalSearch,
+  onOpenNoticeBoard,
+  unreadNoticesCount = 0,
   lowStockCount,
   searchQuery,
   setSearchQuery,
   currentUser,
   usuarios,
-  onSwitchUser,
+  onRequestSwitchUser,
   onLogout,
 }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -58,16 +60,32 @@ export const Header: React.FC<HeaderProps> = ({
 
   const capitalizedDate = todayFormatted.charAt(0).toUpperCase() + todayFormatted.slice(1);
 
-  const toggleUserRole = () => {
-    // Quick toggle between first admin and first operador
-    if (currentUser.role === 'admin') {
-      const operador = usuarios.find(u => u.role === 'operador') || usuarios[1];
-      if (operador) onSwitchUser(operador);
-    } else {
-      const admin = usuarios.find(u => u.role === 'admin') || usuarios[0];
-      if (admin) onSwitchUser(admin);
+  const getRoleBadge = (role: UserRole) => {
+    switch (role) {
+      case 'admin':
+        return {
+          label: '👑 Admin',
+          style: 'bg-indigo-50 text-indigo-700 border-indigo-200/70',
+        };
+      case 'operador':
+        return {
+          label: '🧑‍💼 Operador',
+          style: 'bg-emerald-50 text-emerald-700 border-emerald-200/70',
+        };
+      case 'cliente':
+        return {
+          label: '👤 Cliente',
+          style: 'bg-blue-50 text-blue-700 border-blue-200/70',
+        };
+      default:
+        return {
+          label: 'Usuário',
+          style: 'bg-slate-50 text-slate-700 border-slate-200/70',
+        };
     }
   };
+
+  const currentBadge = getRoleBadge(currentUser.role);
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30 px-4 lg:px-8 py-3 shadow-2xs">
@@ -83,12 +101,8 @@ export const Header: React.FC<HeaderProps> = ({
               <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
                 EstéticaOS
               </h1>
-              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 ${
-                currentUser.role === 'admin'
-                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200/70'
-                  : 'bg-emerald-50 text-emerald-700 border-emerald-200/70'
-              }`}>
-                {currentUser.role === 'admin' ? '👑 Admin' : '🧑‍💼 Recepção'}
+              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 ${currentBadge.style}`}>
+                {currentBadge.label}
               </span>
             </div>
             <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
@@ -122,6 +136,31 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Right Side: Role Switcher Pill & Actions */}
         <div className="flex items-center gap-2.5 w-full md:w-auto justify-end">
           
+          {/* Quadro de Avisos Notification Bell */}
+          <button
+            type="button"
+            onClick={() => {
+              if (onOpenNoticeBoard) {
+                onOpenNoticeBoard();
+              } else {
+                setActiveTab('quadro_avisos');
+              }
+            }}
+            className={`relative p-2 rounded-xl border transition-colors cursor-pointer flex items-center justify-center ${
+              activeTab === 'quadro_avisos'
+                ? 'bg-indigo-50 border-indigo-300 text-indigo-700 shadow-2xs'
+                : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600 hover:text-slate-900'
+            }`}
+            title="Quadro de Avisos da Clínica"
+          >
+            <Megaphone className="w-4 h-4 text-indigo-600" />
+            {unreadNoticesCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center border-2 border-white shadow-2xs animate-pulse">
+                {unreadNoticesCount}
+              </span>
+            )}
+          </button>
+
           {/* User & Role Switcher Dropdown Button */}
           <div className="relative">
             <button
@@ -139,7 +178,7 @@ export const Header: React.FC<HeaderProps> = ({
                   {currentUser.nome.split(' ')[0]} {currentUser.nome.split(' ')[1] || ''}
                 </div>
                 <div className="text-[10px] text-slate-500 font-medium">
-                  {currentUser.role === 'admin' ? '👑 Dra. Admin' : '🧑‍💼 Operador'}
+                  {currentUser.role === 'admin' ? '👑 Admin' : currentUser.role === 'operador' ? '🧑‍💼 Operador' : '👤 Cliente'}
                 </div>
               </div>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
@@ -151,17 +190,18 @@ export const Header: React.FC<HeaderProps> = ({
                 className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-100"
                 onClick={() => setIsUserMenuOpen(false)}
               >
-                <div className="px-3 py-2 border-b border-slate-100">
+                <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                    Alternar Sessão Ativa
+                    Alternar Usuário (Senha)
                   </span>
+                  <KeyRound className="w-3 h-3 text-slate-400" />
                 </div>
 
                 <div className="p-1 space-y-1">
                   {usuarios.map(u => (
                     <button
                       key={u.id}
-                      onClick={() => onSwitchUser(u)}
+                      onClick={() => onRequestSwitchUser(u)}
                       className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs text-left transition-colors cursor-pointer ${
                         u.id === currentUser.id
                           ? 'bg-indigo-50 text-indigo-900 font-semibold'
@@ -176,25 +216,41 @@ export const Header: React.FC<HeaderProps> = ({
                         />
                         <div>
                           <p className="font-semibold leading-tight">{u.nome}</p>
-                          <p className="text-[10px] text-slate-400">{u.cargo}</p>
+                          <p className="text-[10px] text-slate-400">
+                            {u.role === 'admin' ? 'Admin' : u.role === 'operador' ? 'Operador' : 'Cliente'}
+                          </p>
                         </div>
                       </div>
                       <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                        u.role === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'
+                        u.role === 'admin' 
+                          ? 'bg-indigo-100 text-indigo-700' 
+                          : u.role === 'operador'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-blue-100 text-blue-700'
                       }`}>
-                        {u.role === 'admin' ? 'Admin' : 'Operador'}
+                        {u.role === 'admin' ? 'Admin' : u.role === 'operador' ? 'Operador' : 'Cliente'}
                       </span>
                     </button>
                   ))}
                 </div>
 
                 <div className="px-2 pt-2 mt-1 border-t border-slate-100 space-y-1">
+                  {currentUser.role === 'admin' && (
+                    <button
+                      onClick={() => setActiveTab('usuarios')}
+                      className="w-full text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 px-2 py-1.5 rounded-md flex items-center gap-1.5"
+                    >
+                      <Users className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Gerenciar Equipe (Admin)</span>
+                    </button>
+                  )}
+
                   <button
-                    onClick={() => setActiveTab('usuarios')}
-                    className="w-full text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 px-2 py-1.5 rounded-md flex items-center gap-1.5"
+                    onClick={() => onRequestSwitchUser()}
+                    className="w-full text-left text-xs font-semibold text-indigo-700 hover:bg-indigo-50 px-2 py-1.5 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer"
                   >
-                    <Users className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Gerenciar Equipe</span>
+                    <KeyRound className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Trocar Usuário com Senha</span>
                   </button>
 
                   {onLogout && (
@@ -203,7 +259,7 @@ export const Header: React.FC<HeaderProps> = ({
                       className="w-full text-left text-xs font-semibold text-red-600 hover:bg-red-50 px-2 py-1.5 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <LogOut className="w-3.5 h-3.5 text-red-500" />
-                      <span>Sair / Trocar Usuário (Login)</span>
+                      <span>Encerrar Sessão (Logout)</span>
                     </button>
                   )}
                 </div>
@@ -211,32 +267,29 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          {/* Quick 1-Click Role Switcher Toggle */}
+          {/* Trocar Usuário Button requiring password */}
           <button
-            onClick={toggleUserRole}
-            className={`hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer ${
-              currentUser.role === 'admin'
-                ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200'
-                : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border-indigo-200'
-            }`}
-            title="Alternar rapidamente entre Admin e Operador"
+            onClick={() => onRequestSwitchUser()}
+            className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer shadow-2xs"
+            title="Sempre solicita senha para trocar de usuário"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Mudar para {currentUser.role === 'admin' ? 'Operador' : 'Admin'}</span>
+            <KeyRound className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Trocar Usuário</span>
           </button>
 
-          {/* Quick New Appointment Button */}
-          <button
-            onClick={onOpenNewAppointment}
-            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs md:text-sm font-semibold rounded-lg shadow-sm transition-colors cursor-pointer whitespace-nowrap"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Novo Agendamento</span>
-          </button>
+          {/* Quick New Appointment Button (Only visible for Admin and Operador) */}
+          {currentUser.role !== 'cliente' && (
+            <button
+              onClick={onOpenNewAppointment}
+              className="inline-flex items-center justify-center gap-2 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs md:text-sm font-semibold rounded-lg shadow-sm transition-colors cursor-pointer whitespace-nowrap"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Novo Agendamento</span>
+            </button>
+          )}
         </div>
 
       </div>
     </header>
   );
 };
-

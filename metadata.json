@@ -1,6 +1,6 @@
 {
   "name": "AuraEstética - Gestão de Clínica",
-  "description": "Sistema completo para gestão de clínica de estética com tela de login e autenticação por senha (Admin vs Operador Recepção), agendamentos em grade semanal, anamnese avançada com fotos Antes/Depois e TCLE digital, baixa automática de estoque, fechamento financeiro com emissão de recibos e automação de WhatsApp.",
+  "description": "Sistema completo modular para gestão de clínica de estética com autenticação de equipe (Admin vs Recepção), catálogo de procedimentos com permissão de exclusão/adição pelo Admin, estoque de insumos com baixa automática, portal do paciente com login Google e simulador de orçamento, navegação responsiva mobile e automação de WhatsApp.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

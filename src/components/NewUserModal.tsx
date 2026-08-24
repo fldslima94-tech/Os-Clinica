@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, User, Shield, Mail, Phone, Award, CheckCircle2, Lock } from 'lucide-react';
+import { X, User, Shield, Mail, Phone, Award, CheckCircle2, Lock, UserCheck } from 'lucide-react';
 import { UsuarioEquipe, UserRole, PermissoesUsuario } from '../types';
 
 interface NewUserModalProps {
@@ -15,10 +15,9 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
 }) => {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
-  const [cargo, setCargo] = useState('');
+  const [cargo, setCargo] = useState('Operador');
   const [role, setRole] = useState<UserRole>('operador');
   const [telefone, setTelefone] = useState('');
-  const [registroProfissional, setRegistroProfissional] = useState('');
   const [senha, setSenha] = useState('');
 
   // Default permissions based on role
@@ -35,6 +34,7 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
   const handleRoleChange = (newRole: UserRole) => {
     setRole(newRole);
     if (newRole === 'admin') {
+      setCargo('Admin');
       setPermissoes({
         ver_financeiro_completo: true,
         emitir_recibo: true,
@@ -42,8 +42,8 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
         gerenciar_estoque_custos: true,
         configuracoes_sistema: true,
       });
-      if (!cargo) setCargo('Biomédica Esteta / Dra. Responsável');
-    } else {
+    } else if (newRole === 'operador') {
+      setCargo('Operador');
       setPermissoes({
         ver_financeiro_completo: false,
         emitir_recibo: true,
@@ -51,7 +51,15 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
         gerenciar_estoque_custos: false,
         configuracoes_sistema: false,
       });
-      if (!cargo) setCargo('Recepção & Atendimento');
+    } else {
+      setCargo('Cliente');
+      setPermissoes({
+        ver_financeiro_completo: false,
+        emitir_recibo: false,
+        editar_prontuario_clinico: false,
+        gerenciar_estoque_custos: false,
+        configuracoes_sistema: false,
+      });
     }
   };
 
@@ -62,11 +70,10 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
     onSaveUser({
       nome: nome.trim(),
       email: email.trim(),
-      senha: senha.trim() || (role === 'admin' ? 'admin123' : 'recepcao123'),
-      cargo: cargo.trim() || (role === 'admin' ? 'Profissional / Admin' : 'Recepção / Operador'),
+      senha: senha.trim() || (role === 'admin' ? 'admin123' : role === 'operador' ? 'operador123' : 'cliente123'),
+      cargo: cargo.trim() || (role === 'admin' ? 'Admin' : role === 'operador' ? 'Operador' : 'Cliente'),
       role,
       telefone: telefone.trim(),
-      registro_profissional: registroProfissional.trim(),
       status: 'ativo',
       permissoes,
     });
@@ -75,9 +82,8 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
     setNome('');
     setEmail('');
     setSenha('');
-    setCargo('');
+    setCargo('Operador');
     setTelefone('');
-    setRegistroProfissional('');
     onClose();
   };
 
@@ -92,8 +98,8 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
               <User className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">Novo Membro da Equipe</h2>
-              <p className="text-xs text-slate-500">Defina o perfil de acesso (Admin ou Operador)</p>
+              <h2 className="text-base font-bold text-slate-900">Novo Cadastro de Usuário</h2>
+              <p className="text-xs text-slate-500">Selecione o perfil: Admin, Operador ou Cliente</p>
             </div>
           </div>
           <button
@@ -109,199 +115,188 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
           {/* Seletor de Perfil (Role) */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
-              Tipo de Acesso (Perfil)
+              Tipo de Acesso (Perfil) *
             </label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              
               <button
                 type="button"
                 onClick={() => handleRoleChange('admin')}
-                className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
                   role === 'admin'
-                    ? 'border-indigo-600 bg-indigo-50/70 text-indigo-950 ring-2 ring-indigo-600/20'
+                    ? 'border-indigo-600 bg-indigo-50 text-indigo-950 ring-2 ring-indigo-600/20'
                     : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
                 }`}
               >
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-indigo-700">
-                    <Shield className="w-4 h-4 text-indigo-600" />
-                    👑 Administrador
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1 text-indigo-700">
+                    👑 Admin
                   </span>
-                  {role === 'admin' && <CheckCircle2 className="w-4 h-4 text-indigo-600" />}
+                  {role === 'admin' && <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />}
                 </div>
-                <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Acesso irrestrito: gestão financeira, prontuário clínico e estoque.
+                <p className="text-[10px] text-slate-500 leading-tight">
+                  Acesso irrestrito a procedimentos, financeiro e equipe.
                 </p>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleRoleChange('operador')}
-                className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
                   role === 'operador'
-                    ? 'border-indigo-600 bg-indigo-50/70 text-indigo-950 ring-2 ring-indigo-600/20'
+                    ? 'border-emerald-600 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-600/20'
                     : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
                 }`}
               >
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-slate-800">
-                    <User className="w-4 h-4 text-slate-600" />
-                    🧑‍💼 Operador (Recepção)
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1 text-emerald-700">
+                    🧑‍💼 Operador
                   </span>
-                  {role === 'operador' && <CheckCircle2 className="w-4 h-4 text-indigo-600" />}
+                  {role === 'operador' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
                 </div>
-                <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Focado no balcão, agendamentos, WhatsApp e emissão de recibos.
+                <p className="text-[10px] text-slate-500 leading-tight">
+                  Atendimento, agenda, pacientes e estoque.
                 </p>
               </button>
+
+              <button
+                type="button"
+                onClick={() => handleRoleChange('cliente')}
+                className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                  role === 'cliente'
+                    ? 'border-blue-600 bg-blue-50 text-blue-950 ring-2 ring-blue-600/20'
+                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1 text-blue-700">
+                    👤 Cliente
+                  </span>
+                  {role === 'cliente' && <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />}
+                </div>
+                <p className="text-[10px] text-slate-500 leading-tight">
+                  Portal do Paciente e orçamentos.
+                </p>
+              </button>
+
             </div>
           </div>
 
-          {/* Nome Completo */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Nome Completo *
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="Ex: Dra. Juliana Fernandes ou Carlos Souza"
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-colors"
-            />
+          {/* Nome e Cargo */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Nome Completo *</label>
+              <input
+                type="text"
+                required
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                placeholder="Ex: Mariana Silva"
+                className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Cargo / Função *</label>
+              <select
+                value={cargo}
+                onChange={(e) => setCargo(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600"
+              >
+                <option value="Admin">Admin</option>
+                <option value="Operador">Operador</option>
+                <option value="Cliente">Cliente</option>
+              </select>
+            </div>
           </div>
 
           {/* Email, Senha e Telefone */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                E-mail de Acesso (Login) *
-              </label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="email"
-                  required
-                  placeholder="usuario@esteticaos.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-colors"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Senha Inicial
-              </label>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="password"
-                  placeholder={role === 'admin' ? 'admin123' : 'recepcao123'}
-                  value={senha}
-                  onChange={(e) => setSenha(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-colors"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                WhatsApp / Celular
-              </label>
-              <div className="relative">
-                <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  placeholder="(11) 98888-7777"
-                  value={telefone}
-                  onChange={(e) => setTelefone(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-colors"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Cargo e Registro Profissional */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Cargo / Especialidade
-              </label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">E-mail (Login) *</label>
               <input
-                type="text"
-                placeholder={role === 'admin' ? 'Biomédica Esteta' : 'Secretária / Recepcionista'}
-                value={cargo}
-                onChange={(e) => setCargo(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-colors"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="email@esteticaos.com.br"
+                className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Registro Profissional (Opcional)
-              </label>
-              <div className="relative">
-                <Award className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  placeholder="CRBM 12345 / CRM 98765"
-                  value={registroProfissional}
-                  onChange={(e) => setRegistroProfissional(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-colors"
-                />
-              </div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Senha de Acesso *</label>
+              <input
+                type="password"
+                required
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                placeholder="Defina a senha"
+                className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">WhatsApp / Telefone</label>
+              <input
+                type="text"
+                value={telefone}
+                onChange={(e) => setTelefone(e.target.value)}
+                placeholder="(11) 99999-9999"
+                className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600"
+              />
             </div>
           </div>
 
-          {/* Permissões Granulares */}
-          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
-              Permissões Granulares
-            </span>
-            <div className="space-y-2 text-xs">
-              <label className="flex items-center gap-2 cursor-pointer text-slate-800 font-medium">
+          {/* Permissões Específicas */}
+          <div className="pt-2">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+              Permissões do Perfil
+            </label>
+            <div className="space-y-2 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={permissoes.ver_financeiro_completo}
                   onChange={(e) => setPermissoes({ ...permissoes, ver_financeiro_completo: e.target.checked })}
-                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded text-indigo-600 focus:ring-indigo-500"
                 />
-                <span>Visualizar Dashboard Financeiro Completo (Lucro Líquido & DRE)</span>
+                <span className="font-semibold text-slate-800">Visualizar DRE e Métricas Financeiras Completas</span>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer text-slate-800 font-medium">
+
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={permissoes.editar_prontuario_clinico}
                   onChange={(e) => setPermissoes({ ...permissoes, editar_prontuario_clinico: e.target.checked })}
-                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded text-indigo-600 focus:ring-indigo-500"
                 />
-                <span>Editar Anamnese Clínica & Fotos Antes/Depois</span>
+                <span className="font-semibold text-slate-800">Evolução Clínica & Prontuários</span>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer text-slate-800 font-medium">
+
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={permissoes.gerenciar_estoque_custos}
                   onChange={(e) => setPermissoes({ ...permissoes, gerenciar_estoque_custos: e.target.checked })}
-                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded text-indigo-600 focus:ring-indigo-500"
                 />
-                <span>Gerenciar Preços de Custo e Lotes de Insumos</span>
+                <span className="font-semibold text-slate-800">Gerenciar Custos de Insumos & Procedimentos</span>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer text-slate-800 font-medium">
+
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={permissoes.emitir_recibo}
                   onChange={(e) => setPermissoes({ ...permissoes, emitir_recibo: e.target.checked })}
-                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded text-indigo-600 focus:ring-indigo-500"
                 />
-                <span>Emitir Recibos e Registrar Pagamentos de Clientes</span>
+                <span className="font-semibold text-slate-800">Emissão de Recibos & Comprovantes</span>
               </label>
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+          <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
@@ -313,12 +308,11 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
               type="submit"
               className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
             >
-              Salvar Membro
+              Salvar Usuário
             </button>
           </div>
 
         </form>
-
       </div>
     </div>
   );
