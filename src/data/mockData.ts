@@ -529,3 +529,55 @@ Eu, abaixo qualificado(a), declaro para os devidos fins que:
 2. Estou ciente de que podem ocorrer efeitos secundários transitórios normais, tais como: leve edema (inchaço), eritema (vermelhidão), pequenos hematomas locais ou sensibilidade temporária na região aplicada.
 3. Comprometo-me a seguir rigorosamente todas as recomendações e cuidados pós-procedimento repassados pela equipe clínica (como evitar exposição solar direta, não realizar esforço físico intenso nas primeiras 24-48 horas e não massagear a área sem indicação expressa).
 4. Confirmo a veracidade de todas as informações prestadas na minha anamnese clínica, incluindo histórico de alergias, medicamentos em uso ou comorbidades prévias.`;
+
+export const MOCK_ALERTAS_RETORNO = [
+  {
+    id: 'alt-001',
+    paciente_id: 'b1a2c3d4-0001-4000-8000-000000000001',
+    paciente_nome: 'Dra. Camila Nogueira Sampaio',
+    telefone: '(11) 98765-4321',
+    procedimento_origem: 'Toxina Botulínica (3 Áreas)',
+    data_procedimento: new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10),
+    dias_apos: 15,
+    data_ideal_retorno: new Date(Date.now() + 1 * 86400000).toISOString().slice(0, 10),
+    motivo: 'Retorno e Retoque de Avaliação (15 dias)',
+    status: 'pendente' as const,
+  },
+  {
+    id: 'alt-002',
+    paciente_id: 'b1a2c3d4-0004-4000-8000-000000000004',
+    paciente_nome: 'Beatriz Vasconcelos',
+    telefone: '(11) 98234-5566',
+    procedimento_origem: 'Bioestimulador de Colágeno (Radiesse)',
+    data_procedimento: new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10),
+    dias_apos: 30,
+    data_ideal_retorno: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10),
+    motivo: 'Segunda Sessão do Protocolo de Firmeza (30 dias)',
+    status: 'pendente' as const,
+  },
+  {
+    id: 'alt-003',
+    paciente_id: 'b1a2c3d4-0002-4000-8000-000000000002',
+    paciente_nome: 'Juliana Paes Silveira',
+    telefone: '(11) 97654-3210',
+    procedimento_origem: 'Preenchimento Labial (1ml)',
+    data_procedimento: new Date(Date.now() - 12 * 86400000).toISOString().slice(0, 10),
+    dias_apos: 15,
+    data_ideal_retorno: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10),
+    motivo: 'Revisão de Simetria e Pós-Edema Labial',
+    status: 'contatado' as const,
+  },
+  {
+    id: 'alt-004',
+    paciente_id: 'b1a2c3d4-0005-4000-8000-000000000005',
+    paciente_nome: 'Mariana Duarte Rios',
+    telefone: '(11) 97345-6677',
+    procedimento_origem: 'Fios de Sustentação PDO',
+    data_procedimento: new Date(Date.now() - 45 * 86400000).toISOString().slice(0, 10),
+    dias_apos: 45,
+    data_ideal_retorno: new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10),
+    motivo: 'Acompanhamento de Acomodação dos Fios (45 dias)',
+    status: 'pendente' as const,
+  }
+];
+

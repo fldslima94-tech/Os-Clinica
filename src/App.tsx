@@ -5,6 +5,7 @@ import {
   MOCK_ESTOQUE, 
   MOCK_TRANSACOES,
   MOCK_USUARIOS,
+  MOCK_ALERTAS_RETORNO,
   RECEITA_INSUMOS_PADRAO
 } from './data/mockData';
 import { 
@@ -18,7 +19,8 @@ import {
   FormaPagamento, 
   StatusPagamento,
   UsuarioEquipe,
-  UserRole
+  UserRole,
+  AlertaRetornoPos
 } from './types';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -28,6 +30,7 @@ import { PatientsView } from './components/PatientsView';
 import { InventoryView } from './components/InventoryView';
 import { FinancialView } from './components/FinancialView';
 import { WhatsAppAutomationView } from './components/WhatsAppAutomationView';
+import { PostCareReturnView } from './components/PostCareReturnView';
 import { SupabaseGuideView } from './components/SupabaseGuideView';
 import { UsersManagementView } from './components/UsersManagementView';
 import { LoginView } from './components/LoginView';
@@ -39,6 +42,8 @@ import { EditUserModal } from './components/EditUserModal';
 import { PatientDetailsModal } from './components/PatientDetailsModal';
 import { SqlAndArchitectureModal } from './components/SqlAndArchitectureModal';
 import { CompleteProcedureModal } from './components/CompleteProcedureModal';
+import { GlobalSearchModal } from './components/GlobalSearchModal';
+import { TreatmentPackagesModal } from './components/TreatmentPackagesModal';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 
 // Storage Helper
@@ -68,6 +73,9 @@ export default function App() {
   );
   const [usuarios, setUsuarios] = useState<UsuarioEquipe[]>(() => 
     getStoredData<UsuarioEquipe[]>('usuarios', MOCK_USUARIOS)
+  );
+  const [alertasRetorno, setAlertasRetorno] = useState<AlertaRetornoPos[]>(() => 
+    getStoredData<AlertaRetornoPos[]>('alertas_retorno', MOCK_ALERTAS_RETORNO)
   );
   const [currentUser, setCurrentUser] = useState<UsuarioEquipe>(() => 
     getStoredData<UsuarioEquipe>('currentUser', MOCK_USUARIOS[0])
@@ -109,6 +117,12 @@ export default function App() {
 
   useEffect(() => {
     try {
+      localStorage.setItem('esteticaos_alertas_retorno', JSON.stringify(alertasRetorno));
+    } catch (e) {}
+  }, [alertasRetorno]);
+
+  useEffect(() => {
+    try {
       localStorage.setItem('esteticaos_currentUser', JSON.stringify(currentUser));
     } catch (e) {}
   }, [currentUser]);
@@ -124,6 +138,8 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Modals State
+  const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
+  const [patientForPackages, setPatientForPackages] = useState<Paciente | null>(null);
   const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState(false);
   const [isNewPatientOpen, setIsNewPatientOpen] = useState(false);
   const [isNewInventoryOpen, setIsNewInventoryOpen] = useState(false);
@@ -161,6 +177,8 @@ export default function App() {
 
     const statusLabels: Record<StatusAgendamento, string> = {
       confirmado: 'Agendamento confirmado com sucesso!',
+      em_espera: 'Paciente colocado na Sala de Espera (Recepção).',
+      em_atendimento: 'Paciente chamado para a Sala de Procedimento!',
       concluido: 'Procedimento finalizado!',
       cancelado: 'Agendamento cancelado.',
       pendente: 'Status alterado para pendente.',
@@ -356,7 +374,29 @@ export default function App() {
     );
   };
 
-  // 10. User Management Handlers
+  // 10. Update Post Care Alert Status
+  const handleUpdateAlertaStatus = (alertaId: string, status: 'pendente' | 'agendado' | 'contatado') => {
+    setAlertasRetorno(prev =>
+      prev.map(a => (a.id === alertaId ? { ...a, status } : a))
+    );
+    showToast(`Status do alerta atualizado para "${status}"!`);
+  };
+
+  // 11. Update Patient Packages
+  const handleUpdatePacienteObj = (updatedPaciente: Paciente) => {
+    setPacientes(prev =>
+      prev.map(p => (p.id === updatedPaciente.id ? updatedPaciente : p))
+    );
+    if (selectedPatientForDetails?.id === updatedPaciente.id) {
+      setSelectedPatientForDetails(updatedPaciente);
+    }
+    if (patientForPackages?.id === updatedPaciente.id) {
+      setPatientForPackages(updatedPaciente);
+    }
+    showToast('Pacote de sessões do paciente atualizado com sucesso!');
+  };
+
+  // 12. User Management Handlers
   const handleSaveUser = (novo: Omit<UsuarioEquipe, 'id' | 'created_at'>) => {
     const created: UsuarioEquipe = {
       ...novo,
@@ -447,6 +487,7 @@ export default function App() {
         setActiveTab={setActiveTab}
         onOpenNewAppointment={() => setIsNewAppointmentOpen(true)}
         onOpenSqlGuide={() => setIsSqlModalOpen(true)}
+        onOpenGlobalSearch={() => setIsGlobalSearchOpen(true)}
         lowStockCount={lowStockCount}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
@@ -503,6 +544,7 @@ export default function App() {
               pacientes={pacientes}
               onOpenNewPatient={() => setIsNewPatientOpen(true)}
               onViewPatient={(p) => setSelectedPatientForDetails(p)}
+              onOpenPackages={(p) => setPatientForPackages(p)}
             />
           )}
 
@@ -531,6 +573,21 @@ export default function App() {
             />
           )}
 
+          {activeTab === 'retorno_pos' && (
+            <PostCareReturnView
+              alertas={alertasRetorno}
+              onUpdateAlertaStatus={handleUpdateAlertaStatus}
+              onViewPatientByName={(nome) => {
+                const found = pacientes.find(p => p.nome.toLowerCase() === nome.toLowerCase());
+                if (found) {
+                  setSelectedPatientForDetails(found);
+                } else {
+                  setActiveTab('pacientes');
+                }
+              }}
+            />
+          )}
+
           {activeTab === 'usuarios' && (
             <UsersManagementView
               usuarios={usuarios}
@@ -551,6 +608,28 @@ export default function App() {
       </div>
 
       {/* MODALS */}
+      <GlobalSearchModal
+        isOpen={isGlobalSearchOpen}
+        onClose={() => setIsGlobalSearchOpen(false)}
+        pacientes={pacientes}
+        agendamentos={agendamentos}
+        estoque={estoque}
+        setActiveTab={setActiveTab}
+        onViewPatient={(p) => setSelectedPatientForDetails(p)}
+        onOpenNewAppointment={() => setIsNewAppointmentOpen(true)}
+        onOpenNewPatient={() => setIsNewPatientOpen(true)}
+        onOpenNewInventory={() => setIsNewInventoryOpen(true)}
+      />
+
+      {patientForPackages && (
+        <TreatmentPackagesModal
+          isOpen={!!patientForPackages}
+          onClose={() => setPatientForPackages(null)}
+          paciente={patientForPackages}
+          onUpdatePaciente={handleUpdatePacienteObj}
+        />
+      )}
+
       <NewAppointmentModal
         isOpen={isNewAppointmentOpen}
         onClose={() => setIsNewAppointmentOpen(false)}

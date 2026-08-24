@@ -1,8 +1,34 @@
-export type StatusAgendamento = 'pendente' | 'confirmado' | 'concluido' | 'cancelado';
+export type StatusAgendamento = 'pendente' | 'confirmado' | 'em_espera' | 'em_atendimento' | 'concluido' | 'cancelado';
 export type UnidadeMedida = 'ml' | 'unidade' | 'seringa';
 export type FormaPagamento = 'pix' | 'cartao_credito' | 'cartao_debito' | 'dinheiro' | 'transferencia';
 export type StatusPagamento = 'pago' | 'pendente' | 'parcial';
 export type UserRole = 'admin' | 'operador';
+
+export interface PacoteTratamento {
+  id: string;
+  nome_pacote: string; // Ex: "Protocolo Glúteo Max (5 Sessões)" ou "Laser Lavieen (3 Sessões)"
+  procedimento: string;
+  total_sessoes: number;
+  sessoes_realizadas: number;
+  valor_total: number;
+  status: 'em_andamento' | 'concluido' | 'cancelado';
+  data_inicio: string;
+  ultima_sessao?: string;
+  observacoes?: string;
+}
+
+export interface AlertaRetornoPos {
+  id: string;
+  paciente_id: string;
+  paciente_nome: string;
+  telefone: string;
+  procedimento_origem: string;
+  data_procedimento: string;
+  dias_apos: number; // Ex: 15 para botox, 30 para bioestimulador
+  data_ideal_retorno: string;
+  motivo: string; // Ex: "Revisão e retoque gratuito de Botox (15 dias)"
+  status: 'pendente' | 'agendado' | 'contatado';
+}
 
 export interface PermissoesUsuario {
   ver_financeiro_completo: boolean;
@@ -63,6 +89,7 @@ export interface Paciente {
   foto_url?: string;
   fotos_antes_depois?: FotoAntesDepois[];
   termo_consentimento?: TermoConsentimento;
+  pacotes?: PacoteTratamento[];
 }
 
 export interface InsumoConsumido {
@@ -128,5 +155,6 @@ export type TabType =
   | 'financeiro' 
   | 'whatsapp'
   | 'whatsapp_automation' 
+  | 'retorno_pos'
   | 'usuarios'
   | 'supabase_guide';

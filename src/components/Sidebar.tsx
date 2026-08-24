@@ -76,6 +76,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200 font-semibold',
     },
     {
+      id: 'retorno_pos' as TabType,
+      label: 'Retornos & Pós-Venda',
+      icon: HeartPulse,
+      badge: 'Retoque 15d',
+      badgeColor: 'bg-rose-100 text-rose-800 border-rose-200 font-semibold',
+    },
+    {
       id: 'usuarios' as TabType,
       label: 'Equipe & Permissões',
       icon: UserCheck,

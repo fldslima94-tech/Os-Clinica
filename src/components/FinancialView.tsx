@@ -19,7 +19,9 @@ import {
   Calendar,
   Lock,
   Eye,
-  EyeOff
+  EyeOff,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 import { TransacaoFinanceira, FormaPagamento, StatusPagamento, UsuarioEquipe } from '../types';
 
@@ -116,6 +118,31 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
     return map[forma] || forma;
   };
 
+  const handleExportCSV = () => {
+    const headers = ['ID', 'Data', 'Tipo', 'Paciente / Favorecido', 'Procedimento', 'Valor (R$)', 'Custo Insumos (R$)', 'Forma Pagamento', 'Status', 'Observacao'];
+    const rows = filteredTransacoes.map(t => [
+      t.id,
+      new Date(t.data).toLocaleDateString('pt-BR'),
+      t.tipo.toUpperCase(),
+      `"${t.paciente_nome.replace(/"/g, '""')}"`,
+      `"${t.procedimento.replace(/"/g, '""')}"`,
+      t.valor.toFixed(2),
+      (t.custo_insumos || 0).toFixed(2),
+      getFormaLabel(t.forma_pagamento),
+      t.status.toUpperCase(),
+      `"${(t.observacao || '').replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `relatorio_financeiro_esteticaos_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-6">
       
@@ -150,13 +177,24 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={() => setIsNewTxModalOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-lg text-sm font-semibold transition-colors cursor-pointer shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Lançar Entrada / Despesa</span>
-        </button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <button
+            onClick={handleExportCSV}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+            title="Exportar dados para Excel (.CSV)"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            <span>Exportar Excel / CSV</span>
+          </button>
+
+          <button
+            onClick={() => setIsNewTxModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-lg text-sm font-semibold transition-colors cursor-pointer shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Lançar Entrada / Despesa</span>
+          </button>
+        </div>
       </div>
 
       {/* Metric Cards Grid */}

@@ -18,7 +18,10 @@ import {
   Filter,
   Check,
   TrendingUp,
-  ArrowRight
+  ArrowRight,
+  UserCheck,
+  DoorOpen,
+  Volume2
 } from 'lucide-react';
 import { Agendamento, EstoqueInsumo, Paciente, StatusAgendamento } from '../types';
 
@@ -70,6 +73,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // Calculate quick metrics
   const totalToday = agendamentos.length;
   const confirmedCount = agendamentos.filter(a => a.status === 'confirmado').length;
+  const inWaitingRoomCount = agendamentos.filter(a => a.status === 'em_espera').length;
+  const inProcedureCount = agendamentos.filter(a => a.status === 'em_atendimento').length;
   const pendingCount = agendamentos.filter(a => a.status === 'pendente').length;
   const completedCount = agendamentos.filter(a => a.status === 'concluido').length;
 
@@ -92,6 +97,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const getStatusBadge = (status: StatusAgendamento) => {
     switch (status) {
+      case 'em_atendimento':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-300 animate-pulse">
+            <DoorOpen className="w-3.5 h-3.5 text-indigo-700" />
+            Em Procedimento (Sala)
+          </span>
+        );
+      case 'em_espera':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300">
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+            Na Recepção (Chegou)
+          </span>
+        );
       case 'confirmado':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200/60">
@@ -103,7 +122,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200/60">
             <Hourglass className="w-3.5 h-3.5 text-amber-600" />
-            Pendente
+            Aguardando Confirmação
           </span>
         );
       case 'concluido':
@@ -126,7 +145,54 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   return (
     <div className="space-y-6">
       
-      {/* 1. TOP STATS CARDS */}
+      {/* 1. REAL-TIME CLINIC QUEUE STATUS BANNER */}
+      {(inWaitingRoomCount > 0 || inProcedureCount > 0) && (
+        <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 text-white rounded-2xl p-4 sm:p-5 shadow-lg border border-indigo-700 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0">
+              <DoorOpen className="w-5 h-5 text-indigo-300" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">
+                  Painel de Presença & Fila da Clínica
+                </h3>
+                <span className="bg-emerald-500 text-white text-[10px] font-bold uppercase px-2 py-0.5 rounded-full animate-pulse">
+                  Ao Vivo
+                </span>
+              </div>
+              <p className="text-xs text-indigo-200 mt-0.5">
+                {inWaitingRoomCount} paciente{inWaitingRoomCount > 1 ? 's' : ''} aguardando na recepção • {inProcedureCount} em atendimento em sala clínica
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+            <button
+              onClick={() => setStatusFilter('em_espera')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer border ${
+                statusFilter === 'em_espera'
+                  ? 'bg-amber-400 text-slate-950 border-amber-300'
+                  : 'bg-white/10 hover:bg-white/20 text-white border-white/20'
+              }`}
+            >
+              🔔 Ver Recepção ({inWaitingRoomCount})
+            </button>
+            <button
+              onClick={() => setStatusFilter('em_atendimento')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer border ${
+                statusFilter === 'em_atendimento'
+                  ? 'bg-indigo-300 text-indigo-950 border-indigo-200'
+                  : 'bg-white/10 hover:bg-white/20 text-white border-white/20'
+              }`}
+            >
+              🚪 Ver Em Sala ({inProcedureCount})
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 2. TOP STATS CARDS */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         
         {/* Card 1: Total do Dia */}
@@ -141,27 +207,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Card 2: Confirmados */}
+        {/* Card 2: Na Recepção / Confirmados */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <div className="text-slate-400 text-xs font-bold uppercase mb-1 tracking-wider">Na Recepção / Sala</div>
+            <div className="text-2xl font-bold text-indigo-600">{inWaitingRoomCount + inProcedureCount}</div>
+            <p className="text-xs text-slate-400 mt-1">{inWaitingRoomCount} na espera • {inProcedureCount} em sala</p>
+          </div>
+          <div className="w-10 h-10 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+            <UserCheck className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Card 3: Confirmados */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <div className="text-slate-400 text-xs font-bold uppercase mb-1 tracking-wider">Confirmados</div>
             <div className="text-2xl font-bold text-green-600">{confirmedCount}</div>
-            <p className="text-xs text-slate-400 mt-1">Prontos para atendimento</p>
+            <p className="text-xs text-slate-400 mt-1">Prontos para chegada</p>
           </div>
           <div className="w-10 h-10 rounded-lg bg-green-50 border border-green-100 flex items-center justify-center text-green-600">
             <CheckCircle2 className="w-5 h-5" />
-          </div>
-        </div>
-
-        {/* Card 3: Pendentes */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div>
-            <div className="text-slate-400 text-xs font-bold uppercase mb-1 tracking-wider">Aguardando Confirmação</div>
-            <div className="text-2xl font-bold text-amber-600">{pendingCount}</div>
-            <p className="text-xs text-slate-400 mt-1">Contatar via WhatsApp</p>
-          </div>
-          <div className="w-10 h-10 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
-            <Hourglass className="w-5 h-5" />
           </div>
         </div>
 
@@ -191,7 +257,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       </div>
 
-      {/* 2. LOW STOCK ALERT BANNER */}
+      {/* 3. LOW STOCK ALERT BANNER */}
       {lowStockItems.length > 0 && (
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
@@ -241,22 +307,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       )}
 
-      {/* 3. MAIN SECTION: TODAY'S APPOINTMENTS (BALCÃO DE RECEPÇÃO) */}
+      {/* 4. MAIN SECTION: TODAY'S APPOINTMENTS (BALCÃO DE RECEPÇÃO COM STATUS DE ESPERA) */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
         
         {/* Section Header with Filters */}
-        <div className="px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="px-6 py-4 border-b border-slate-100 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
               <h2 className="font-bold text-slate-800 uppercase text-sm tracking-wider">
-                Próximos Horários & Agendamentos
+                Fila de Atendimento & Horários de Hoje
               </h2>
               <span className="text-xs bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-full border border-slate-200">
                 {filteredAgendamentos.length}
               </span>
             </div>
             <p className="text-xs text-slate-400 font-medium mt-0.5">
-              Fluxo em tempo real para controle de recepção e atendimentos da clínica
+              Controle de presença: marque quando a paciente chegar na recepção ou entrar na sala
             </p>
           </div>
 
@@ -264,7 +330,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 p-1 rounded-lg border border-slate-200 text-xs">
             <button
               onClick={() => setStatusFilter('todos')}
-              className={`px-3 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
+              className={`px-2.5 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
                 statusFilter === 'todos'
                   ? 'bg-white text-slate-900 shadow-2xs font-semibold'
                   : 'text-slate-600 hover:text-slate-900'
@@ -273,8 +339,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               Todos ({totalToday})
             </button>
             <button
+              onClick={() => setStatusFilter('em_espera')}
+              className={`px-2.5 py-1.5 rounded-md font-bold transition-colors cursor-pointer ${
+                statusFilter === 'em_espera'
+                  ? 'bg-amber-500 text-white shadow-2xs'
+                  : 'text-amber-800 hover:bg-amber-100'
+              }`}
+            >
+              🔔 Na Recepção ({inWaitingRoomCount})
+            </button>
+            <button
+              onClick={() => setStatusFilter('em_atendimento')}
+              className={`px-2.5 py-1.5 rounded-md font-bold transition-colors cursor-pointer ${
+                statusFilter === 'em_atendimento'
+                  ? 'bg-indigo-600 text-white shadow-2xs'
+                  : 'text-indigo-700 hover:bg-indigo-100'
+              }`}
+            >
+              🚪 Em Sala ({inProcedureCount})
+            </button>
+            <button
               onClick={() => setStatusFilter('confirmado')}
-              className={`px-3 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
+              className={`px-2.5 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
                 statusFilter === 'confirmado'
                   ? 'bg-white text-green-700 shadow-2xs font-semibold'
                   : 'text-slate-600 hover:text-slate-900'
@@ -284,7 +370,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </button>
             <button
               onClick={() => setStatusFilter('pendente')}
-              className={`px-3 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
+              className={`px-2.5 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
                 statusFilter === 'pendente'
                   ? 'bg-white text-amber-700 shadow-2xs font-semibold'
                   : 'text-slate-600 hover:text-slate-900'
@@ -294,7 +380,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </button>
             <button
               onClick={() => setStatusFilter('concluido')}
-              className={`px-3 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
+              className={`px-2.5 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
                 statusFilter === 'concluido'
                   ? 'bg-white text-slate-800 shadow-2xs font-semibold'
                   : 'text-slate-600 hover:text-slate-900'
@@ -333,21 +419,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <th className="px-6 py-3">Horário</th>
                   <th className="px-6 py-3">Paciente</th>
                   <th className="px-6 py-3">Procedimento</th>
-                  <th className="px-6 py-3">Status</th>
+                  <th className="px-6 py-3">Status de Fila</th>
                   <th className="px-6 py-3">Observações</th>
-                  <th className="px-6 py-3 text-right">Ações de Recepção</th>
+                  <th className="px-6 py-3 text-right">Controle em Tempo Real</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
                 {filteredAgendamentos.map((ag) => {
                   const patient = ag.paciente || pacientes.find(p => p.id === ag.paciente_id);
+                  const isWaiting = ag.status === 'em_espera';
+                  const isInRoom = ag.status === 'em_atendimento';
                   const isPending = ag.status === 'pendente';
 
                   return (
                     <tr 
                       key={ag.id} 
                       className={`hover:bg-slate-50 transition-colors ${
-                        isPending ? 'bg-amber-50/20' : ''
+                        isWaiting ? 'bg-amber-50/40 font-medium' : isInRoom ? 'bg-indigo-50/40' : isPending ? 'bg-amber-50/20' : ''
                       }`}
                     >
                       {/* Horário */}
@@ -421,28 +509,42 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </p>
                       </td>
 
-                      {/* Ações Rápidas */}
+                      {/* Ações Rápidas de Fila */}
                       <td className="px-6 py-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
-                          {ag.status === 'pendente' && (
+                          
+                          {/* 1. Se confirmado ou pendente: Botão "Chegou na Recepção" */}
+                          {(ag.status === 'confirmado' || ag.status === 'pendente') && (
                             <button
-                              onClick={() => onUpdateStatus(ag.id, 'confirmado')}
-                              title="Confirmar Agendamento"
-                              className="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white rounded-md text-xs font-semibold shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1"
+                              onClick={() => onUpdateStatus(ag.id, 'em_espera')}
+                              title="Marcar que o paciente chegou na recepção"
+                              className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-md text-xs font-bold shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1"
                             >
-                              <Check className="w-3 h-3" />
-                              <span>Confirmar</span>
+                              <span>🔔 Chegou</span>
                             </button>
                           )}
 
-                          {ag.status !== 'concluido' && (
+                          {/* 2. Se na recepção: Botão "Chamar p/ Sala" */}
+                          {ag.status === 'em_espera' && (
+                            <button
+                              onClick={() => onUpdateStatus(ag.id, 'em_atendimento')}
+                              title="Chamar paciente para a sala de atendimento"
+                              className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-bold shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1"
+                            >
+                              <DoorOpen className="w-3.5 h-3.5" />
+                              <span>Entrar em Sala</span>
+                            </button>
+                          )}
+
+                          {/* 3. Concluir Procedimento */}
+                          {(ag.status === 'em_atendimento' || ag.status === 'em_espera' || ag.status === 'confirmado') && (
                             <button
                               onClick={() => handleConclude(ag)}
-                              title="Marcar como Concluído e dar Baixa"
-                              className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-semibold shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1"
+                              title="Concluir Procedimento, dar Baixa no Estoque e Lançar Financeiro"
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-bold shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1"
                             >
-                              <CheckCircle2 className="w-3 h-3" />
-                              <span>Concluir</span>
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Finalizar</span>
                             </button>
                           )}
 
@@ -477,7 +579,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         {/* Footer info */}
         <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-          <span>* Concluir um atendimento desconta os insumos automaticamente do estoque e gera lançamento financeiro.</span>
+          <span>* Fila inteligente: Alerte a biomédica/médica quando a paciente chegar marcando <strong>🔔 Chegou</strong>.</span>
           <button 
             onClick={onOpenNewAppointment}
             className="text-indigo-600 hover:text-indigo-700 font-semibold cursor-pointer"
@@ -488,7 +590,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       </div>
 
-      {/* 4. BALCÃO QUICK ACTIONS BAR */}
+      {/* 5. BALCÃO QUICK ACTIONS BAR */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         
         <div 

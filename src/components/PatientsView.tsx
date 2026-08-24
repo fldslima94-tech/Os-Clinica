@@ -9,7 +9,8 @@ import {
   MessageCircle, 
   AlertCircle, 
   ChevronRight,
-  ShieldAlert
+  ShieldAlert,
+  Package
 } from 'lucide-react';
 import { Paciente } from '../types';
 
@@ -17,12 +18,14 @@ interface PatientsViewProps {
   pacientes: Paciente[];
   onOpenNewPatient: () => void;
   onViewPatient: (paciente: Paciente) => void;
+  onOpenPackages?: (paciente: Paciente) => void;
 }
 
 export const PatientsView: React.FC<PatientsViewProps> = ({
   pacientes,
   onOpenNewPatient,
   onViewPatient,
+  onOpenPackages,
 }) => {
   const [search, setSearch] = useState('');
 
@@ -157,6 +160,19 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
                     </div>
                   </div>
 
+                  {/* Pacotes Ativos */}
+                  {paciente.pacotes && paciente.pacotes.length > 0 && (
+                    <div className="p-2.5 rounded-lg bg-indigo-50/60 border border-indigo-100 flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-indigo-900 font-medium">
+                        <Package className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>{paciente.pacotes.length} Pacote{paciente.pacotes.length > 1 ? 's' : ''} Ativo{paciente.pacotes.length > 1 ? 's' : ''}</span>
+                      </div>
+                      <span className="text-[10px] font-bold bg-indigo-200 text-indigo-800 px-1.5 py-0.5 rounded">
+                        {paciente.pacotes.reduce((acc, p) => acc + (p.sessoes_totais - p.sessoes_realizadas), 0)} sessões rest.
+                      </span>
+                    </div>
+                  )}
+
                   {/* Prontuário / Histórico Clínico Preview */}
                   <div className="p-3 rounded-lg bg-slate-50 border border-slate-100">
                     <p className="text-[11px] font-semibold text-slate-700 mb-1 flex items-center gap-1">
@@ -170,13 +186,23 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
                 </div>
               </div>
 
-              <button
-                onClick={() => onViewPatient(paciente)}
-                className="w-full py-2 px-3 bg-slate-50 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200 hover:border-indigo-200 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer"
-              >
-                <span>Ver Prontuário Completo</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <button
+                  onClick={() => onOpenPackages && onOpenPackages(paciente)}
+                  className="py-2 px-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                  title="Gerenciar Pacotes e Sessões deste paciente"
+                >
+                  <Package className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Pacotes</span>
+                </button>
+                <button
+                  onClick={() => onViewPatient(paciente)}
+                  className="py-2 px-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <span>Prontuário</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           );
         })}

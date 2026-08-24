@@ -22,6 +22,7 @@ interface HeaderProps {
   setActiveTab: (tab: TabType) => void;
   onOpenNewAppointment: () => void;
   onOpenSqlGuide: () => void;
+  onOpenGlobalSearch?: () => void;
   lowStockCount: number;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
@@ -36,6 +37,7 @@ export const Header: React.FC<HeaderProps> = ({
   setActiveTab,
   onOpenNewAppointment,
   onOpenSqlGuide,
+  onOpenGlobalSearch,
   lowStockCount,
   searchQuery,
   setSearchQuery,
@@ -96,16 +98,25 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Search Bar */}
-        <div className="relative w-full md:w-72">
+        {/* Search Bar with Ctrl+K trigger */}
+        <div className="relative w-full md:w-80">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Buscar paciente, procedimento..."
+            placeholder="Buscar rápida no sistema..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+            onClick={() => onOpenGlobalSearch && onOpenGlobalSearch()}
+            className="w-full pl-9 pr-14 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
           />
+          <button
+            type="button"
+            onClick={() => onOpenGlobalSearch && onOpenGlobalSearch()}
+            className="absolute right-2 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] font-mono font-bold bg-white border border-slate-200 rounded text-slate-500 shadow-2xs hover:bg-slate-50"
+            title="Pressione Ctrl+K ou clique para busca avançada"
+          >
+            ⌘K
+          </button>
         </div>
 
         {/* Right Side: Role Switcher Pill & Actions */}
