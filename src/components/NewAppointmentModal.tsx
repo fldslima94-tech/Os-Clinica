@@ -12,13 +12,14 @@ import {
   ShieldCheck,
   Layers
 } from 'lucide-react';
-import { Agendamento, Paciente, ProcedimentoClinico, StatusAgendamento } from '../types';
+import { Agendamento, Paciente, ProcedimentoClinico, StatusAgendamento, UsuarioEquipe } from '../types';
 
 interface NewAppointmentModalProps {
   isOpen: boolean;
   onClose: () => void;
   pacientes: Paciente[];
   procedimentos?: ProcedimentoClinico[];
+  profissionais?: UsuarioEquipe[];
   onSaveAppointment: (novoAgendamento: Partial<Agendamento>) => void;
   onOpenNewPatient: () => void;
 }
@@ -28,6 +29,7 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
   onClose,
   pacientes,
   procedimentos = [],
+  profissionais = [],
   onSaveAppointment,
   onOpenNewPatient,
 }) => {
@@ -35,6 +37,7 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
   const adminProcedures = procedimentos.filter(p => p.ativo !== false && (p.cadastrado_por_admin !== false));
 
   const [pacienteId, setPacienteId] = useState<string>(pacientes[0]?.id || '');
+  const [profissionalId, setProfissionalId] = useState<string>(profissionais[0]?.id || '');
   const [selectedProcId, setSelectedProcId] = useState<string>(adminProcedures[0]?.id || '');
   const [selectedVariationId, setSelectedVariationId] = useState<string>('');
   const [data, setData] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -45,6 +48,12 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
   const [observacoes, setObservacoes] = useState<string>('');
 
   const currentProc = adminProcedures.find(p => p.id === selectedProcId) || adminProcedures[0];
+
+  useEffect(() => {
+    if (profissionais.length > 0 && !profissionalId) {
+      setProfissionalId(profissionais[0].id);
+    }
+  }, [profissionais, profissionalId]);
 
   useEffect(() => {
     if (adminProcedures.length > 0 && !selectedProcId) {
@@ -94,6 +103,8 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
       }
     }
 
+    const selectedProf = profissionais.find(p => p.id === profissionalId);
+
     onSaveAppointment({
       paciente_id: pacienteId,
       data_hora: dataHoraIso,
@@ -102,6 +113,11 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
       duracao_minutos: Number(duracao),
       valor_estimado: valor ? parseFloat(valor) : undefined,
       observacoes: observacoes.trim() || undefined,
+      profissional_id: profissionalId || undefined,
+      profissional_nome: selectedProf?.nome || undefined,
+      profissional_cargo: selectedProf?.cargo || undefined,
+      contrato_vinculado: currentProc?.contrato_padrao || undefined,
+      contrato_assinado: false,
     });
 
     onClose();
@@ -165,6 +181,25 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
               {pacientes.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.nome} — {p.telefone}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Profissional Responsável */}
+          <div>
+            <label className="font-semibold text-slate-700 block mb-1.5 flex items-center gap-1.5">
+              <User className="w-4 h-4 text-purple-600" />
+              <span>Profissional Responsável pelo Atendimento *</span>
+            </label>
+            <select
+              value={profissionalId}
+              onChange={(e) => setProfissionalId(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-medium"
+            >
+              {profissionais.map((prof) => (
+                <option key={prof.id} value={prof.id}>
+                  {prof.nome} — {prof.cargo} ({prof.role === 'admin' ? 'Responsável Técnico / Admin' : 'Profissional Clínico'})
                 </option>
               ))}
             </select>

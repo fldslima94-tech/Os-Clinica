@@ -1,0 +1,235 @@
+{
+  "entities": {
+    "ClinicaConfig": {
+      "title": "ClinicaConfig",
+      "description": "Configuração da clínica e identidade visual (logomarca, contatos)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "nome": { "type": "string", "maxLength": 120 },
+        "logomarca_url": { "type": "string", "maxLength": 2048 },
+        "telefone": { "type": "string", "maxLength": 30 },
+        "endereco": { "type": "string", "maxLength": 200 },
+        "cnpj": { "type": "string", "maxLength": 30 }
+      },
+      "required": ["id", "nome"]
+    },
+    "UsuarioEquipe": {
+      "title": "UsuarioEquipe",
+      "description": "Profissionais e operadores com RBAC (gestor, recepcao, profissional, cliente)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "clinica_id": { "type": "string", "maxLength": 128 },
+        "nome": { "type": "string", "maxLength": 120 },
+        "email": { "type": "string", "maxLength": 120 },
+        "cargo": { "type": "string", "maxLength": 80 },
+        "role": { "type": "string", "enum": ["gestor", "recepcao", "profissional", "cliente", "admin", "operador"] },
+        "telefone": { "type": "string", "maxLength": 30 },
+        "status": { "type": "string", "enum": ["ativo", "inativo"] },
+        "avatar_url": { "type": "string", "maxLength": 2048 },
+        "registro_profissional": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "nome", "email", "role", "status"]
+    },
+    "Paciente": {
+      "title": "Paciente",
+      "description": "Ficha completa do cliente, histórico, anamnese e evolução",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "clinica_id": { "type": "string", "maxLength": 128 },
+        "nome": { "type": "string", "maxLength": 120 },
+        "telefone": { "type": "string", "maxLength": 30 },
+        "email": { "type": "string", "maxLength": 120 },
+        "cpf": { "type": "string", "maxLength": 20 },
+        "data_nascimento": { "type": "string", "maxLength": 20 },
+        "historico_clinico": { "type": "string", "maxLength": 10000 },
+        "alergias": { "type": "string", "maxLength": 1000 },
+        "medicacoes": { "type": "string", "maxLength": 1000 },
+        "queixa_principal": { "type": "string", "maxLength": 2000 },
+        "criado_em": { "type": "string", "maxLength": 40 }
+      },
+      "required": ["id", "nome", "telefone"]
+    },
+    "Agendamento": {
+      "title": "Agendamento",
+      "description": "Agendamento de atendimento com profissional e insumos",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "clinica_id": { "type": "string", "maxLength": 128 },
+        "paciente_id": { "type": "string", "maxLength": 128 },
+        "profissional_id": { "type": "string", "maxLength": 128 },
+        "profissional_nome": { "type": "string", "maxLength": 120 },
+        "data_hora": { "type": "string", "maxLength": 40 },
+        "procedimento": { "type": "string", "maxLength": 150 },
+        "status": { "type": "string", "enum": ["pendente", "confirmado", "em_espera", "em_atendimento", "concluido", "cancelado"] },
+        "valor_estimado": { "type": "number" },
+        "forma_pagamento": { "type": "string", "maxLength": 30 },
+        "status_pagamento": { "type": "string", "maxLength": 30 }
+      },
+      "required": ["id", "paciente_id", "data_hora", "procedimento", "status"]
+    },
+    "ProcedimentoClinico": {
+      "title": "ProcedimentoClinico",
+      "description": "Procedimento cadastrado com sessões, contratos e fotos",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "clinica_id": { "type": "string", "maxLength": 128 },
+        "nome": { "type": "string", "maxLength": 150 },
+        "categoria": { "type": "string", "maxLength": 80 },
+        "duracao_minutos": { "type": "number" },
+        "valor_tabela": { "type": "number" },
+        "quantidade_sessoes": { "type": "number" },
+        "profissional_id": { "type": "string", "maxLength": 128 },
+        "contrato_padrao": { "type": "string", "maxLength": 10000 },
+        "ativo": { "type": "boolean" }
+      },
+      "required": ["id", "nome", "categoria", "valor_tabela"]
+    },
+    "EstoqueInsumo": {
+      "title": "EstoqueInsumo",
+      "description": "Insumo de estoque com suporte a pigmentos, lotes e marcas",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "clinica_id": { "type": "string", "maxLength": 128 },
+        "nome_item": { "type": "string", "maxLength": 150 },
+        "categoria": { "type": "string", "maxLength": 60 },
+        "quantidade": { "type": "number" },
+        "unidade_medida": { "type": "string", "maxLength": 20 },
+        "alerta_minimo": { "type": "number" },
+        "marca": { "type": "string", "maxLength": 80 },
+        "cor_tonalidade": { "type": "string", "maxLength": 80 },
+        "lote": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "nome_item", "quantidade", "unidade_medida"]
+    },
+    "TransacaoFinanceira": {
+      "title": "TransacaoFinanceira",
+      "description": "Lançamento de fluxo de caixa com soft delete e auditoria",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "clinica_id": { "type": "string", "maxLength": 128 },
+        "tipo": { "type": "string", "enum": ["entrada", "saida", "receita", "despesa"] },
+        "categoria": { "type": "string", "maxLength": 80 },
+        "valor": { "type": "number" },
+        "forma_pagamento": { "type": "string", "maxLength": 30 },
+        "status": { "type": "string", "maxLength": 30 },
+        "data": { "type": "string", "maxLength": 40 },
+        "excluido": { "type": "boolean" },
+        "motivo_exclusao": { "type": "string", "maxLength": 500 },
+        "excluido_por": { "type": "string", "maxLength": 120 }
+      },
+      "required": ["id", "tipo", "valor", "data"]
+    },
+    "DespesaRecorrente": {
+      "title": "DespesaRecorrente",
+      "description": "Despesas fixas mensais da clínica",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "clinica_id": { "type": "string", "maxLength": 128 },
+        "descricao": { "type": "string", "maxLength": 150 },
+        "categoria": { "type": "string", "maxLength": 60 },
+        "valor": { "type": "number" },
+        "dia_vencimento": { "type": "number" },
+        "recorrencia": { "type": "string", "maxLength": 20 },
+        "status": { "type": "string", "enum": ["ativo", "inativo"] }
+      },
+      "required": ["id", "descricao", "valor", "dia_vencimento"]
+    },
+    "BemAtivo": {
+      "title": "BemAtivo",
+      "description": "Patrimônio, máquinas, dermógrafos e macas da clínica",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "clinica_id": { "type": "string", "maxLength": 128 },
+        "nome": { "type": "string", "maxLength": 150 },
+        "categoria": { "type": "string", "maxLength": 60 },
+        "data_aquisicao": { "type": "string", "maxLength": 30 },
+        "valor_compra": { "type": "number" },
+        "estado_conservacao": { "type": "string", "enum": ["excelente", "bom", "regular", "manutencao"] },
+        "localizacao_sala": { "type": "string", "maxLength": 100 }
+      },
+      "required": ["id", "nome", "categoria", "valor_compra", "estado_conservacao"]
+    },
+    "ModeloAnamnese": {
+      "title": "ModeloAnamnese",
+      "description": "Modelos flexíveis de anamnese configuráveis",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "clinica_id": { "type": "string", "maxLength": 128 },
+        "titulo": { "type": "string", "maxLength": 150 },
+        "especialidade": { "type": "string", "maxLength": 100 }
+      },
+      "required": ["id", "titulo", "especialidade"]
+    },
+    "SolicitacaoOrcamento": {
+      "title": "SolicitacaoOrcamento",
+      "description": "Solicitação de orçamento com privacidade de contato",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "clinica_id": { "type": "string", "maxLength": 128 },
+        "paciente_nome": { "type": "string", "maxLength": 120 },
+        "paciente_email": { "type": "string", "maxLength": 120 },
+        "paciente_telefone": { "type": "string", "maxLength": 30 },
+        "valor_total_estimado": { "type": "number" },
+        "status": { "type": "string", "maxLength": 30 }
+      },
+      "required": ["id", "paciente_nome", "paciente_email"]
+    }
+  },
+  "firestore": {
+    "/clinicas/{clinicaId}/config/{configId}": {
+      "schema": "ClinicaConfig",
+      "description": "Configurações da clínica"
+    },
+    "/usuarios/{usuarioId}": {
+      "schema": "UsuarioEquipe",
+      "description": "Usuários e profissionais da clínica"
+    },
+    "/pacientes/{pacienteId}": {
+      "schema": "Paciente",
+      "description": "Clientes e fichas"
+    },
+    "/agendamentos/{agendamentoId}": {
+      "schema": "Agendamento",
+      "description": "Agendamentos de atendimento"
+    },
+    "/procedimentos/{procedimentoId}": {
+      "schema": "ProcedimentoClinico",
+      "description": "Catálogo de procedimentos"
+    },
+    "/estoque/{estoqueId}": {
+      "schema": "EstoqueInsumo",
+      "description": "Estoque de insumos e pigmentos"
+    },
+    "/transacoes/{transacaoId}": {
+      "schema": "TransacaoFinanceira",
+      "description": "Lançamentos financeiros"
+    },
+    "/despesas_recorrentes/{despesaId}": {
+      "schema": "DespesaRecorrente",
+      "description": "Despesas fixas recorrentes"
+    },
+    "/bens/{bemId}": {
+      "schema": "BemAtivo",
+      "description": "Bens e ativos patrimoniais"
+    },
+    "/modelos_anamnese/{modeloId}": {
+      "schema": "ModeloAnamnese",
+      "description": "Modelos de anamnese"
+    },
+    "/solicitacoes_orcamento/{orcamentoId}": {
+      "schema": "SolicitacaoOrcamento",
+      "description": "Solicitações de orçamento do portal"
+    }
+  }
+}

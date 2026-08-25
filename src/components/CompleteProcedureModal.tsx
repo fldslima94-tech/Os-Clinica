@@ -21,14 +21,24 @@ import {
 } from '../types';
 import { RECEITA_INSUMOS_PADRAO } from '../data/mockData';
 
-interface CompleteProcedureModalProps {
+export interface CompleteProcedureModalProps {
   isOpen: boolean;
   onClose: () => void;
   agendamento: Agendamento | null;
   estoque: EstoqueInsumo[];
-  onConfirmComplete: (
+  onConfirmComplete?: (
     agendamentoId: string, 
     insumosUsados: InsumoConsumido[], 
+    pagamento: {
+      valor: number;
+      forma: FormaPagamento;
+      status: StatusPagamento;
+      observacao?: string;
+    }
+  ) => void;
+  onComplete?: (
+    agendamentoOrId: any,
+    insumosUsados: InsumoConsumido[],
     pagamento: {
       valor: number;
       forma: FormaPagamento;
@@ -44,6 +54,7 @@ export const CompleteProcedureModal: React.FC<CompleteProcedureModalProps> = ({
   agendamento,
   estoque,
   onConfirmComplete,
+  onComplete,
 }) => {
   const [insumosUsados, setInsumosUsados] = useState<InsumoConsumido[]>([]);
   const [valorFinal, setValorFinal] = useState<number>(0);
@@ -126,16 +137,26 @@ export const CompleteProcedureModal: React.FC<CompleteProcedureModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onConfirmComplete(
-      agendamento.id,
-      insumosUsados,
-      {
-        valor: valorFinal,
-        forma: formaPagamento,
-        status: statusPagamento,
-        observacao: observacaoPagamento,
-      }
-    );
+    if (!agendamento) return;
+    const paymentData = {
+      valor: valorFinal,
+      forma: formaPagamento,
+      status: statusPagamento,
+      observacao: observacaoPagamento,
+    };
+    if (typeof onConfirmComplete === 'function') {
+      onConfirmComplete(
+        agendamento.id,
+        insumosUsados,
+        paymentData
+      );
+    } else if (typeof onComplete === 'function') {
+      onComplete(
+        agendamento,
+        insumosUsados,
+        paymentData
+      );
+    }
     onClose();
   };
 

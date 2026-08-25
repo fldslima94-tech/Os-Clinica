@@ -179,9 +179,11 @@ export const NewInventoryModal: React.FC<NewInventoryModalProps> = ({
                 <option value="Injetáveis">Injetáveis</option>
                 <option value="Preenchedores">Preenchedores</option>
                 <option value="Bioestimuladores">Bioestimuladores</option>
+                <option value="Pigmento">Pigmento</option>
                 <option value="Descartáveis">Descartáveis</option>
                 <option value="Tópicos & Anestésicos">Tópicos & Anestésicos</option>
                 <option value="Diluentes">Diluentes</option>
+                <option value="Outros">Outros</option>
               </select>
             </div>
 

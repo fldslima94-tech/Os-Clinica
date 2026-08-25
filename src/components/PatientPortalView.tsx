@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { ProcedimentoClinico, SolicitacaoOrcamento, PacienteGoogleProfile, UsuarioEquipe } from '../types';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
+import { loginWithFirebaseGoogle, logoutFirebase, onFirebaseAuthStateChange } from '../services/firebaseService';
 
 interface PatientPortalViewProps {
   procedimentos: ProcedimentoClinico[];
@@ -56,17 +57,11 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
   const [search, setSearch] = useState('');
   const [orcamentoToDelete, setOrcamentoToDelete] = useState<SolicitacaoOrcamento | null>(null);
 
-  // Google Authentication State
+  // Google Authentication State (null por padrão para não exibir contas pré-credenciadas)
   const [googleProfile, setGoogleProfile] = useState<PacienteGoogleProfile | null>(() => {
     try {
       const saved = localStorage.getItem('esteticaos_google_user');
-      return saved ? JSON.parse(saved) : {
-        id: 'goog-001',
-        nome: 'Fernanda Lima da Silva',
-        email: 'fldslima94@gmail.com',
-        avatar_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&auto=format&fit=crop&q=80',
-        telefone: '(11) 99888-7766',
-      };
+      return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
     }
@@ -110,7 +105,28 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
   const totalComDescontoPix = totalEstimado * 0.95; // 5% discount
   const valorParcela10x = totalEstimado > 0 ? (totalEstimado / 10) : 0;
 
-  // Handle Google Login
+  // Handle Google Login with Firebase Auth and fallback
+  const handleFirebaseGoogleSignIn = async () => {
+    try {
+      const user = await loginWithFirebaseGoogle();
+      if (user) {
+        const profile: PacienteGoogleProfile = {
+          id: user.uid,
+          nome: user.displayName || 'Paciente Google',
+          email: user.email || '',
+          avatar_url: user.photoURL || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&auto=format&fit=crop&q=80',
+          telefone: user.phoneNumber || '(11) 99888-7766',
+        };
+        setGoogleProfile(profile);
+        localStorage.setItem('esteticaos_google_user', JSON.stringify(profile));
+        setIsGoogleLoginModalOpen(false);
+      }
+    } catch (err) {
+      console.warn('[Firebase Auth] Abrindo modal para identificação:', err);
+      setIsGoogleLoginModalOpen(true);
+    }
+  };
+
   const handleGoogleLogin = (useMockOrCustom: 'mock' | 'custom') => {
     let profile: PacienteGoogleProfile;
     if (useMockOrCustom === 'mock') {
@@ -137,7 +153,8 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
     setIsGoogleLoginModalOpen(false);
   };
 
-  const handleGoogleLogout = () => {
+  const handleGoogleLogout = async () => {
+    await logoutFirebase();
     setGoogleProfile(null);
     localStorage.removeItem('esteticaos_google_user');
   };
@@ -247,9 +264,9 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
                   </span>
                   <button
                     onClick={handleGoogleLogout}
-                    className="text-indigo-200 hover:text-white underline cursor-pointer text-[11px]"
+                    className="text-red-300 hover:text-red-200 font-bold underline cursor-pointer text-[11px]"
                   >
-                    Trocar conta
+                    Desconectar / Sair
                   </button>
                 </div>
               </div>
@@ -259,7 +276,7 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
                   Conecte sua conta para salvar e acompanhar seus orçamentos:
                 </p>
                 <button
-                  onClick={() => setIsGoogleLoginModalOpen(true)}
+                  onClick={handleFirebaseGoogleSignIn}
                   className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white text-slate-800 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
                 >
                   <svg className="w-4 h-4" viewBox="0 0 24 24">

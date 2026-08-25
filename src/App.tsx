@@ -9,7 +9,9 @@ import {
   MOCK_PROCEDIMENTOS, 
   MOCK_ORCAMENTOS,
   MOCK_AVISOS,
-  RECEITA_INSUMOS_PADRAO
+  MOCK_CLINICA_CONFIG,
+  MOCK_DESPESAS_RECORRENTES,
+  MOCK_BENS_PATRIMONIAIS
 } from './data/mockData';
 import { 
   Paciente, 
@@ -26,7 +28,11 @@ import {
   AlertaRetornoPos, 
   ProcedimentoClinico, 
   SolicitacaoOrcamento,
-  AvisoQuadro
+  AvisoQuadro,
+  ClinicaConfig,
+  DespesaRecorrente,
+  BemPatrimonial,
+  BemAtivo
 } from './types';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -42,6 +48,7 @@ import { SupabaseGuideView } from './components/SupabaseGuideView';
 import { UsersManagementView } from './components/UsersManagementView';
 import { PatientPortalView } from './components/PatientPortalView';
 import { NoticeBoardView } from './components/NoticeBoardView';
+import { AssetsView } from './components/AssetsView';
 import { LoginView } from './components/LoginView';
 import { UrgentAlertPopupModal } from './components/UrgentAlertPopupModal';
 import { SwitchUserPasswordModal } from './components/SwitchUserPasswordModal';
@@ -56,7 +63,19 @@ import { SqlAndArchitectureModal } from './components/SqlAndArchitectureModal';
 import { CompleteProcedureModal } from './components/CompleteProcedureModal';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { TreatmentPackagesModal } from './components/TreatmentPackagesModal';
-import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { ClinicSettingsModal } from './components/ClinicSettingsModal';
+import { UserProfileAvatarModal } from './components/UserProfileAvatarModal';
+import { NewAssetModal } from './components/NewAssetModal';
+import { CheckCircle2, AlertCircle, Cloud } from 'lucide-react';
+import { 
+  seedInitialFirestoreData, 
+  subscribeToCollection, 
+  saveDocument, 
+  removeDocument, 
+  executeAtomicCheckout,
+  softDeleteTransacao,
+  COLLECTIONS 
+} from './services/firebaseService';
 
 // Storage Helper
 const getStoredData = <T,>(key: string, fallback: T): T => {
@@ -71,6 +90,9 @@ const getStoredData = <T,>(key: string, fallback: T): T => {
 
 export default function App() {
   // Application State with localStorage Persistence
+  const [clinicaConfig, setClinicaConfig] = useState<ClinicaConfig>(() =>
+    getStoredData<ClinicaConfig>('clinica_config', MOCK_CLINICA_CONFIG)
+  );
   const [pacientes, setPacientes] = useState<Paciente[]>(() => 
     getStoredData<Paciente[]>('pacientes', MOCK_PACIENTES)
   );
@@ -80,6 +102,9 @@ export default function App() {
   const [estoque, setEstoque] = useState<EstoqueInsumo[]>(() => 
     getStoredData<EstoqueInsumo[]>('estoque', MOCK_ESTOQUE)
   );
+  const [bensPatrimoniais, setBensPatrimoniais] = useState<BemPatrimonial[]>(() =>
+    getStoredData<BemPatrimonial[]>('bens_patrimoniais', MOCK_BENS_PATRIMONIAIS)
+  );
   const [procedimentos, setProcedimentos] = useState<ProcedimentoClinico[]>(() =>
     getStoredData<ProcedimentoClinico[]>('procedimentos', MOCK_PROCEDIMENTOS)
   );
@@ -88,6 +113,9 @@ export default function App() {
   );
   const [transacoes, setTransacoes] = useState<TransacaoFinanceira[]>(() => 
     getStoredData<TransacaoFinanceira[]>('transacoes', MOCK_TRANSACOES)
+  );
+  const [despesasRecorrentes, setDespesasRecorrentes] = useState<DespesaRecorrente[]>(() =>
+    getStoredData<DespesaRecorrente[]>('despesas_recorrentes', MOCK_DESPESAS_RECORRENTES)
   );
   const [usuarios, setUsuarios] = useState<UsuarioEquipe[]>(() => 
     getStoredData<UsuarioEquipe[]>('usuarios', MOCK_USUARIOS)
@@ -125,6 +153,8 @@ export default function App() {
 
   // Modals State
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
+  const [isClinicSettingsOpen, setIsClinicSettingsOpen] = useState(false);
+  const [isUserAvatarModalOpen, setIsUserAvatarModalOpen] = useState(false);
   const [patientForPackages, setPatientForPackages] = useState<Paciente | null>(null);
   const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState(false);
   const [isNewPatientOpen, setIsNewPatientOpen] = useState(false);
@@ -133,6 +163,8 @@ export default function App() {
   const [procedureToEdit, setProcedureToEdit] = useState<ProcedimentoClinico | null>(null);
   const [isNewUserOpen, setIsNewUserOpen] = useState(false);
   const [userToEdit, setUserToEdit] = useState<UsuarioEquipe | null>(null);
+  const [isNewAssetOpen, setIsNewAssetOpen] = useState(false);
+  const [assetToEdit, setAssetToEdit] = useState<BemAtivo | null>(null);
   const [isSqlModalOpen, setIsSqlModalOpen] = useState(false);
   const [selectedPatientForDetails, setSelectedPatientForDetails] = useState<Paciente | null>(null);
   const [appointmentToComplete, setAppointmentToComplete] = useState<Agendamento | null>(null);
@@ -148,6 +180,12 @@ export default function App() {
   };
 
   // Auto-persist state changes into localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('esteticaos_clinica_config', JSON.stringify(clinicaConfig));
+    } catch (e) {}
+  }, [clinicaConfig]);
+
   useEffect(() => {
     try {
       localStorage.setItem('esteticaos_pacientes', JSON.stringify(pacientes));
@@ -168,6 +206,12 @@ export default function App() {
 
   useEffect(() => {
     try {
+      localStorage.setItem('esteticaos_bens_patrimoniais', JSON.stringify(bensPatrimoniais));
+    } catch (e) {}
+  }, [bensPatrimoniais]);
+
+  useEffect(() => {
+    try {
       localStorage.setItem('esteticaos_procedimentos', JSON.stringify(procedimentos));
     } catch (e) {}
   }, [procedimentos]);
@@ -183,6 +227,12 @@ export default function App() {
       localStorage.setItem('esteticaos_transacoes', JSON.stringify(transacoes));
     } catch (e) {}
   }, [transacoes]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('esteticaos_despesas_recorrentes', JSON.stringify(despesasRecorrentes));
+    } catch (e) {}
+  }, [despesasRecorrentes]);
 
   useEffect(() => {
     try {
@@ -226,23 +276,57 @@ export default function App() {
       if (activeTab !== 'portal_paciente' && activeTab !== 'quadro_avisos') {
         setActiveTab('portal_paciente');
       }
-    } else if (currentUser.role === 'operador') {
+    } else if (currentUser.role === 'recepcao' || currentUser.role === 'operador') {
       if (activeTab === 'usuarios' || activeTab === 'supabase_guide') {
         setActiveTab('dashboard');
       }
     }
   }, [currentUser.role, activeTab]);
 
+  // Firebase Firestore Real-Time Subscriptions and Cloud Seeding
+  useEffect(() => {
+    seedInitialFirestoreData({
+      pacientes,
+      agendamentos,
+      estoque,
+      procedimentos,
+      orcamentos,
+      transacoes,
+      usuarios,
+      avisos,
+      alertas_retorno: alertasRetorno
+    });
+
+    const unsubPacientes = subscribeToCollection<Paciente>(COLLECTIONS.PACIENTES, (data) => setPacientes(data), pacientes);
+    const unsubAgendamentos = subscribeToCollection<Agendamento>(COLLECTIONS.AGENDAMENTOS, (data) => setAgendamentos(data), agendamentos);
+    const unsubEstoque = subscribeToCollection<EstoqueInsumo>(COLLECTIONS.ESTOQUE, (data) => setEstoque(data), estoque);
+    const unsubProcedimentos = subscribeToCollection<ProcedimentoClinico>(COLLECTIONS.PROCEDIMENTOS, (data) => setProcedimentos(data), procedimentos);
+    const unsubOrcamentos = subscribeToCollection<SolicitacaoOrcamento>(COLLECTIONS.ORCAMENTOS, (data) => setOrcamentos(data), orcamentos);
+    const unsubTransacoes = subscribeToCollection<TransacaoFinanceira>(COLLECTIONS.TRANSACOES, (data) => setTransacoes(data), transacoes);
+    const unsubUsuarios = subscribeToCollection<UsuarioEquipe>(COLLECTIONS.USUARIOS, (data) => setUsuarios(data), usuarios);
+    const unsubAvisos = subscribeToCollection<AvisoQuadro>(COLLECTIONS.AVISOS, (data) => setAvisos(data), avisos);
+    const unsubAlertas = subscribeToCollection<AlertaRetornoPos>(COLLECTIONS.ALERTAS_RETORNO, (data) => setAlertasRetorno(data), alertasRetorno);
+
+    return () => {
+      unsubPacientes();
+      unsubAgendamentos();
+      unsubEstoque();
+      unsubProcedimentos();
+      unsubOrcamentos();
+      unsubTransacoes();
+      unsubUsuarios();
+      unsubAvisos();
+      unsubAlertas();
+    };
+  }, []);
+
   // Check for auto-triggering Urgent Alert Pop-ups on screen
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    // Find any unacknowledged aviso with exibir_popup: true targeted to current user
     const urgentPopupAviso = avisos.find(a => {
       if (!a.ativo || !a.exibir_popup) return false;
-      // Target check
       if (a.destinatarios !== 'todos' && a.destinatarios !== currentUser.role) return false;
-      // Check if user already acknowledged
       const userAcknowledged = acknowledgedAvisos.includes(`${currentUser.id}_${a.id}`);
       return !userAcknowledged;
     });
@@ -253,44 +337,17 @@ export default function App() {
     }
   }, [isAuthenticated, currentUser.id, currentUser.role, avisos, acknowledgedAvisos]);
 
-  // Count unread / relevant notices for current user
+  // Unread Notices count
   const unreadNoticesCount = avisos.filter(a => {
     if (!a.ativo) return false;
-    if (a.destinatarios !== 'todos' && a.destinatarios !== currentUser.role && currentUser.role !== 'admin') return false;
+    if (a.destinatarios !== 'todos' && a.destinatarios !== currentUser.role) return false;
     return !acknowledgedAvisos.includes(`${currentUser.id}_${a.id}`);
   }).length;
 
-  // --- NOTICE BOARD HANDLERS ---
-  const handleAddAviso = (novoAviso: Omit<AvisoQuadro, 'id' | 'data_criacao' | 'lido_por'>) => {
-    const created: AvisoQuadro = {
-      ...novoAviso,
-      id: `aviso-${Date.now()}`,
-      data_criacao: new Date().toISOString(),
-      lido_por: [currentUser.id],
-    };
-
-    setAvisos(prev => [created, ...prev]);
-    showToast('Novo comunicado publicado no Quadro de Avisos!');
-
-    if (created.exibir_popup) {
-      setActivePopupAviso(created);
-      setIsPopupModalOpen(true);
-    }
-  };
-
-  const handleDeleteAviso = (id: string) => {
-    if (currentUser.role !== 'admin') {
-      showToast('Apenas administradores podem remover avisos do mural.', 'info');
-      return;
-    }
-    setAvisos(prev => prev.filter(a => a.id !== id));
-    showToast('Aviso removido do mural.');
-  };
-
   const handleAcknowledgeAviso = (avisoId: string) => {
-    const ackKey = `${currentUser.id}_${avisoId}`;
-    if (!acknowledgedAvisos.includes(ackKey)) {
-      setAcknowledgedAvisos(prev => [...prev, ackKey]);
+    const key = `${currentUser.id}_${avisoId}`;
+    if (!acknowledgedAvisos.includes(key)) {
+      setAcknowledgedAvisos(prev => [...prev, key]);
     }
   };
 
@@ -299,158 +356,119 @@ export default function App() {
     setIsPopupModalOpen(true);
   };
 
-  // --- PROCEDURE MANAGEMENT ---
-  const handleSaveProcedure = (procData: Omit<ProcedimentoClinico, 'id' | 'criado_em'> & { id?: string }) => {
-    if (procData.id) {
-      setProcedimentos(prev => prev.map(p => p.id === procData.id ? { 
-        ...p, 
-        ...procData,
-        cadastrado_por_admin: p.cadastrado_por_admin ?? (currentUser.role === 'admin')
-      } as ProcedimentoClinico : p));
-      showToast('Procedimento atualizado com sucesso!');
-    } else {
-      const newProc: ProcedimentoClinico = {
-        ...procData,
-        id: `proc-${Date.now()}`,
-        cadastrado_por_admin: currentUser.role === 'admin',
-        criado_por_usuario_id: currentUser.id,
-        criado_por_nome: `${currentUser.nome} (${currentUser.role === 'admin' ? 'Admin' : 'Operador'})`,
-        criado_em: new Date().toISOString(),
-      };
-      setProcedimentos(prev => [newProc, ...prev]);
-      showToast('Novo procedimento cadastrado no catálogo!');
-    }
-  };
-
-  const handleDeleteProcedure = (id: string) => {
-    if (currentUser.role !== 'admin') {
-      showToast('Apenas administradores podem excluir procedimentos.', 'info');
-      return;
-    }
-    setProcedimentos(prev => prev.filter(p => p.id !== id));
-    showToast('Procedimento removido do catálogo com sucesso.');
-  };
-
-  // --- QUOTES (PORTAL DO PACIENTE) ---
-  const handleCriarOrcamento = (novoOrcamentoData: Omit<SolicitacaoOrcamento, 'id' | 'data_solicitacao'>) => {
-    const newQuote: SolicitacaoOrcamento = {
-      ...novoOrcamentoData,
-      id: `orc-${Date.now()}`,
-      data_solicitacao: new Date().toISOString(),
-    };
-    setOrcamentos(prev => [newQuote, ...prev]);
-    showToast('Solicitação de orçamento enviada com sucesso!');
-  };
-
-  const handleAtualizarStatusOrcamento = (id: string, status: SolicitacaoOrcamento['status'], resposta?: string) => {
-    setOrcamentos(prev => prev.map(o => o.id === id ? { ...o, status, resposta_clinica: resposta || o.resposta_clinica } : o));
-    showToast('Status do orçamento atualizado!');
-  };
-
-  const handleConverterOrcamentoEmAgendamento = (orc: SolicitacaoOrcamento) => {
-    setActiveTab('agendamentos');
-    setIsNewAppointmentOpen(true);
-    showToast(`Iniciando agendamento para ${orc.paciente_nome}`);
-  };
-
-  const handleDeleteOrcamento = (id: string) => {
-    const target = orcamentos.find(o => o.id === id);
-    setOrcamentos(prev => prev.filter(o => o.id !== id));
-    showToast(`Orçamento de "${target?.paciente_nome || 'Paciente'}" excluído com sucesso.`);
-  };
-
-  // --- APPOINTMENTS & INVENTORY HANDLERS ---
   const handleUpdateStatus = (agendamentoId: string, novoStatus: StatusAgendamento) => {
-    if (novoStatus === 'concluido') {
-      const ag = agendamentos.find(a => a.id === agendamentoId);
-      if (ag) {
-        setAppointmentToComplete(ag);
-        return;
-      }
+    const ag = agendamentos.find(a => a.id === agendamentoId);
+    if (ag) {
+      const updated = { ...ag, status: novoStatus };
+      setAgendamentos(prev => prev.map(a => (a.id === agendamentoId ? updated : a)));
+      saveDocument(COLLECTIONS.AGENDAMENTOS, updated);
+      showToast(`Status atualizado para: ${novoStatus.replace('_', ' ').toUpperCase()}`);
     }
-
-    setAgendamentos(prev =>
-      prev.map(ag => (ag.id === agendamentoId ? { ...ag, status: novoStatus } : ag))
-    );
-
-    const statusLabels: Record<StatusAgendamento, string> = {
-      confirmado: 'Agendamento confirmado com sucesso!',
-      em_espera: 'Paciente colocado na Sala de Espera (Recepção).',
-      em_atendimento: 'Paciente chamado para a Sala de Procedimento!',
-      concluido: 'Procedimento finalizado!',
-      cancelado: 'Agendamento cancelado.',
-      pendente: 'Status alterado para pendente.',
-    };
-    showToast(statusLabels[novoStatus]);
   };
 
-  const handleConfirmCompleteProcedure = (
-    agendamentoId: string,
+  // Procedure completion with Atomic Inventory debit and Financial creation
+  const handleSaveProcedureCompletion = async (
+    targetAgendamentoOrId: Agendamento | string,
     insumosUsados: InsumoConsumido[],
-    pagamento: {
-      valor: number;
-      forma: FormaPagamento;
-      status: StatusPagamento;
-      observacao?: string;
-    }
+    pagamento: { valor: number; forma: FormaPagamento; status: StatusPagamento; observacao?: string },
+    dataRetornoSugerida?: string,
+    termoAssinado?: boolean
   ) => {
-    const targetAgendamento = agendamentos.find(a => a.id === agendamentoId);
+    const targetAgendamento = typeof targetAgendamentoOrId === 'string'
+      ? agendamentos.find(a => a.id === targetAgendamentoOrId) || appointmentToComplete
+      : targetAgendamentoOrId;
+
     if (!targetAgendamento) return;
 
-    const patient = targetAgendamento.paciente || pacientes.find(p => p.id === targetAgendamento.paciente_id);
+    const patient = pacientes.find(p => p.id === targetAgendamento.paciente_id) || targetAgendamento.paciente;
 
-    // 1. Deduct supplies from inventory
-    if (insumosUsados.length > 0) {
-      setEstoque(prevEstoque => {
-        return prevEstoque.map(item => {
-          const used = insumosUsados.find(u => u.insumo_id === item.id || u.nome_item === item.nome_item);
-          if (used) {
-            const newQty = Math.max(0, item.quantidade - used.quantidade);
-            return { ...item, quantidade: newQty };
-          }
-          return item;
-        });
-      });
-    }
+    // Normalize supplies array with both quantidade and quantidade_utilizada
+    const normalizedSupplies: InsumoConsumido[] = insumosUsados.map(i => ({
+      ...i,
+      quantidade: i.quantidade || i.quantidade_utilizada || 1,
+      quantidade_utilizada: i.quantidade_utilizada || i.quantidade || 1,
+    }));
 
-    // 2. Mark appointment as completed
+    // Execute atomic checkout
+    await executeAtomicCheckout({
+      agendamentoId: targetAgendamento.id,
+      insumosConsumidos: normalizedSupplies,
+      transacao: {
+        paciente_nome: patient?.nome || 'Cliente',
+        procedimento: targetAgendamento.procedimento,
+        valor: pagamento.valor,
+        tipo: 'receita',
+        forma_pagamento: pagamento.forma,
+        status: pagamento.status,
+        profissional_nome: targetAgendamento.profissional_nome || currentUser.nome,
+        observacao: pagamento.observacao,
+      }
+    });
+
+    // Update Local States
     setAgendamentos(prev =>
-      prev.map(ag =>
-        ag.id === agendamentoId
-          ? {
-              ...ag,
-              status: 'concluido',
-              insumos_consumidos: insumosUsados,
-              valor_estimado: pagamento.valor,
-              forma_pagamento: pagamento.forma,
-              status_pagamento: pagamento.status,
-            }
-          : ag
+      prev.map(a =>
+        a.id === targetAgendamento.id
+          ? { ...a, status: 'concluido' as StatusAgendamento, insumos_utilizados: normalizedSupplies, insumos_consumidos: normalizedSupplies }
+          : a
       )
     );
 
-    // 3. Register transaction in Financial module
+    setEstoque(prev =>
+      prev.map(item => {
+        const consumed = normalizedSupplies.find(c => c.insumo_id === item.id);
+        if (consumed) {
+          const qtyToDeduct = consumed.quantidade_utilizada || consumed.quantidade || 0;
+          return {
+            ...item,
+            quantidade: Math.max(0, item.quantidade - qtyToDeduct),
+          };
+        }
+        return item;
+      })
+    );
+
     const newTx: TransacaoFinanceira = {
       id: `tx-${Date.now()}`,
-      agendamento_id: agendamentoId,
       paciente_id: targetAgendamento.paciente_id,
-      paciente_nome: patient?.nome || 'Paciente',
+      paciente_nome: patient?.nome || 'Cliente',
       procedimento: targetAgendamento.procedimento,
       valor: pagamento.valor,
       tipo: 'receita',
       forma_pagamento: pagamento.forma,
       status: pagamento.status,
       data: new Date().toISOString(),
-      custo_insumos: insumosUsados.length * 65,
+      profissional_nome: targetAgendamento.profissional_nome || currentUser.nome,
       observacao: pagamento.observacao,
+      excluido: false,
     };
 
     setTransacoes(prev => [newTx, ...prev]);
 
-    const insumoCount = insumosUsados.length;
-    showToast(
-      `Procedimento concluído! ${insumoCount > 0 ? `Baixa em ${insumoCount} insumo(s) e ` : ''}receita de R$ ${pagamento.valor.toFixed(2)} registrada.`
-    );
+    // If Return Appointment is suggested, schedule it directly
+    if (dataRetornoSugerida) {
+      const returnAgendamento: Agendamento = {
+        id: `ag-retorno-${Date.now()}`,
+        paciente_id: targetAgendamento.paciente_id,
+        data_hora: dataRetornoSugerida,
+        procedimento: `Retorno & Avaliação: ${targetAgendamento.procedimento}`,
+        status: 'confirmado',
+        criado_em: new Date().toISOString(),
+        duracao_minutos: 30,
+        valor_estimado: 0,
+        profissional_nome: targetAgendamento.profissional_nome,
+        observacoes: 'Retorno clínico pós-procedimento agendado automaticamente no checkout.',
+        paciente: patient,
+      };
+
+      setAgendamentos(prev => [returnAgendamento, ...prev]);
+      saveDocument(COLLECTIONS.AGENDAMENTOS, returnAgendamento);
+      showToast(`Procedimento concluído e Retorno de ${patient?.nome} agendado com sucesso!`);
+    } else {
+      showToast(`Procedimento concluído com baixa em ${normalizedSupplies.length} insumo(s) e receita registrada.`);
+    }
+
+    setAppointmentToComplete(null);
   };
 
   const handleSaveAppointment = (novo: Partial<Agendamento>) => {
@@ -465,10 +483,12 @@ export default function App() {
       duracao_minutos: novo.duracao_minutos || 45,
       valor_estimado: novo.valor_estimado,
       observacoes: novo.observacoes,
+      profissional_nome: novo.profissional_nome || currentUser.nome,
       paciente: patientObj,
     };
 
     setAgendamentos(prev => [createdAgendamento, ...prev]);
+    saveDocument(COLLECTIONS.AGENDAMENTOS, createdAgendamento);
     showToast(`Agendamento de ${patientObj?.nome || 'paciente'} registrado!`);
   };
 
@@ -486,28 +506,33 @@ export default function App() {
       medicacoes: novo.medicacoes,
       fototipo: novo.fototipo || 'Fototipo III',
       fotos_antes_depois: [],
+      evolucoes_retornos: [],
       termo_consentimento: { assinado: false },
     };
 
     setPacientes(prev => [createdPatient, ...prev]);
-    showToast(`Paciente ${createdPatient.nome} cadastrado(a) com sucesso!`);
+    saveDocument(COLLECTIONS.PACIENTES, createdPatient);
+    showToast(`Ficha de ${createdPatient.nome} cadastrada com sucesso!`);
   };
 
   const handleDeletePatient = (id: string) => {
-    if (currentUser.role !== 'admin') {
-      showToast('Apenas administradores têm permissão para excluir pacientes.', 'info');
+    const isGestor = currentUser.role === 'gestor' || currentUser.role === 'admin';
+    if (!isGestor) {
+      showToast('Apenas gestores têm permissão para excluir fichas de clientes.', 'info');
       return;
     }
-    const patientName = pacientes.find(p => p.id === id)?.nome || 'Paciente';
+    const patientName = pacientes.find(p => p.id === id)?.nome || 'Cliente';
     setPacientes(prev => prev.filter(p => p.id !== id));
     setAgendamentos(prev => prev.filter(a => a.paciente_id !== id));
+    removeDocument(COLLECTIONS.PACIENTES, id);
+
     if (selectedPatientForDetails?.id === id) {
       setSelectedPatientForDetails(null);
     }
     if (patientForPackages?.id === id) {
       setPatientForPackages(null);
     }
-    showToast(`Cadastro de ${patientName} e registros vinculados foram excluídos com sucesso.`);
+    showToast(`Ficha de ${patientName} e registros vinculados foram excluídos.`);
   };
 
   const handleUpdatePatientHistory = (
@@ -515,9 +540,12 @@ export default function App() {
     novoHistorico: string, 
     dadosExtras?: Partial<Paciente>
   ) => {
-    setPacientes(prev =>
-      prev.map(p => (p.id === pacienteId ? { ...p, historico_clinico: novoHistorico, ...(dadosExtras || {}) } : p))
-    );
+    const target = pacientes.find(p => p.id === pacienteId);
+    if (target) {
+      const updated: Paciente = { ...target, historico_clinico: novoHistorico, ...(dadosExtras || {}) };
+      setPacientes(prev => prev.map(p => p.id === pacienteId ? updated : p));
+      saveDocument(COLLECTIONS.PACIENTES, updated);
+    }
     setAgendamentos(prev =>
       prev.map(ag =>
         ag.paciente_id === pacienteId && ag.paciente
@@ -525,7 +553,22 @@ export default function App() {
           : ag
       )
     );
-    showToast('Prontuário clínico atualizado com sucesso!');
+    showToast('Ficha clínica atualizada com sucesso!');
+  };
+
+  const handleUpdatePacienteObj = (updatedPaciente: Paciente) => {
+    setPacientes(prev =>
+      prev.map(p => (p.id === updatedPaciente.id ? updatedPaciente : p))
+    );
+    saveDocument(COLLECTIONS.PACIENTES, updatedPaciente);
+
+    if (selectedPatientForDetails?.id === updatedPaciente.id) {
+      setSelectedPatientForDetails(updatedPaciente);
+    }
+    if (patientForPackages?.id === updatedPaciente.id) {
+      setPatientForPackages(updatedPaciente);
+    }
+    showToast('Pacote de sessões do cliente atualizado com sucesso!');
   };
 
   const handleSaveInventory = (novo: Partial<EstoqueInsumo>) => {
@@ -539,34 +582,39 @@ export default function App() {
       lote: novo.lote,
       validade: novo.validade,
       custo_unitario: novo.custo_unitario,
-      procedimento_vinculado_id: novo.procedimento_vinculado_id,
-      procedimento_vinculado_nome: novo.procedimento_vinculado_nome,
-      quantidade_por_procedimento: novo.quantidade_por_procedimento,
-      procedimentos_vinculados: novo.procedimentos_vinculados,
+      marca: novo.marca,
+      tom_cor: novo.tom_cor,
       criado_em: new Date().toISOString(),
     };
 
     setEstoque(prev => [createdItem, ...prev]);
-    showToast(`Insumo "${createdItem.nome_item}" cadastrado no estoque!`);
+    saveDocument(COLLECTIONS.ESTOQUE, createdItem);
+    showToast(`Insumo/Pigmento "${createdItem.nome_item}" cadastrado!`);
   };
 
   const handleDeleteInventoryItem = (id: string) => {
-    if (currentUser.role !== 'admin') {
-      showToast('Apenas administradores têm permissão para excluir insumos do estoque.', 'info');
+    const isGestor = currentUser.role === 'gestor' || currentUser.role === 'admin';
+    if (!isGestor) {
+      showToast('Apenas gestores têm permissão para excluir insumos.', 'info');
       return;
     }
     const item = estoque.find(i => i.id === id);
     setEstoque(prev => prev.filter(i => i.id !== id));
-    showToast(`Insumo "${item?.nome_item || 'Item'}" removido do estoque com sucesso.`);
+    removeDocument(COLLECTIONS.ESTOQUE, id);
+    showToast(`Insumo "${item?.nome_item || 'Item'}" removido com sucesso.`);
   };
 
   const handleUpdateQuantity = (id: string, newQuantity: number) => {
-    setEstoque(prev =>
-      prev.map(item => (item.id === id ? { ...item, quantidade: newQuantity } : item))
-    );
+    const item = estoque.find(i => i.id === id);
+    if (item) {
+      const updated = { ...item, quantidade: newQuantity };
+      setEstoque(prev => prev.map(i => (i.id === id ? updated : i)));
+      saveDocument(COLLECTIONS.ESTOQUE, updated);
+    }
     showToast('Quantidade em estoque atualizada!');
   };
 
+  // Financial Handlers
   const handleAddTransaction = (nova: Partial<TransacaoFinanceira>) => {
     const created: TransacaoFinanceira = {
       id: nova.id || `tx-${Date.now()}`,
@@ -578,73 +626,287 @@ export default function App() {
       status: nova.status || 'pago',
       data: nova.data || new Date().toISOString(),
       observacao: nova.observacao,
+      excluido: false,
     };
     setTransacoes(prev => [created, ...prev]);
+    saveDocument(COLLECTIONS.TRANSACOES, created);
     showToast('Lançamento financeiro registrado com sucesso!');
   };
 
-  const handleDeleteTransaction = (id: string) => {
-    if (currentUser.role !== 'admin') {
-      showToast('Apenas administradores têm permissão para excluir lançamentos financeiros.', 'info');
-      return;
+  const handleSoftDeleteTransaction = async (id: string, motivo: string) => {
+    await softDeleteTransacao(id, motivo, currentUser.nome);
+    setTransacoes(prev =>
+      prev.map(t =>
+        t.id === id
+          ? {
+              ...t,
+              excluido: true,
+              motivo_exclusao: motivo,
+              excluido_por: currentUser.nome,
+              data_exclusao: new Date().toISOString(),
+            }
+          : t
+      )
+    );
+    showToast('Lançamento cancelado com auditoria de exclusão registrada.');
+  };
+
+  const handleAddDespesaRecorrente = (nova: Omit<DespesaRecorrente, 'id'>) => {
+    const created: DespesaRecorrente = {
+      ...nova,
+      id: `rec-${Date.now()}`,
+    };
+    setDespesasRecorrentes(prev => [created, ...prev]);
+    showToast(`Despesa recorrente "${created.descricao}" cadastrada!`);
+  };
+
+  const handleToggleDespesaRecorrenteStatus = (id: string) => {
+    setDespesasRecorrentes(prev =>
+      prev.map(d =>
+        d.id === id ? { ...d, status: d.status === 'ativo' ? 'inativo' : 'ativo' } : d
+      )
+    );
+    showToast('Status da despesa recorrente atualizado.');
+  };
+
+  // Asset Management Handlers
+  const handleSaveBem = (bemData: Omit<BemAtivo, 'id'>, idToEdit?: string) => {
+    if (idToEdit) {
+      const updated: BemAtivo = {
+        ...bemData,
+        id: idToEdit,
+        criado_em: bensPatrimoniais.find(b => b.id === idToEdit)?.criado_em || new Date().toISOString()
+      };
+      setBensPatrimoniais(prev => prev.map(b => (b.id === idToEdit ? updated : b)));
+      saveDocument(COLLECTIONS.BENS, updated);
+      showToast(`Equipamento "${updated.nome}" atualizado com sucesso!`);
+    } else {
+      const created: BemAtivo = {
+        ...bemData,
+        id: `bem-${Date.now()}`,
+        criado_em: new Date().toISOString(),
+      };
+      setBensPatrimoniais(prev => [created, ...prev]);
+      saveDocument(COLLECTIONS.BENS, created);
+      showToast(`Equipamento "${created.nome}" registrado no patrimônio!`);
     }
-    setTransacoes(prev => prev.filter(t => t.id !== id));
-    showToast('Lançamento financeiro excluído com sucesso.');
+    setIsNewAssetOpen(false);
+    setAssetToEdit(null);
+  };
+
+  const handleUpdateStatusBemPatrimonial = (id: string, status: BemAtivo['status']) => {
+    setBensPatrimoniais(prev =>
+      prev.map(b => (b.id === id ? { ...b, status } : b))
+    );
+    const target = bensPatrimoniais.find(b => b.id === id);
+    if (target) {
+      saveDocument(COLLECTIONS.BENS, { ...target, status });
+    }
+    showToast(`Status do equipamento atualizado.`);
+  };
+
+  const handleDeleteBemPatrimonial = (id: string) => {
+    const item = bensPatrimoniais.find(b => b.id === id);
+    setBensPatrimoniais(prev => prev.filter(b => b.id !== id));
+    removeDocument(COLLECTIONS.BENS, id);
+    showToast(`Equipamento "${item?.nome || 'Ativo'}" removido do patrimônio.`);
+  };
+
+  // User Profile & Avatar Handlers
+  const handleUpdateAvatar = (newAvatarUrl: string, newName?: string) => {
+    const updated: UsuarioEquipe = {
+      ...currentUser,
+      avatar_url: newAvatarUrl,
+      ...(newName ? { nome: newName } : {}),
+    };
+    setCurrentUser(updated);
+    setUsuarios(prev => prev.map(u => (u.id === updated.id ? updated : u)));
+    saveDocument(COLLECTIONS.USUARIOS, updated);
+    showToast('Foto de perfil e dados atualizados com sucesso!');
+  };
+
+  const handleSaveClinicConfig = (newConfig: ClinicaConfig) => {
+    setClinicaConfig(newConfig);
+    showToast('Identidade visual e dados da clínica salvos com sucesso!');
   };
 
   const handleDeleteAppointment = (id: string) => {
-    if (currentUser.role !== 'admin') {
-      showToast('Apenas administradores têm permissão para excluir agendamentos.', 'info');
+    const isGestor = currentUser.role === 'gestor' || currentUser.role === 'admin';
+    if (!isGestor) {
+      showToast('Apenas gestores têm permissão para excluir agendamentos.', 'info');
       return;
     }
     setAgendamentos(prev => prev.filter(a => a.id !== id));
-    showToast('Agendamento excluído da agenda com sucesso.');
+    removeDocument(COLLECTIONS.AGENDAMENTOS, id);
+    showToast('Agendamento excluído da agenda.');
   };
 
   const handleUpdateTransactionStatus = (id: string, status: StatusPagamento) => {
-    setTransacoes(prev =>
-      prev.map(t => (t.id === id ? { ...t, status } : t))
-    );
+    const t = transacoes.find(tx => tx.id === id);
+    if (t) {
+      const updated = { ...t, status };
+      setTransacoes(prev => prev.map(tx => (tx.id === id ? updated : tx)));
+      saveDocument(COLLECTIONS.TRANSACOES, updated);
+    }
     showToast(`Status da transação alterado para: ${status}`);
   };
 
   const handleMarkReminderSent = (agendamentoId: string) => {
-    setAgendamentos(prev =>
-      prev.map(a => (a.id === agendamentoId ? { ...a, lembrete_enviado: true } : a))
-    );
+    const ag = agendamentos.find(a => a.id === agendamentoId);
+    if (ag) {
+      const updated = { ...ag, lembrete_enviado: true };
+      setAgendamentos(prev => prev.map(a => (a.id === agendamentoId ? updated : a)));
+      saveDocument(COLLECTIONS.AGENDAMENTOS, updated);
+    }
   };
 
   const handleUpdateAlertaStatus = (alertaId: string, status: 'pendente' | 'agendado' | 'contatado') => {
-    setAlertasRetorno(prev =>
-      prev.map(a => (a.id === alertaId ? { ...a, status } : a))
-    );
+    const al = alertasRetorno.find(a => a.id === alertaId);
+    if (al) {
+      const updated = { ...al, status };
+      setAlertasRetorno(prev => prev.map(a => (a.id === alertaId ? updated : a)));
+      saveDocument(COLLECTIONS.ALERTAS_RETORNO, updated);
+    }
     showToast(`Status do alerta atualizado para "${status}"!`);
   };
 
   const handleDeleteAlertaRetorno = (alertaId: string) => {
-    if (currentUser.role !== 'admin') {
-      showToast('Apenas administradores têm permissão para excluir alertas de retorno.', 'info');
+    const isGestor = currentUser.role === 'gestor' || currentUser.role === 'admin';
+    if (!isGestor) {
+      showToast('Apenas gestores têm permissão para excluir alertas de retorno.', 'info');
       return;
     }
     const alerta = alertasRetorno.find(a => a.id === alertaId);
     setAlertasRetorno(prev => prev.filter(a => a.id !== alertaId));
-    showToast(`Alerta de retorno de "${alerta?.paciente_nome || 'Paciente'}" excluído com sucesso.`);
+    removeDocument(COLLECTIONS.ALERTAS_RETORNO, alertaId);
+    showToast(`Alerta de retorno excluído com sucesso.`);
   };
 
-  const handleUpdatePacienteObj = (updatedPaciente: Paciente) => {
-    setPacientes(prev =>
-      prev.map(p => (p.id === updatedPaciente.id ? updatedPaciente : p))
-    );
-    if (selectedPatientForDetails?.id === updatedPaciente.id) {
-      setSelectedPatientForDetails(updatedPaciente);
+  // Procedures Catalog Handlers
+  const handleSaveProcedure = (novo: Partial<ProcedimentoClinico>) => {
+    if (procedureToEdit) {
+      const updated: ProcedimentoClinico = { ...procedureToEdit, ...novo } as ProcedimentoClinico;
+      setProcedimentos(prev => prev.map(p => (p.id === procedureToEdit.id ? updated : p)));
+      saveDocument(COLLECTIONS.PROCEDIMENTOS, updated);
+      showToast(`Procedimento "${updated.nome}" atualizado!`);
+    } else {
+      const created: ProcedimentoClinico = {
+        id: `proc-${Date.now()}`,
+        nome: novo.nome!,
+        categoria: novo.categoria || 'Facial',
+        descricao: novo.descricao || '',
+        preco_sugerido: novo.preco_sugerido || 0,
+        duracao_minutos: novo.duracao_minutos || 60,
+        dias_retorno_padrao: novo.dias_retorno_padrao || 15,
+        instrucoes_cuidados: novo.instrucoes_cuidados || '',
+        contraindicacoes: novo.contraindicacoes,
+      };
+      setProcedimentos(prev => [created, ...prev]);
+      saveDocument(COLLECTIONS.PROCEDIMENTOS, created);
+      showToast(`Procedimento "${created.nome}" cadastrado no catálogo!`);
     }
-    if (patientForPackages?.id === updatedPaciente.id) {
-      setPatientForPackages(updatedPaciente);
-    }
-    showToast('Pacote de sessões do paciente atualizado com sucesso!');
+    setIsNewProcedureOpen(false);
+    setProcedureToEdit(null);
   };
 
-  // --- USER MANAGEMENT & AUTHENTICATION WITH PASSWORD PROTECTION ---
+  const handleDeleteProcedure = (id: string) => {
+    const isGestor = currentUser.role === 'gestor' || currentUser.role === 'admin';
+    if (!isGestor) {
+      showToast('Apenas gestores podem remover procedimentos do catálogo.', 'info');
+      return;
+    }
+    setProcedimentos(prev => prev.filter(p => p.id !== id));
+    removeDocument(COLLECTIONS.PROCEDIMENTOS, id);
+    showToast('Procedimento excluído do catálogo.');
+  };
+
+  // Quotes / Patient Portal Handlers
+  const handleCriarOrcamento = (novo: Omit<SolicitacaoOrcamento, 'id' | 'data_solicitacao' | 'status'>) => {
+    const created: SolicitacaoOrcamento = {
+      ...novo,
+      id: `orc-${Date.now()}`,
+      data_solicitacao: new Date().toISOString(),
+      status: 'pendente',
+    };
+    setOrcamentos(prev => [created, ...prev]);
+    saveDocument(COLLECTIONS.ORCAMENTOS, created);
+    showToast('Orçamento enviado com sucesso!');
+  };
+
+  const handleAtualizarStatusOrcamento = (id: string, status: SolicitacaoOrcamento['status'], observacoes?: string) => {
+    const target = orcamentos.find(o => o.id === id);
+    if (target) {
+      const updated = { ...target, status, ...(observacoes ? { observacoes } : {}) };
+      setOrcamentos(prev => prev.map(o => (o.id === id ? updated : o)));
+      saveDocument(COLLECTIONS.ORCAMENTOS, updated);
+      showToast(`Status do orçamento atualizado para: ${status.toUpperCase()}`);
+    }
+  };
+
+  const handleConverterOrcamentoEmAgendamento = (orcamento: SolicitacaoOrcamento, dataHora: string) => {
+    let patient = pacientes.find(p => p.telefone === orcamento.paciente_telefone);
+    if (!patient) {
+      patient = {
+        id: `pac-${Date.now()}`,
+        nome: orcamento.paciente_nome,
+        telefone: orcamento.paciente_telefone,
+        email: orcamento.paciente_email,
+        data_nascimento: '',
+        historico_clinico: `Cadastrado via orçamento online para ${orcamento.procedimento_nome}.`,
+        criado_em: new Date().toISOString(),
+        termo_consentimento: { assinado: false },
+      };
+      setPacientes(prev => [patient!, ...prev]);
+      saveDocument(COLLECTIONS.PACIENTES, patient);
+    }
+
+    const createdAgendamento: Agendamento = {
+      id: `ag-${Date.now()}`,
+      paciente_id: patient.id,
+      data_hora: dataHora,
+      procedimento: orcamento.procedimento_nome || 'Procedimento Solicitado',
+      status: 'confirmado',
+      criado_em: new Date().toISOString(),
+      duracao_minutos: 60,
+      valor_estimado: orcamento.valor_total || 0,
+      observacoes: `Convertido do orçamento nº ${orcamento.id}.`,
+      paciente: patient,
+      profissional_id: currentUser.id || 'user-01',
+      profissional_nome: currentUser.nome || 'Profissional Responsável',
+    };
+
+    setAgendamentos(prev => [createdAgendamento, ...prev]);
+    saveDocument(COLLECTIONS.AGENDAMENTOS, createdAgendamento);
+
+    handleAtualizarStatusOrcamento(orcamento.id, 'agendado');
+    showToast(`Orçamento convertido em agendamento para ${patient.nome}!`);
+  };
+
+  const handleDeleteOrcamento = (id: string) => {
+    setOrcamentos(prev => prev.filter(o => o.id !== id));
+    removeDocument(COLLECTIONS.ORCAMENTOS, id);
+    showToast('Orçamento excluído.');
+  };
+
+  // Notice Board Handlers
+  const handleAddAviso = (novo: Omit<AvisoQuadro, 'id' | 'data_publicacao'>) => {
+    const created: AvisoQuadro = {
+      ...novo,
+      id: `aviso-${Date.now()}`,
+      data_publicacao: new Date().toISOString(),
+    };
+    setAvisos(prev => [created, ...prev]);
+    saveDocument(COLLECTIONS.AVISOS, created);
+    showToast('Aviso publicado no mural da clínica!');
+  };
+
+  const handleDeleteAviso = (id: string) => {
+    setAvisos(prev => prev.filter(a => a.id !== id));
+    removeDocument(COLLECTIONS.AVISOS, id);
+    showToast('Aviso removido do mural.');
+  };
+
+  // User Management Handlers
   const handleSaveUser = (novo: Omit<UsuarioEquipe, 'id' | 'created_at'>) => {
     const created: UsuarioEquipe = {
       ...novo,
@@ -653,20 +915,21 @@ export default function App() {
       ultimo_acesso: 'Agora',
     };
     setUsuarios(prev => [created, ...prev]);
-    showToast(`Novo usuário ${created.nome} cadastrado com sucesso!`);
+    saveDocument(COLLECTIONS.USUARIOS, created);
+    showToast(`Novo profissional ${created.nome} cadastrado na equipe!`);
   };
 
   const handleUpdateUser = (updated: UsuarioEquipe) => {
     setUsuarios(prev =>
       prev.map(u => (u.id === updated.id ? updated : u))
     );
+    saveDocument(COLLECTIONS.USUARIOS, updated);
     if (currentUser.id === updated.id) {
       setCurrentUser(updated);
     }
-    showToast(`Dados de ${updated.nome} atualizados com sucesso!`);
+    showToast(`Dados de ${updated.nome} atualizados!`);
   };
 
-  // User Switching requiring password
   const handleRequestSwitchUser = (targetUser?: UsuarioEquipe) => {
     setSwitchTargetUser(targetUser || null);
     setIsSwitchUserModalOpen(true);
@@ -674,38 +937,37 @@ export default function App() {
 
   const handleConfirmSwitchUser = (user: UsuarioEquipe) => {
     setCurrentUser(user);
-    const roleLabel = user.role === 'admin' ? 'Admin' : user.role === 'operador' ? 'Operador' : 'Cliente';
+    const roleLabel = user.role === 'gestor' || user.role === 'admin' ? 'Gestor' : user.role === 'profissional' ? 'Profissional' : user.role === 'recepcao' ? 'Recepção' : 'Cliente';
     showToast(`Sessão autenticada para: ${user.nome} (${roleLabel})`, 'info');
   };
 
   const handleLoginSuccess = (user: UsuarioEquipe) => {
     setCurrentUser(user);
     setIsAuthenticated(true);
-    const roleLabel = user.role === 'admin' ? 'Admin' : user.role === 'operador' ? 'Operador' : 'Cliente';
+    const roleLabel = user.role === 'gestor' || user.role === 'admin' ? 'Gestor' : user.role === 'profissional' ? 'Profissional' : user.role === 'recepcao' ? 'Recepção' : 'Cliente';
     showToast(`Bem-vindo(a), ${user.nome}! Acesso concedido como ${roleLabel}.`);
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
-    showToast('Sessão encerrada com sucesso. Faça login para continuar.', 'info');
+    showToast('Sessão encerrada. Faça login para continuar.', 'info');
   };
 
   const handleToggleUserStatus = (userId: string) => {
-    setUsuarios(prev =>
-      prev.map(u => {
-        if (u.id === userId) {
-          const novoStatus = u.status === 'ativo' ? 'inativo' : 'ativo';
-          return { ...u, status: novoStatus };
-        }
-        return u;
-      })
-    );
-    showToast('Status do usuário atualizado.');
+    const target = usuarios.find(u => u.id === userId);
+    if (target) {
+      const novoStatus = target.status === 'ativo' ? 'inativo' : 'ativo';
+      const updated: UsuarioEquipe = { ...target, status: novoStatus };
+      setUsuarios(prev => prev.map(u => (u.id === userId ? updated : u)));
+      saveDocument(COLLECTIONS.USUARIOS, updated);
+      showToast('Status do usuário atualizado.');
+    }
   };
 
   const handleDeleteUser = (userId: string) => {
-    if (currentUser.role !== 'admin') {
-      showToast('Apenas administradores têm permissão para excluir usuários.', 'info');
+    const isGestor = currentUser.role === 'gestor' || currentUser.role === 'admin';
+    if (!isGestor) {
+      showToast('Apenas gestores têm permissão para excluir usuários.', 'info');
       return;
     }
     if (currentUser.id === userId) {
@@ -714,6 +976,7 @@ export default function App() {
     }
     const user = usuarios.find(u => u.id === userId);
     setUsuarios(prev => prev.filter(u => u.id !== userId));
+    removeDocument(COLLECTIONS.USUARIOS, userId);
     showToast(`Usuário "${user?.nome || 'Usuário'}" excluído do sistema.`);
   };
 
@@ -736,7 +999,7 @@ export default function App() {
 
   // Quick stats calculations
   const lowStockCount = estoque.filter(i => i.quantidade <= i.alerta_minimo).length;
-  const pendingCount = agendamentos.filter(a => a.status === 'pendente').length;
+  const pendingCount = agendamentos.filter(a => a.status === 'pendente' || a.status === 'em_espera').length;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col antialiased">
@@ -780,10 +1043,13 @@ export default function App() {
           pendingCount={pendingCount}
           currentUser={currentUser}
           unreadNoticesCount={unreadNoticesCount}
+          clinicaConfig={clinicaConfig}
+          onOpenClinicSettings={() => setIsClinicSettingsOpen(true)}
+          onOpenUserAvatarModal={() => setIsUserAvatarModalOpen(true)}
           onLogout={handleLogout}
         />
 
-        {/* Mobile Navigation (Bottom Bar + Drawer) */}
+        {/* Mobile Navigation */}
         <MobileNavigation
           activeTab={activeTab}
           setActiveTab={setActiveTab}
@@ -803,6 +1069,7 @@ export default function App() {
               agendamentos={agendamentos}
               estoque={estoque}
               pacientes={pacientes}
+              profissionais={usuarios}
               onOpenNewAppointment={() => setIsNewAppointmentOpen(true)}
               onOpenNewPatient={() => setIsNewPatientOpen(true)}
               onOpenNewInventory={() => setIsNewInventoryOpen(true)}
@@ -818,6 +1085,7 @@ export default function App() {
             <AppointmentsView
               agendamentos={agendamentos}
               pacientes={pacientes}
+              profissionais={usuarios}
               onOpenNewAppointment={() => setIsNewAppointmentOpen(true)}
               onUpdateStatus={handleUpdateStatus}
               onViewPatient={(p) => setSelectedPatientForDetails(p)}
@@ -858,6 +1126,22 @@ export default function App() {
             />
           )}
 
+          {(activeTab === 'patrimonio' || activeTab === 'bens') && currentUser.role !== 'cliente' && (
+            <AssetsView
+              bens={bensPatrimoniais}
+              onOpenNewBem={() => {
+                setAssetToEdit(null);
+                setIsNewAssetOpen(true);
+              }}
+              onEditBem={(bem) => {
+                setAssetToEdit(bem);
+                setIsNewAssetOpen(true);
+              }}
+              onDeleteBem={handleDeleteBemPatrimonial}
+              currentUser={currentUser}
+            />
+          )}
+
           {activeTab === 'portal_paciente' && (
             <PatientPortalView
               procedimentos={procedimentos}
@@ -883,9 +1167,12 @@ export default function App() {
           {activeTab === 'financeiro' && currentUser.role !== 'cliente' && (
             <FinancialView
               transacoes={transacoes}
+              despesasRecorrentes={despesasRecorrentes}
               onAddTransaction={handleAddTransaction}
               onUpdateTransactionStatus={handleUpdateTransactionStatus}
-              onDeleteTransaction={handleDeleteTransaction}
+              onSoftDeleteTransaction={handleSoftDeleteTransaction}
+              onAddDespesaRecorrente={handleAddDespesaRecorrente}
+              onToggleDespesaRecorrenteStatus={handleToggleDespesaRecorrenteStatus}
               currentUser={currentUser}
             />
           )}
@@ -915,7 +1202,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'usuarios' && currentUser.role === 'admin' && (
+          {activeTab === 'usuarios' && (currentUser.role === 'admin' || currentUser.role === 'gestor') && (
             <UsersManagementView
               usuarios={usuarios}
               currentUser={currentUser}
@@ -928,7 +1215,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'supabase_guide' && currentUser.role === 'admin' && (
+          {activeTab === 'supabase_guide' && (currentUser.role === 'admin' || currentUser.role === 'gestor') && (
             <SupabaseGuideView />
           )}
         </main>
@@ -954,50 +1241,56 @@ export default function App() {
         onConfirmSwitch={handleConfirmSwitchUser}
       />
 
+      {/* USER PROFILE AVATAR MODAL */}
+      <UserProfileAvatarModal
+        isOpen={isUserAvatarModalOpen}
+        onClose={() => setIsUserAvatarModalOpen(false)}
+        currentUser={currentUser}
+        onUpdateAvatar={handleUpdateAvatar}
+      />
+
+      {/* CLINIC LOGO AND SETTINGS MODAL */}
+      <ClinicSettingsModal
+        isOpen={isClinicSettingsOpen}
+        onClose={() => setIsClinicSettingsOpen(false)}
+        config={clinicaConfig}
+        onSaveConfig={handleSaveClinicConfig}
+      />
+
       {/* MODALS */}
       <GlobalSearchModal
         isOpen={isGlobalSearchOpen}
         onClose={() => setIsGlobalSearchOpen(false)}
-        pacientes={pacientes}
         agendamentos={agendamentos}
+        pacientes={pacientes}
         estoque={estoque}
-        setActiveTab={setActiveTab}
-        onViewPatient={(p) => setSelectedPatientForDetails(p)}
-        onOpenNewAppointment={() => setIsNewAppointmentOpen(true)}
-        onOpenNewPatient={() => setIsNewPatientOpen(true)}
-        onOpenNewInventory={() => setIsNewInventoryOpen(true)}
+        procedimentos={procedimentos}
+        orcamentos={orcamentos}
+        transacoes={transacoes}
+        onNavigate={(tab) => setActiveTab(tab)}
+        onSelectPatient={(p) => setSelectedPatientForDetails(p)}
       />
-
-      {patientForPackages && (
-        <TreatmentPackagesModal
-          isOpen={!!patientForPackages}
-          onClose={() => setPatientForPackages(null)}
-          paciente={patientForPackages}
-          onUpdatePaciente={handleUpdatePacienteObj}
-          currentUser={currentUser}
-          procedimentos={procedimentos}
-        />
-      )}
 
       <NewAppointmentModal
         isOpen={isNewAppointmentOpen}
         onClose={() => setIsNewAppointmentOpen(false)}
         pacientes={pacientes}
         procedimentos={procedimentos}
-        onSaveAppointment={handleSaveAppointment}
-        onOpenNewPatient={() => setIsNewPatientOpen(true)}
+        profissionais={usuarios}
+        onSave={handleSaveAppointment}
       />
 
       <NewPatientModal
         isOpen={isNewPatientOpen}
         onClose={() => setIsNewPatientOpen(false)}
-        onSavePatient={handleSavePatient}
+        onSave={handleSavePatient}
       />
 
       <NewInventoryModal
         isOpen={isNewInventoryOpen}
         onClose={() => setIsNewInventoryOpen(false)}
-        onSaveInventory={handleSaveInventory}
+        procedimentos={procedimentos}
+        onSave={handleSaveInventory}
       />
 
       <ProcedureModal
@@ -1007,31 +1300,43 @@ export default function App() {
           setProcedureToEdit(null);
         }}
         onSave={handleSaveProcedure}
-        procedimentoToEdit={procedureToEdit}
-        estoqueDisponivel={estoque}
+        procedureToEdit={procedureToEdit}
       />
 
       <NewUserModal
         isOpen={isNewUserOpen}
         onClose={() => setIsNewUserOpen(false)}
-        onSaveUser={handleSaveUser}
+        onSave={handleSaveUser}
       />
 
       <EditUserModal
         isOpen={!!userToEdit}
-        usuario={userToEdit}
         onClose={() => setUserToEdit(null)}
-        onSaveUser={handleUpdateUser}
+        user={userToEdit}
+        onSave={handleUpdateUser}
       />
 
       <PatientDetailsModal
-        paciente={selectedPatientForDetails}
         isOpen={!!selectedPatientForDetails}
         onClose={() => setSelectedPatientForDetails(null)}
+        paciente={selectedPatientForDetails}
         agendamentos={agendamentos}
+        profissionais={usuarios}
         onUpdatePatientHistory={handleUpdatePatientHistory}
         onDeletePatient={handleDeletePatient}
         currentUser={currentUser}
+      />
+
+      <TreatmentPackagesModal
+        isOpen={!!patientForPackages}
+        onClose={() => setPatientForPackages(null)}
+        paciente={patientForPackages}
+        procedimentos={procedimentos}
+        onUpdatePaciente={handleUpdatePacienteObj}
+        onScheduleSession={(sessaoInfo) => {
+          setPatientForPackages(null);
+          setIsNewAppointmentOpen(true);
+        }}
       />
 
       <CompleteProcedureModal
@@ -1039,14 +1344,25 @@ export default function App() {
         onClose={() => setAppointmentToComplete(null)}
         agendamento={appointmentToComplete}
         estoque={estoque}
-        onConfirmComplete={handleConfirmCompleteProcedure}
+        onConfirmComplete={handleSaveProcedureCompletion}
+        onComplete={handleSaveProcedureCompletion}
+      />
+
+      <NewAssetModal
+        isOpen={isNewAssetOpen}
+        onClose={() => {
+          setIsNewAssetOpen(false);
+          setAssetToEdit(null);
+        }}
+        onSave={handleSaveBem}
+        bemToEdit={assetToEdit}
+        profissionais={usuarios}
       />
 
       <SqlAndArchitectureModal
         isOpen={isSqlModalOpen}
         onClose={() => setIsSqlModalOpen(false)}
       />
-
     </div>
   );
 }

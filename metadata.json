@@ -1,6 +1,6 @@
 {
-  "name": "AuraEstética - Gestão de Clínica",
-  "description": "Sistema completo modular para gestão de clínica de estética com autenticação de equipe (Admin vs Recepção), catálogo de procedimentos com permissão de exclusão/adição pelo Admin, estoque de insumos com baixa automática, portal do paciente com login Google e simulador de orçamento, navegação responsiva mobile e automação de WhatsApp.",
+  "name": "AuraEstética - SaaS Clínica & Studio",
+  "description": "SaaS Multi-tenant completo para Clínicas de Estética e Studios de Beleza com Firebase Firestore, RBAC (Gestor, Recepção, Profissional, Cliente), Balcão do Dia, Fichas de Clientes com Anamnese e Evolução Clínica, Gestão de Bens Patrimoniais, Insumos e Pigmentos, Fluxo de Caixa com Soft Delete auditado e Despesas Recorrentes.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

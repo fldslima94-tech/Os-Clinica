@@ -13,7 +13,8 @@ import {
   Layers, 
   Image as ImageIcon,
   Sliders,
-  Check
+  Check,
+  FileText
 } from 'lucide-react';
 import { ProcedimentoClinico, EstoqueInsumo, UnidadeMedida, VariacaoProcedimento } from '../types';
 
@@ -54,6 +55,8 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
   const [imagemUrl, setImagemUrl] = useState('');
   const [destaquePortal, setDestaquePortal] = useState(true);
   const [ativo, setAtivo] = useState(true);
+  const [exigeContrato, setExigeContrato] = useState(true);
+  const [contratoPadrao, setContratoPadrao] = useState('');
 
   // 3 Tabela de Valores Variáveis (Variações de Preço e Porte)
   const [variacao1, setVariacao1] = useState<VariacaoProcedimento>({
@@ -102,6 +105,8 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
       setImagemUrl(procedimentoToEdit.imagem_url || '');
       setDestaquePortal(procedimentoToEdit.destaque_portal ?? true);
       setAtivo(procedimentoToEdit.ativo ?? true);
+      setExigeContrato(procedimentoToEdit.exige_contrato ?? true);
+      setContratoPadrao(procedimentoToEdit.contrato_padrao || `TERMO DE CONSENTIMENTO LIVRE E ESCLARECIDO & CONTRATO DE SERVIÇOS ESTÉTICOS\n\n1. PROCEDIMENTO: ${procedimentoToEdit.nome}\n2. ESCLARECIMENTO: O paciente declara ter sido orientado(a) sobre indicações, contraindicações e cuidados pós-procedimento.\n3. CUSTOS E PRODUTOS: Os valores acordados e produtos aplicados constam em ficha e recibo financeiro.\n4. PRIVACIDADE: O paciente autoriza registros clínicos para histórico no prontuário eletrônico.`);
       setInsumosVinculados(procedimentoToEdit.insumos_vinculados || []);
 
       if (procedimentoToEdit.variacoes && procedimentoToEdit.variacoes.length >= 3) {
@@ -145,6 +150,8 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
       setImagemUrl('');
       setDestaquePortal(true);
       setAtivo(true);
+      setExigeContrato(true);
+      setContratoPadrao('TERMO DE CONSENTIMENTO LIVRE E ESCLARECIDO & CONTRATO DE PRESTAÇÃO DE SERVIÇOS ESTÉTICOS\n\n1. OBJETO E TRATAMENTO: O presente contrato tem por objeto a prestação de serviços estéticos especializados conforme avaliação e plano de aplicação acordado.\n2. CIÊNCIA E ESCLARECIMENTOS: O(A) paciente declara ter sido devidamente orientado(a) quanto à técnica utilizada, número de sessões recomendadas, cuidados pré e pós-procedimento, bem como possíveis reações temporárias esperadas (edema, rubor ou sensibilidade local).\n3. OBRIGAÇÕES DO PACIENTE: O(A) paciente compromete-se a seguir integralmente as recomendações e cuidados domiciliares fornecidos pelo profissional, bem como retornar nas datas agendadas para reavaliação clínica.\n4. CONDIÇÕES FINANCEIRAS: Os valores acordados e formas de pagamento contratadas encontram-se discriminados no recibo do procedimento.\n5. AUTORIZAÇÃO E PRONTUÁRIO: Fica autorizada a inclusão das fotos de evolução clínica e dados de aplicação no prontuário eletrônico confidencial.');
       setInsumosVinculados([]);
       setVariacao1({
         id: 'v1',
@@ -251,6 +258,8 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
       destaque_portal: destaquePortal,
       ativo,
       insumos_vinculados: insumosVinculados.length > 0 ? insumosVinculados : undefined,
+      exige_contrato: exigeContrato,
+      contrato_padrao: contratoPadrao.trim() || undefined,
     }, procedimentoToEdit?.id);
 
     onClose();
@@ -705,6 +714,57 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+
+          {/* Contrato Vinculado Obrigatório */}
+          <div className="bg-gradient-to-br from-indigo-50/50 to-slate-50 p-4 rounded-xl border border-indigo-100/80 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                  Contrato & Termo de Consentimento Vinculado
+                </h4>
+                <p className="text-[11px] text-slate-500">
+                  Todo agendamento deste procedimento exigirá e vinculará este modelo de contrato com assinatura digital da paciente.
+                </p>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer bg-white px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={exigeContrato}
+                  onChange={(e) => setExigeContrato(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                />
+                <span>Exigir Contrato</span>
+              </label>
+            </div>
+
+            {exigeContrato && (
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between text-[11px] text-slate-500">
+                  <span className="font-semibold text-slate-700">Minuta do Contrato / Termo de Esclarecimento</span>
+                  <button
+                    type="button"
+                    onClick={() => setContratoPadrao(`TERMO DE CONSENTIMENTO LIVRE E ESCLARECIDO & CONTRATO DE PRESTAÇÃO DE SERVIÇOS ESTÉTICOS\n\n1. OBJETO E TRATAMENTO: O presente contrato tem por objeto a realização do procedimento ${nome || 'estético selecionado'}, com plano de aplicação personalizado.\n2. ESCLARECIMENTOS: O(A) paciente declara ter recebido todas as explicações pertinentes sobre indicações clínicas, reações comuns (edema leve, rubor ou pequenos hematomas) e tempo de recuperação.\n3. CUIDADOS PÓS-PROCEDIMENTO: O(A) paciente assume a responsabilidade de seguir rigorosamente as orientações profissionais e retornar para a consulta de revisão.\n4. TERMO FINANCEIRO E VALORES: Os valores, formas de parcelamento e recibos emitidos integram este instrumento.\n5. AUTORIZAÇÃO DE REGISTRO CLÍNICO: Autorizo o registro fotográfico de evolução clínica para controle exclusivo em meu prontuário médico.`)}
+                    className="text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer"
+                  >
+                    Restaurar Modelo Padrão
+                  </button>
+                </div>
+                <textarea
+                  rows={4}
+                  value={contratoPadrao}
+                  onChange={(e) => setContratoPadrao(e.target.value)}
+                  placeholder="Insira as cláusulas e o termo de consentimento do procedimento..."
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono"
+                />
+                <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-100">
+                  <Check className="w-3.5 h-3.5 shrink-0" />
+                  <span>Vinculação ativa: ao agendar este procedimento, o contrato será automaticamente anexado.</span>
+                </div>
               </div>
             )}
           </div>

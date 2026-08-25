@@ -11,7 +11,10 @@ import {
   ChevronRight,
   ShieldAlert,
   Package,
-  Trash2
+  Trash2,
+  Sparkles,
+  Camera,
+  HeartPulse
 } from 'lucide-react';
 import { Paciente, UsuarioEquipe } from '../types';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
@@ -33,16 +36,18 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
   onDeletePatient,
   currentUser,
 }) => {
-  const isAdmin = !currentUser || currentUser.role === 'admin';
+  const isGestor = !currentUser || currentUser.role === 'gestor' || currentUser.role === 'admin';
   const [search, setSearch] = useState('');
   const [patientToDelete, setPatientToDelete] = useState<Paciente | null>(null);
 
   const filteredPacientes = pacientes.filter(p => {
-    const q = search.toLowerCase();
+    const q = search.toLowerCase().trim();
     return (
+      !q ||
       p.nome.toLowerCase().includes(q) ||
       p.telefone.includes(q) ||
-      p.historico_clinico.toLowerCase().includes(q)
+      (p.email && p.email.toLowerCase().includes(q)) ||
+      (p.historico_clinico && p.historico_clinico.toLowerCase().includes(q))
     );
   });
 
@@ -76,180 +81,168 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
     <div className="space-y-6">
       
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
         <div>
-          <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
-            Cadastro de Pacientes & Prontuários
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+              Prontuários & Anamnese
+            </span>
+          </div>
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight mt-1">
+            Fichas de Clientes & Histórico Clínico
           </h2>
-          <p className="text-xs text-slate-400 font-medium mt-0.5">
-            Gerenciamento de prontuários estéticos, histórico de alergias e dados de contato.
+          <p className="text-xs text-slate-500 font-medium mt-0.5">
+            Anamneses personalizáveis, evoluções de retorno clínico e galeria fotográfica privada antes/depois.
           </p>
         </div>
 
         <button
           onClick={onOpenNewPatient}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-lg text-sm font-semibold transition-colors cursor-pointer shadow-sm"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-sm font-semibold transition-all cursor-pointer shadow-sm"
         >
           <Plus className="w-4 h-4" />
-          <span>Cadastrar Paciente</span>
+          <span>Cadastrar Nova Ficha</span>
         </button>
       </div>
 
       {/* Search */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
         <div className="relative w-full max-w-md">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Buscar por nome, telefone ou queixa/histórico..."
+            placeholder="Buscar ficha por nome do cliente, telefone, e-mail ou histórico..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+            className="w-full pl-9 pr-4 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
           />
         </div>
-        <span className="text-xs text-slate-400 font-medium">
-          {filteredPacientes.length} paciente{filteredPacientes.length !== 1 ? 's' : ''} encontrado{filteredPacientes.length !== 1 ? 's' : ''}
-        </span>
+
+        <div className="text-xs text-slate-500 font-medium hidden sm:block">
+          Total de <strong>{filteredPacientes.length}</strong> fichas cadastradas
+        </div>
       </div>
 
-      {/* Patients List Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredPacientes.map(paciente => {
-          const age = calculateAge(paciente.data_nascimento);
-          const hasAlergy = paciente.historico_clinico.toLowerCase().includes('alerg');
+      {/* Patient Cards Grid */}
+      {filteredPacientes.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center">
+          <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-base font-semibold text-slate-800">Nenhuma ficha de cliente encontrada</h3>
+          <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+            Cadastre novos clientes com anamnese clínica, fotos de acompanhamento e termos de consentimento.
+          </p>
+          <button
+            onClick={onOpenNewPatient}
+            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition-colors cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Cadastrar Primeira Ficha
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {filteredPacientes.map((paciente) => {
+            const age = calculateAge(paciente.data_nascimento);
+            const totalFotos = (paciente.fotos_antes_depois?.length || 0) + (paciente.galeria_clinica?.length || 0);
+            const totalEvolucoes = paciente.evolucoes_retornos?.length || 0;
 
-          return (
-            <div
-              key={paciente.id}
-              className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:border-slate-300 transition-colors flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-xs shrink-0 border border-slate-300">
-                      {paciente.nome.substring(0, 2).toUpperCase()}
+            return (
+              <div
+                key={paciente.id}
+                className="bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-all p-5 flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm">
+                      {paciente.nome.charAt(0).toUpperCase()}
                     </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-900 leading-tight">
-                        {paciente.nome}
-                      </h3>
-                      <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5 font-medium">
-                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{formatDate(paciente.data_nascimento)} {age ? `(${age} anos)` : ''}</span>
-                      </p>
+
+                    <div className="flex items-center gap-1.5">
+                      {totalFotos > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                          <Camera className="w-3 h-3" />
+                          {totalFotos} fotos
+                        </span>
+                      )}
+                      {totalEvolucoes > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                          <HeartPulse className="w-3 h-3" />
+                          {totalEvolucoes} evoluções
+                        </span>
+                      )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
-                    {hasAlergy && (
-                      <span 
-                        title="Alergia relatada no histórico"
-                        className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200/60 text-[10px] font-semibold inline-flex items-center gap-1"
-                      >
-                        <ShieldAlert className="w-3 h-3 text-amber-600" />
-                        Alergia
-                      </span>
-                    )}
+                  <h3 className="text-base font-bold text-slate-900 line-clamp-1">
+                    {paciente.nome}
+                  </h3>
 
-                    {isAdmin && onDeletePatient && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPatientToDelete(paciente);
-                        }}
-                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                        title="Excluir paciente (Admin)"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-2.5 mb-4 text-xs">
-                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between">
-                    <span className="text-slate-500 font-medium">Telefone:</span>
+                  <div className="mt-2 space-y-1.5 text-xs text-slate-600">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-slate-800">{paciente.telefone}</span>
-                      <a
-                        href={`https://wa.me/55${paciente.telefone.replace(/\D/g, '')}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-emerald-600 hover:text-emerald-700 p-0.5 rounded hover:bg-emerald-50 transition-colors"
-                        title="Conversar no WhatsApp"
-                      >
-                        <MessageCircle className="w-4 h-4" />
-                      </a>
+                      <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span>{paciente.telefone}</span>
                     </div>
-                  </div>
 
-                  {/* Pacotes Ativos */}
-                  {paciente.pacotes && paciente.pacotes.length > 0 && (
-                    <div className="p-2.5 rounded-lg bg-indigo-50/60 border border-indigo-100 flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-indigo-900 font-medium">
-                        <Package className="w-3.5 h-3.5 text-indigo-600" />
-                        <span>{paciente.pacotes.length} Pacote{paciente.pacotes.length > 1 ? 's' : ''} Ativo{paciente.pacotes.length > 1 ? 's' : ''}</span>
+                    {paciente.data_nascimento && (
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span>{formatDate(paciente.data_nascimento)} {age ? `(${age} anos)` : ''}</span>
                       </div>
-                      <span className="text-[10px] font-bold bg-indigo-200 text-indigo-800 px-1.5 py-0.5 rounded">
-                        {paciente.pacotes.reduce((acc, p) => acc + (p.sessoes_totais - p.sessoes_realizadas), 0)} sessões rest.
-                      </span>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Prontuário / Histórico Clínico Preview */}
-                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-100">
-                    <p className="text-[11px] font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                      <FileText className="w-3.5 h-3.5 text-slate-400" />
-                      Histórico Clínico / Prontuário:
-                    </p>
-                    <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed">
-                      {paciente.historico_clinico || 'Sem histórico ou queixas cadastradas.'}
-                    </p>
+                    {paciente.fototipo && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Fototipo:</span>
+                        <span className="font-semibold text-slate-700">{paciente.fototipo}</span>
+                      </div>
+                    )}
+
+                    {paciente.alergias && (
+                      <div className="mt-2 p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-[11px] flex items-start gap-1.5">
+                        <ShieldAlert className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
+                        <span className="line-clamp-2"><strong>Alergias:</strong> {paciente.alergias}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                <button
-                  onClick={() => onOpenPackages && onOpenPackages(paciente)}
-                  className="py-2 px-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer"
-                  title="Gerenciar Pacotes e Sessões deste paciente"
-                >
-                  <Package className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>Pacotes</span>
-                </button>
-                <button
-                  onClick={() => onViewPatient(paciente)}
-                  className="py-2 px-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer"
-                >
-                  <span>Prontuário</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
+                  <button
+                    onClick={() => onViewPatient(paciente)}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer"
+                  >
+                    <span>Abrir Ficha Completa</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
 
-      {/* Delete Patient Confirmation Modal */}
-      {patientToDelete && (
-        <DeleteConfirmModal
-          isOpen={!!patientToDelete}
-          onClose={() => setPatientToDelete(null)}
-          onConfirm={() => {
-            if (patientToDelete && onDeletePatient) {
-              onDeletePatient(patientToDelete.id);
-            }
-            setPatientToDelete(null);
-          }}
-          title="Excluir Cadastro de Paciente"
-          itemType="Paciente"
-          itemName={patientToDelete.nome}
-          description="A exclusão deste paciente removerá seu prontuário, histórico clínico, fotos e agendamentos relacionados do sistema."
-        />
+                  {isGestor && onDeletePatient && (
+                    <button
+                      onClick={() => setPatientToDelete(paciente)}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                      title="Excluir Ficha"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
 
+      {patientToDelete && onDeletePatient && (
+        <DeleteConfirmModal
+          isOpen={true}
+          onClose={() => setPatientToDelete(null)}
+          onConfirm={() => {
+            onDeletePatient(patientToDelete.id);
+            setPatientToDelete(null);
+          }}
+          title="Excluir Ficha de Cliente"
+          description={`Tem certeza que deseja excluir a ficha de ${patientToDelete.nome}? Esta ação removerá o prontuário e registros associados.`}
+        />
+      )}
     </div>
   );
 };

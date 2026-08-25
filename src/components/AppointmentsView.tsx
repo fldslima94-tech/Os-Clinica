@@ -1,33 +1,35 @@
 import React, { useState } from 'react';
 import { 
-  Calendar as CalendarIcon, 
   Plus, 
-  Clock, 
   Search, 
+  Clock, 
   CheckCircle2, 
-  Hourglass, 
   XCircle, 
-  Check, 
-  User, 
-  Phone, 
   MessageCircle, 
-  Sparkles, 
-  Filter,
-  LayoutGrid,
-  List
+  Calendar as CalendarIcon, 
+  List,
+  AlertCircle,
+  Trash2,
+  User,
+  Users,
+  DollarSign,
+  FileText,
+  UserCheck,
+  Sparkles,
+  Columns
 } from 'lucide-react';
 import { Agendamento, Paciente, StatusAgendamento, UsuarioEquipe } from '../types';
 import { CalendarGridView } from './CalendarGridView';
-import { DeleteConfirmModal } from './DeleteConfirmModal';
-import { Trash2 } from 'lucide-react';
 
 interface AppointmentsViewProps {
   agendamentos: Agendamento[];
   pacientes: Paciente[];
+  profissionais?: UsuarioEquipe[];
   onOpenNewAppointment: () => void;
   onUpdateStatus: (id: string, status: StatusAgendamento) => void;
   onViewPatient: (paciente: Paciente) => void;
   onOpenCompleteModal?: (agendamento: Agendamento) => void;
+  onOpenCheckInModal?: (agendamento: Agendamento) => void;
   onDeleteAppointment?: (id: string) => void;
   currentUser?: UsuarioEquipe;
 }
@@ -35,25 +37,36 @@ interface AppointmentsViewProps {
 export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
   agendamentos,
   pacientes,
+  profissionais = [],
   onOpenNewAppointment,
   onUpdateStatus,
   onViewPatient,
   onOpenCompleteModal,
+  onOpenCheckInModal,
   onDeleteAppointment,
   currentUser,
 }) => {
   const isAdmin = !currentUser || currentUser.role === 'admin';
-  const [viewFormat, setViewFormat] = useState<'cards' | 'calendario'>('cards');
+  const [viewFormat, setViewFormat] = useState<'cards' | 'profissionais' | 'calendario'>('cards');
   const [filterStatus, setFilterStatus] = useState<string>('todos');
+  const [filterProfissional, setFilterProfissional] = useState<string>('todos');
   const [search, setSearch] = useState('');
   const [appointmentToDelete, setAppointmentToDelete] = useState<Agendamento | null>(null);
+  const [selectedContratoAgendamento, setSelectedContratoAgendamento] = useState<Agendamento | null>(null);
 
+  // Filter appointments
   const filtered = agendamentos.filter(ag => {
     const matchesStatus = filterStatus === 'todos' || ag.status === filterStatus;
+    const matchesProfissional = filterProfissional === 'todos' || 
+      ag.profissional_id === filterProfissional || 
+      ag.profissional_nome === filterProfissional;
+    
     const q = search.toLowerCase();
     const patientName = ag.paciente?.nome.toLowerCase() || '';
     const proc = ag.procedimento.toLowerCase();
-    return matchesStatus && (patientName.includes(q) || proc.includes(q));
+    const profName = (ag.profissional_nome || '').toLowerCase();
+    
+    return matchesStatus && matchesProfissional && (patientName.includes(q) || proc.includes(q) || profName.includes(q));
   });
 
   const formatDateTime = (iso: string) => {
@@ -76,22 +89,42 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
     }
   };
 
+  const handleCheckInClick = (ag: Agendamento) => {
+    if (onOpenCheckInModal) {
+      onOpenCheckInModal(ag);
+    } else {
+      onUpdateStatus(ag.id, 'confirmado');
+    }
+  };
+
+  // Get active list of professionals (either from props or inferred from appointments)
+  const allProfissionaisList = profissionais.length > 0 ? profissionais : [
+    { id: 'user-01', nome: 'Dra. Camila Vasconcelos', cargo: 'Admin / Biomédica Esteta', role: 'admin' as const, email: '', senha: '', telefone: '', status: 'ativo' as const },
+    { id: 'user-02', nome: 'Dra. Larissa Souza', cargo: 'Especialista em Harmonização', role: 'operador' as const, email: '', senha: '', telefone: '', status: 'ativo' as const },
+    { id: 'user-03', nome: 'Dr. Matheus Brandão', cargo: 'Dermatologia & Injetáveis', role: 'operador' as const, email: '', senha: '', telefone: '', status: 'ativo' as const },
+  ];
+
   return (
     <div className="space-y-6">
       
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
         <div>
-          <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
-            Gestão de Agendamentos & Calendário
-          </h2>
-          <p className="text-xs text-slate-400 font-medium mt-0.5">
-            Visualize por cards ou grade de horários diária/semanal, confirme presenças e baixe insumos.
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+              Gestão de Agendamentos & Agenda por Profissional
+            </h2>
+            <span className="text-[11px] bg-indigo-50 text-indigo-700 font-bold px-2 py-0.5 rounded-full border border-indigo-200">
+              Multi-Profissional
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 font-medium mt-0.5">
+            Visualize por profissional, cards gerais ou grade semanal, confirme chegadas com pagamento e retorno.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          {/* Toggle Cards vs Grade Calendário */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Toggle Views */}
           <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-semibold">
             <button
               onClick={() => setViewFormat('cards')}
@@ -102,7 +135,18 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
               }`}
             >
               <List className="w-3.5 h-3.5" />
-              <span>Lista / Cards</span>
+              <span>Geral (Cards)</span>
+            </button>
+            <button
+              onClick={() => setViewFormat('profissionais')}
+              className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer ${
+                viewFormat === 'profissionais'
+                  ? 'bg-white text-indigo-700 shadow-2xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Columns className="w-3.5 h-3.5" />
+              <span>Por Profissional</span>
             </button>
             <button
               onClick={() => setViewFormat('calendario')}
@@ -122,36 +166,211 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
             className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-lg text-sm font-semibold transition-colors cursor-pointer shadow-sm"
           >
             <Plus className="w-4 h-4" />
-            <span>Novo Horário</span>
+            <span>Novo Agendamento</span>
           </button>
         </div>
       </div>
 
-      {/* RENDER VIEW: CALENDAR OR CARDS */}
+      {/* RENDER VIEW: CALENDAR OR CARDS OR PER-PROFESSIONAL */}
       {viewFormat === 'calendario' ? (
         <CalendarGridView
-          agendamentos={agendamentos}
+          agendamentos={filtered}
           pacientes={pacientes}
           onOpenNewAppointment={onOpenNewAppointment}
           onSelectAgendamento={(ag) => handleConcludeClick(ag)}
           onViewPatient={onViewPatient}
           onUpdateStatus={onUpdateStatus}
         />
-      ) : (
-        <>
-          {/* Filters Bar */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
-            <div className="relative w-full md:w-80">
+      ) : viewFormat === 'profissionais' ? (
+        /* VISÃO SEPARADA POR PROFISSIONAL (COLUNAS / ABAS) */
+        <div className="space-y-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-indigo-600" />
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Agendas Separadas por Profissional</h3>
+                <p className="text-xs text-slate-500">Acompanhe a fila de atendimentos e compromissos individuais de cada especialista</p>
+              </div>
+            </div>
+
+            <div className="relative w-full sm:w-64">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Filtrar por paciente ou procedimento..."
+                placeholder="Buscar paciente ou procedimento..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              />
+            </div>
+          </div>
+
+          {/* Grid of Professional Columns */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {allProfissionaisList.map((prof) => {
+              const profAgendamentos = agendamentos.filter(ag => {
+                const isThisProf = ag.profissional_id === prof.id || 
+                  ag.profissional_nome === prof.nome ||
+                  (!ag.profissional_id && !ag.profissional_nome && prof.role === 'admin');
+                
+                const q = search.toLowerCase();
+                const patientName = ag.paciente?.nome.toLowerCase() || '';
+                const proc = ag.procedimento.toLowerCase();
+                return isThisProf && (patientName.includes(q) || proc.includes(q));
+              });
+
+              return (
+                <div key={prof.id} className="bg-slate-50/70 rounded-xl border border-slate-200 p-4 flex flex-col h-full shadow-2xs">
+                  
+                  {/* Column Header */}
+                  <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-200 bg-white -mx-4 -mt-4 p-4 rounded-t-xl mb-3 shadow-2xs">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-xs shrink-0 border border-indigo-200">
+                        {prof.nome.split(' ').map(n => n[0]).slice(0, 2).join('')}
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-900 leading-tight">
+                          {prof.nome}
+                        </h4>
+                        <p className="text-[11px] text-slate-500 font-medium">
+                          {prof.cargo || 'Especialista Clínico'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <span className="text-xs bg-indigo-50 text-indigo-700 font-bold px-2 py-1 rounded-md border border-indigo-200/60 shrink-0">
+                      {profAgendamentos.length} horários
+                    </span>
+                  </div>
+
+                  {/* Appointments for this professional */}
+                  <div className="space-y-3 flex-1 overflow-y-auto max-h-[600px] pr-0.5">
+                    {profAgendamentos.length === 0 ? (
+                      <div className="text-center py-8 px-4 bg-white rounded-lg border border-dashed border-slate-200 text-slate-400 text-xs">
+                        Nenhum agendamento para este profissional.
+                        <button
+                          onClick={onOpenNewAppointment}
+                          className="block mx-auto mt-2 text-indigo-600 font-semibold hover:underline cursor-pointer"
+                        >
+                          + Agendar Horário
+                        </button>
+                      </div>
+                    ) : (
+                      profAgendamentos.map((ag) => {
+                        const patient = ag.paciente || pacientes.find(p => p.id === ag.paciente_id);
+                        const dt = formatDateTime(ag.data_hora);
+
+                        return (
+                          <div 
+                            key={ag.id}
+                            className="bg-white rounded-lg border border-slate-200 p-3.5 shadow-2xs hover:border-indigo-300 transition-all space-y-2.5"
+                          >
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span className="text-xs font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                                {dt.date} às {dt.time}
+                              </span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                                ag.status === 'confirmado' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                                ag.status === 'pendente' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                                ag.status === 'concluido' ? 'bg-slate-100 text-slate-600 border border-slate-200' :
+                                'bg-rose-50 text-rose-600 border border-rose-200'
+                              }`}>
+                                {ag.status}
+                              </span>
+                            </div>
+
+                            <div>
+                              <div className="text-xs font-bold text-slate-900 flex items-center justify-between">
+                                <span>{patient?.nome || 'Paciente'}</span>
+                                {patient && (
+                                  <button
+                                    onClick={() => onViewPatient(patient)}
+                                    className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer"
+                                  >
+                                    Prontuário
+                                  </button>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-600 mt-0.5">
+                                {ag.procedimento}
+                              </p>
+                              {ag.valor_estimado && (
+                                <p className="text-[11px] font-bold text-emerald-700 mt-0.5">
+                                  R$ {ag.valor_estimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-1">
+                              {ag.status !== 'concluido' && (
+                                <button
+                                  onClick={() => handleCheckInClick(ag)}
+                                  className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                  title="Confirmar Chegada, Pagamento e Retorno"
+                                >
+                                  <UserCheck className="w-3 h-3" />
+                                  <span>Chegada & Pagto</span>
+                                </button>
+                              )}
+
+                              {ag.status !== 'concluido' ? (
+                                <button
+                                  onClick={() => handleConcludeClick(ag)}
+                                  className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                >
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>Concluir</span>
+                                </button>
+                              ) : (
+                                <span className="text-[11px] text-slate-400 font-medium italic">Atendimento Finalizado</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        /* VISÃO EM CARDS COM FILTRO */
+        <>
+          {/* Filters Bar */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
+            <div className="relative w-full md:w-72">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Filtrar por paciente, procedimento ou profissional..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-9 pr-4 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               />
             </div>
 
+            {/* Filter by Professional */}
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <label className="text-xs font-bold text-slate-600 whitespace-nowrap flex items-center gap-1">
+                <User className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Profissional:</span>
+              </label>
+              <select
+                value={filterProfissional}
+                onChange={(e) => setFilterProfissional(e.target.value)}
+                className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+              >
+                <option value="todos">Todos os Profissionais</option>
+                {allProfissionaisList.map(p => (
+                  <option key={p.id} value={p.id}>{p.nome}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Filter by Status */}
             <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
               {['todos', 'confirmado', 'pendente', 'concluido', 'cancelado'].map(st => (
                 <button
@@ -205,6 +424,14 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                           R$ {ag.valor_estimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </p>
                       )}
+
+                      {/* Profissional Designado */}
+                      <div className="mt-2 flex items-center gap-1.5 bg-indigo-50/70 border border-indigo-100/80 px-2.5 py-1 rounded-md">
+                        <User className="w-3.5 h-3.5 text-indigo-600" />
+                        <span className="text-xs font-bold text-indigo-900 truncate">
+                          {ag.profissional_nome || 'Dra. Camila Vasconcelos (Admin)'}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="p-3 rounded-lg bg-slate-50 border border-slate-100 mb-3 space-y-1">
@@ -235,6 +462,24 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                       </div>
                     </div>
 
+                    {/* Contrato Vinculado se existir */}
+                    {ag.contrato_vinculado && (
+                      <div className="mb-3">
+                        <button
+                          onClick={() => setSelectedContratoAgendamento(ag)}
+                          className="w-full text-left p-2 bg-purple-50/70 hover:bg-purple-100/70 border border-purple-200 rounded-lg text-xs font-semibold text-purple-900 flex items-center justify-between cursor-pointer transition-colors"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <FileText className="w-3.5 h-3.5 text-purple-600" />
+                            <span>Contrato Vinculado</span>
+                          </span>
+                          <span className="text-[10px] bg-purple-200/80 text-purple-800 px-1.5 py-0.5 rounded font-bold">
+                            Visualizar
+                          </span>
+                        </button>
+                      </div>
+                    )}
+
                     {ag.observacoes && (
                       <p className="text-xs text-slate-600 bg-amber-50/60 p-2.5 rounded-md border border-amber-100 mb-3 line-clamp-2">
                         {ag.observacoes}
@@ -243,39 +488,53 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                   </div>
 
                   {/* Status Action Buttons */}
-                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-1 text-xs">
-                    <span className="text-[11px] text-slate-400 font-medium">Ações:</span>
+                  <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-1.5 text-xs">
                     <div className="flex items-center gap-1.5">
-                      {ag.status !== 'confirmado' && (
+                      {ag.status !== 'concluido' && (
+                        <button
+                          onClick={() => handleCheckInClick(ag)}
+                          className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-md text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                          title="Confirmar Chegada do Paciente, Lançar Pagamento e Agendar Retorno"
+                        >
+                          <UserCheck className="w-3.5 h-3.5" />
+                          <span>Chegada</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {ag.status !== 'confirmado' && ag.status !== 'concluido' && (
                         <button
                           onClick={() => onUpdateStatus(ag.id, 'confirmado')}
-                          className="px-2.5 py-1 bg-green-50 text-green-700 hover:bg-green-100 rounded-md font-semibold transition-colors cursor-pointer border border-green-200/60"
+                          className="p-1.5 text-green-600 hover:bg-green-50 rounded-md transition-colors cursor-pointer"
+                          title="Confirmar"
                         >
-                          Confirmar
+                          <CheckCircle2 className="w-4 h-4" />
                         </button>
                       )}
                       {ag.status !== 'concluido' && (
                         <button
                           onClick={() => handleConcludeClick(ag)}
-                          className="px-2.5 py-1 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-md font-semibold transition-colors cursor-pointer border border-indigo-200/60 flex items-center gap-1"
+                          className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-semibold transition-colors cursor-pointer"
+                          title="Concluir Procedimento e Baixar Insumos"
                         >
-                          <CheckCircle2 className="w-3 h-3 text-indigo-600" />
-                          <span>Concluir & Baixar</span>
+                          Concluir
                         </button>
                       )}
-                      {ag.status !== 'cancelado' && (
+                      {ag.status !== 'cancelado' && ag.status !== 'concluido' && (
                         <button
                           onClick={() => onUpdateStatus(ag.id, 'cancelado')}
-                          className="px-2 py-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md font-medium transition-colors cursor-pointer"
+                          className="p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600 rounded-md transition-colors cursor-pointer"
+                          title="Cancelar"
                         >
-                          Cancelar
+                          <XCircle className="w-4 h-4" />
                         </button>
                       )}
                       {isAdmin && onDeleteAppointment && (
                         <button
                           onClick={() => setAppointmentToDelete(ag)}
-                          className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer ml-1"
-                          title="Excluir agendamento do sistema (Admin)"
+                          className="p-1.5 text-slate-300 hover:bg-rose-50 hover:text-rose-600 rounded-md transition-colors cursor-pointer"
+                          title="Excluir Agendamento"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -289,22 +548,78 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
         </>
       )}
 
-      {/* Delete Appointment Confirmation Modal */}
+      {/* Modal Visualizador de Contrato */}
+      {selectedContratoAgendamento && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 border-b border-slate-100 bg-purple-50 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-purple-700" />
+                <h3 className="font-bold text-slate-900 text-sm">
+                  Contrato do Procedimento
+                </h3>
+              </div>
+              <button
+                onClick={() => setSelectedContratoAgendamento(null)}
+                className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-5 space-y-3 text-xs text-slate-700 max-h-[60vh] overflow-y-auto">
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1">
+                <p><strong>Paciente:</strong> {selectedContratoAgendamento.paciente?.nome}</p>
+                <p><strong>Procedimento:</strong> {selectedContratoAgendamento.procedimento}</p>
+                <p><strong>Profissional:</strong> {selectedContratoAgendamento.profissional_nome || 'Dra. Camila Vasconcelos'}</p>
+              </div>
+              <div className="p-3 bg-white border border-slate-200 rounded-lg font-mono text-[11px] whitespace-pre-wrap leading-relaxed">
+                {selectedContratoAgendamento.contrato_vinculado}
+              </div>
+            </div>
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+              <button
+                onClick={() => setSelectedContratoAgendamento(null)}
+                className="px-4 py-2 bg-slate-800 text-white rounded-lg text-xs font-bold cursor-pointer hover:bg-slate-900"
+              >
+                Fechar Visualização
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Appointment Deletion */}
       {appointmentToDelete && (
-        <DeleteConfirmModal
-          isOpen={!!appointmentToDelete}
-          onClose={() => setAppointmentToDelete(null)}
-          onConfirm={() => {
-            if (appointmentToDelete && onDeleteAppointment) {
-              onDeleteAppointment(appointmentToDelete.id);
-            }
-            setAppointmentToDelete(null);
-          }}
-          title="Excluir Agendamento"
-          itemType="Agendamento da Agenda"
-          itemName={`${appointmentToDelete.paciente?.nome || 'Paciente'} - ${appointmentToDelete.procedimento} (${formatDateTime(appointmentToDelete.data_hora).date} às ${formatDateTime(appointmentToDelete.data_hora).time})`}
-          description="A exclusão deste agendamento liberará o horário na grade e removerá este atendimento do histórico."
-        />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-sm overflow-hidden p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-base font-bold text-slate-900">Excluir Agendamento?</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Esta ação removerá o horário agendado de <strong>{appointmentToDelete.paciente?.nome || 'Paciente'}</strong> permanentemente.
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <button
+                onClick={() => setAppointmentToDelete(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  if (onDeleteAppointment) onDeleteAppointment(appointmentToDelete.id);
+                  setAppointmentToDelete(null);
+                }}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
+              >
+                Confirmar Exclusão
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

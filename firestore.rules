@@ -1,0 +1,139 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Funções Auxiliares de Autenticação e RBAC
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/perfis/$(request.auth.uid)).data;
+    }
+
+    function isMemberOf(clinicaId) {
+      return isAuthenticated() && getUserData().clinicaId == clinicaId;
+    }
+
+    function hasRole(role) {
+      return isAuthenticated() && getUserData().cargo == role;
+    }
+
+    function isStaff(clinicaId) {
+      return isMemberOf(clinicaId) && getUserData().cargo in ['gestor', 'recepcao', 'profissional'];
+    }
+
+    function isGestor(clinicaId) {
+      return isMemberOf(clinicaId) && getUserData().cargo == 'gestor';
+    }
+
+    // 1. Perfis de Usuários
+    match /perfis/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (request.auth.uid == userId || hasRole('gestor'));
+    }
+
+    // 2. Clínicas
+    match /clinicas/{clinicaId} {
+      allow read: if isMemberOf(clinicaId);
+      allow update: if isGestor(clinicaId);
+
+      // Comunicados Internos (Ocultos para Clientes)
+      match /comunicados_internos/{comunicadoId} {
+        allow read, write: if isStaff(clinicaId);
+      }
+
+      // Despesas Recorrentes
+      match /despesas_recorrentes/{despesaId} {
+        allow read, write: if isGestor(clinicaId);
+      }
+    }
+
+    // 3. Fichas de Clientes e Evolução
+    match /fichas_clientes/{clienteId} {
+      allow read, write: if isStaff(resource.data.clinicaId);
+      allow create: if isStaff(request.resource.data.clinicaId);
+
+      match /evolucoes_atendimentos/{evolucaoId} {
+        allow read, write: if isStaff(get(/databases/$(database)/documents/fichas_clientes/$(clienteId)).data.clinicaId);
+      }
+    }
+
+    // 4. Procedimentos e Modelos
+    match /procedimentos/{procedimentoId} {
+      allow read: if isMemberOf(resource.data.clinicaId);
+      allow write: if isStaff(request.resource.data.clinicaId);
+    }
+
+    match /modelos_anamnese/{modeloId} {
+      allow read, write: if isStaff(resource.data.clinicaId);
+    }
+
+    match /modelos_contratos/{contratoId} {
+      allow read, write: if isStaff(resource.data.clinicaId);
+    }
+
+    // 5. Estoque de Insumos
+    match /estoque_insumos/{insumoId} {
+      allow read, write: if isStaff(resource.data.clinicaId);
+    }
+
+    // 6. Agendamentos
+    match /agendamentos/{agendamentoId} {
+      allow read: if isStaff(resource.data.clinicaId) || (isAuthenticated() && resource.data.clienteId == request.auth.uid);
+      allow write: if isStaff(request.resource.data.clinicaId);
+    }
+
+    // 7. Financeiro (Fluxo de Caixa com Soft Delete)
+    match /fluxo_caixa/{lancamentoId} {
+      allow read, write: if isStaff(resource.data.clinicaId) && getUserData().cargo in ['gestor', 'recepcao'];
+    }
+
+    // 8. Bens e Ativos
+    match /bens_ativos/{bemId} {
+      allow read, write: if isGestor(resource.data.clinicaId);
+    }
+
+    // 9. Orçamentos e Solicitações (Privacidade de E-mail)
+    match /orcamentos_solicitacoes/{solicitacaoId} {
+      allow create: if isAuthenticated();
+      allow read, update: if isAuthenticated() && (
+        resource.data.usuarioClienteId == request.auth.uid ||
+        resource.data.profissionalId == request.auth.uid ||
+        isGestor(resource.data.clinicaId)
+      );
+    }
+
+    // Compatibilidade com coleções raiz auxiliares
+    match /usuarios/{usuarioId} {
+      allow read, write: if true;
+    }
+    match /pacientes/{pacienteId} {
+      allow read, write: if true;
+    }
+    match /estoque/{estoqueId} {
+      allow read, write: if true;
+    }
+    match /transacoes/{transacaoId} {
+      allow read, write: if true;
+    }
+    match /bens/{bemId} {
+      allow read, write: if true;
+    }
+    match /fichas_retorno/{fichaId} {
+      allow read, write: if true;
+    }
+    match /solicitacoes_orcamento/{orcamentoId} {
+      allow read, write: if true;
+    }
+    match /avisos/{avisoId} {
+      allow read, write: if true;
+    }
+    match /alertas_retorno/{alertaId} {
+      allow read, write: if true;
+    }
+    match /clinica_config/{configId} {
+      allow read, write: if true;
+    }
+  }
+}
