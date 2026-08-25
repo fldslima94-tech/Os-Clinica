@@ -40,11 +40,20 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
   onLogout,
 }) => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const isAdmin = currentUser.role === 'admin';
-  const isOperador = currentUser.role === 'operador';
+  const isAdminTotal = currentUser.role === 'admin_total';
+  const isAdminLocal = currentUser.role === 'admin_local' || currentUser.role === 'gestor' || currentUser.role === 'admin';
+  const isGestor = isAdminTotal || isAdminLocal;
   const isCliente = currentUser.role === 'cliente';
 
-  const roleLabel = isAdmin ? 'Admin' : isOperador ? 'Operador' : 'Cliente';
+  const roleLabel = isAdminTotal 
+    ? 'Super Admin' 
+    : isAdminLocal 
+    ? 'Admin Local' 
+    : currentUser.role === 'profissional'
+    ? 'Profissional'
+    : currentUser.role === 'recepcao' || currentUser.role === 'operador'
+    ? 'Recepção'
+    : 'Cliente';
 
   const handleTabClick = (tab: TabType) => {
     setActiveTab(tab);
@@ -147,13 +156,15 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
         { id: 'financeiro' as TabType, label: 'Financeiro, Recibos & DRE', icon: DollarSign },
       ]
     },
-    ...(isAdmin ? [{
-      title: 'Configurações & Equipe',
+    {
+      title: 'Configurações & Segurança',
       items: [
-        { id: 'usuarios' as TabType, label: 'Equipe & Permissões', icon: UserCheck },
-        { id: 'supabase_guide' as TabType, label: 'SQL Supabase & Deploy', icon: Code2 },
+        ...(isAdminTotal ? [{ id: 'permissoes' as TabType, label: 'Permissões Granulares & Campos', icon: UserCheck, badge: 'Master' }] : []),
+        ...(isGestor ? [{ id: 'usuarios' as TabType, label: 'Equipe & Usuários', icon: UserCheck }] : []),
+        { id: 'perfil' as TabType, label: 'Meu Perfil & Senha', icon: Users },
+        ...(isGestor ? [{ id: 'supabase_guide' as TabType, label: 'Arquitetura Firestore', icon: Code2 }] : []),
       ]
-    }] : []),
+    },
   ];
 
   return (

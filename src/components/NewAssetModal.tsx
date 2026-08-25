@@ -10,7 +10,11 @@ import {
   CheckCircle2, 
   Sparkles,
   Layers,
-  Upload
+  Upload,
+  Wrench,
+  AlertTriangle,
+  Clock,
+  Building2
 } from 'lucide-react';
 import { BemAtivo, CategoriaBem, EstadoConservacaoBem, UsuarioEquipe } from '../types';
 
@@ -42,20 +46,62 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
   const [notaFiscalUrl, setNotaFiscalUrl] = useState('');
   const [observacoes, setObservacoes] = useState('');
 
+  // 6.1 Manutenção Preventiva
+  const [requerManutencao, setRequerManutencao] = useState(false);
+  const [periodicidadeDias, setPeriodicidadeDias] = useState<number>(90);
+  const [dataUltimaManutencao, setDataUltimaManutencao] = useState('');
+  const [dataProximaManutencao, setDataProximaManutencao] = useState('');
+  const [empresaTecnica, setEmpresaTecnica] = useState('');
+  const [statusManutencao, setStatusManutencao] = useState<'em_dia' | 'alerta_proximo' | 'vencida' | 'em_manutencao'>('em_dia');
+
+  // Recalcular data da próxima manutenção ao alterar última manutenção ou periodicidade
+  const calcularProximaData = (dataUltima: string, dias: number) => {
+    if (!dataUltima) return '';
+    try {
+      const d = new Date(dataUltima);
+      d.setDate(d.getDate() + dias);
+      return d.toISOString().slice(0, 10);
+    } catch {
+      return '';
+    }
+  };
+
+  const handleDataUltimaChange = (val: string) => {
+    setDataUltimaManutencao(val);
+    if (val && periodicidadeDias > 0) {
+      setDataProximaManutencao(calcularProximaData(val, periodicidadeDias));
+    }
+  };
+
+  const handlePeriodicidadeChange = (dias: number) => {
+    setPeriodicidadeDias(dias);
+    if (dataUltimaManutencao && dias > 0) {
+      setDataProximaManutencao(calcularProximaData(dataUltimaManutencao, dias));
+    }
+  };
+
   useEffect(() => {
     if (bemToEdit) {
-      setNome(bemToEdit.nome);
+      setNome(bemToEdit.nome || bemToEdit.nomeBem || '');
       setCategoria(bemToEdit.categoria);
       setDataAquisicao(bemToEdit.data_aquisicao ? bemToEdit.data_aquisicao.slice(0, 10) : new Date().toISOString().slice(0, 10));
-      setValorCompra(bemToEdit.valor_compra);
-      setEstadoConservacao(bemToEdit.estado_conservacao);
-      setNumeroSerie(bemToEdit.numero_serie || '');
-      setLocalizacaoSala(bemToEdit.localizacao_sala);
+      setValorCompra(bemToEdit.valor_compra ?? bemToEdit.valorCompra ?? 0);
+      setEstadoConservacao(bemToEdit.estado_conservacao || bemToEdit.estadoConservacao || 'excelente');
+      setNumeroSerie(bemToEdit.numero_serie || bemToEdit.numeroSerie || '');
+      setLocalizacaoSala(bemToEdit.localizacao_sala || bemToEdit.localizacaoSala || '');
       setResponsavelNome(bemToEdit.responsavel_nome || '');
       setGarantiaAte(bemToEdit.garantia_ate ? bemToEdit.garantia_ate.slice(0, 10) : '');
       setNotaFiscalNome(bemToEdit.nota_fiscal_nome || '');
       setNotaFiscalUrl(bemToEdit.nota_fiscal_url || '');
       setObservacoes(bemToEdit.observacoes || '');
+
+      // Manutenção
+      setRequerManutencao(Boolean(bemToEdit.requerManutencao));
+      setPeriodicidadeDias(bemToEdit.periodicidadeDias || 90);
+      setDataUltimaManutencao(bemToEdit.dataUltimaManutencao ? bemToEdit.dataUltimaManutencao.slice(0, 10) : '');
+      setDataProximaManutencao(bemToEdit.dataProximaManutencao ? bemToEdit.dataProximaManutencao.slice(0, 10) : '');
+      setEmpresaTecnica(bemToEdit.empresaTecnica || '');
+      setStatusManutencao(bemToEdit.statusManutencao || 'em_dia');
     } else {
       setNome('');
       setCategoria('equipamento');
@@ -69,6 +115,14 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
       setNotaFiscalNome('');
       setNotaFiscalUrl('');
       setObservacoes('');
+
+      // Manutenção default
+      setRequerManutencao(false);
+      setPeriodicidadeDias(90);
+      setDataUltimaManutencao('');
+      setDataProximaManutencao('');
+      setEmpresaTecnica('');
+      setStatusManutencao('em_dia');
     }
   }, [bemToEdit, profissionais, isOpen]);
 
@@ -77,6 +131,25 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nome.trim() || !localizacaoSala.trim()) return;
+
+    // Calcular status automático de manutenção
+    let finalStatusManutencao = statusManutencao;
+    if (requerManutencao && dataProximaManutencao) {
+      const hoje = new Date().toISOString().slice(0, 10);
+      const limiteAlerta = new Date();
+      limiteAlerta.setDate(limiteAlerta.getDate() + 15);
+      const limiteAlertaStr = limiteAlerta.toISOString().slice(0, 10);
+
+      if (estadoConservacao === 'manutencao' || statusManutencao === 'em_manutencao') {
+        finalStatusManutencao = 'em_manutencao';
+      } else if (dataProximaManutencao < hoje) {
+        finalStatusManutencao = 'vencida';
+      } else if (dataProximaManutencao <= limiteAlertaStr) {
+        finalStatusManutencao = 'alerta_proximo';
+      } else {
+        finalStatusManutencao = 'em_dia';
+      }
+    }
 
     onSave(
       {
@@ -92,6 +165,16 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
         nota_fiscal_nome: notaFiscalNome.trim() || undefined,
         nota_fiscal_url: notaFiscalUrl.trim() || undefined,
         observacoes: observacoes.trim() || undefined,
+
+        // Manutenção Preventiva
+        requerManutencao,
+        periodicidadeDias: requerManutencao ? Number(periodicidadeDias) : undefined,
+        dataUltimaManutencao: requerManutencao && dataUltimaManutencao ? dataUltimaManutencao : undefined,
+        dataProximaManutencao: requerManutencao && dataProximaManutencao ? dataProximaManutencao : undefined,
+        empresaTecnica: requerManutencao && empresaTecnica.trim() ? empresaTecnica.trim() : undefined,
+        statusManutencao: requerManutencao ? finalStatusManutencao : undefined,
+        historicoManutencoes: bemToEdit?.historicoManutencoes || [],
+        criado_em: bemToEdit?.criado_em || new Date().toISOString(),
       },
       bemToEdit ? bemToEdit.id : undefined
     );
@@ -101,7 +184,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-xl overflow-hidden my-6 animate-in fade-in zoom-in-95">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-2xl overflow-hidden my-6 animate-in fade-in zoom-in-95">
         
         {/* Header */}
         <div className="p-5 border-b border-slate-100 bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 text-white flex items-center justify-between">
@@ -114,7 +197,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
                 {bemToEdit ? 'Editar Bem / Equipamento' : 'Novo Bem & Ativo do Studio'}
               </h3>
               <p className="text-xs text-indigo-200">
-                Cadastro patrimonial para controle de garantias e manutenção
+                Cadastro patrimonial e controle de ciclo de manutenção preventiva
               </p>
             </div>
           </div>
@@ -271,6 +354,161 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
             </div>
           </div>
 
+          {/* ========================================================= */}
+          {/* 6.1 SEÇÃO DE GESTÃO DE MANUTENÇÃO PREVENTIVA E ALERTAS */}
+          {/* ========================================================= */}
+          <div className="mt-4 p-4.5 bg-gradient-to-br from-indigo-50/70 via-slate-50 to-amber-50/40 rounded-2xl border border-indigo-100 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                  <Wrench className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    Manutenção Preventiva & Alertas Periódicos
+                    <span className="px-2 py-0.5 text-[10px] bg-indigo-100 text-indigo-700 font-bold rounded-full">
+                      Módulo 6.1
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    Controle de ciclos de calibração, revisões e alertas visuais de vencimento
+                  </p>
+                </div>
+              </div>
+
+              {/* Toggle Requer Manutenção */}
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={requerManutencao}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setRequerManutencao(checked);
+                    if (checked && !dataUltimaManutencao) {
+                      const hoje = new Date().toISOString().slice(0, 10);
+                      setDataUltimaManutencao(hoje);
+                      setDataProximaManutencao(calcularProximaData(hoje, periodicidadeDias));
+                    }
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                <span className="ml-2 text-xs font-bold text-slate-700">
+                  {requerManutencao ? 'Ativo' : 'Não Requer'}
+                </span>
+              </label>
+            </div>
+
+            {requerManutencao && (
+              <div className="pt-3 border-t border-indigo-100/80 space-y-4 animate-in fade-in slide-in-from-top-2">
+                
+                {/* Periodicidade com Presets */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
+                    <span>Periodicidade da Manutenção</span>
+                    <span className="text-[11px] font-bold text-indigo-600">
+                      A cada {periodicidadeDias} dias ({Math.round(periodicidadeDias / 30)} {Math.round(periodicidadeDias / 30) === 1 ? 'mês' : 'meses'})
+                    </span>
+                  </label>
+
+                  <div className="grid grid-cols-4 gap-2 mb-2">
+                    {[
+                      { dias: 30, label: '30d (Mensal)' },
+                      { dias: 60, label: '60d (Bimestral)' },
+                      { dias: 90, label: '90d (Trimestral)' },
+                      { dias: 180, label: '180d (Semestral)' },
+                    ].map((preset) => (
+                      <button
+                        key={preset.dias}
+                        type="button"
+                        onClick={() => handlePeriodicidadeChange(preset.dias)}
+                        className={`py-1.5 px-2 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
+                          periodicidadeDias === preset.dias
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-indigo-50/50 hover:border-indigo-300'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handlePeriodicidadeChange(365)}
+                      className={`py-1.5 px-3 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
+                        periodicidadeDias === 365
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-indigo-50/50 hover:border-indigo-300'
+                      }`}
+                    >
+                      365d (Anual)
+                    </button>
+                    <div className="flex-1 relative">
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="Outro intervalo em dias..."
+                        value={periodicidadeDias}
+                        onChange={(e) => handlePeriodicidadeChange(parseInt(e.target.value) || 30)}
+                        className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-400 font-medium">
+                        dias
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Datas de Manutenção */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Data da Última Manutenção *
+                    </label>
+                    <input
+                      type="date"
+                      required={requerManutencao}
+                      value={dataUltimaManutencao}
+                      onChange={(e) => handleDataUltimaChange(e.target.value)}
+                      className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>Data da Próxima Manutenção *</span>
+                      <span className="text-[10px] text-slate-400">(Auto calculada)</span>
+                    </label>
+                    <input
+                      type="date"
+                      required={requerManutencao}
+                      value={dataProximaManutencao}
+                      onChange={(e) => setDataProximaManutencao(e.target.value)}
+                      className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-bold text-indigo-950"
+                    />
+                  </div>
+                </div>
+
+                {/* Empresa de Manutenção / Técnico */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+                    Responsável / Empresa de Manutenção Técnica
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: MedLaser Assistência Técnica Autorizada - (11) 98888-0000 / Eng. Roberto"
+                    value={empresaTecnica}
+                    onChange={(e) => setEmpresaTecnica(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
               Nota Fiscal / Comprovante de Compra
@@ -286,7 +524,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Observações Técnicas & Histórico de Manutenção
+              Observações Técnicas & Histórico
             </label>
             <textarea
               rows={2}
@@ -319,3 +557,4 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
     </div>
   );
 };
+

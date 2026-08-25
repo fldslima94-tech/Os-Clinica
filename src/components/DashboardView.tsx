@@ -18,14 +18,17 @@ import {
   UserCheck,
   ChevronRight,
   Eye,
-  EyeOff
+  EyeOff,
+  Wrench,
+  ShieldAlert
 } from 'lucide-react';
-import { Agendamento, EstoqueInsumo, Paciente, StatusAgendamento, UsuarioEquipe } from '../types';
+import { Agendamento, EstoqueInsumo, Paciente, StatusAgendamento, UsuarioEquipe, BemAtivo } from '../types';
 
 interface DashboardViewProps {
   agendamentos: Agendamento[];
   estoque: EstoqueInsumo[];
   pacientes: Paciente[];
+  bens?: BemAtivo[];
   profissionais?: UsuarioEquipe[];
   onOpenNewAppointment: () => void;
   onOpenNewPatient: () => void;
@@ -33,6 +36,7 @@ interface DashboardViewProps {
   onUpdateStatus: (agendamentoId: string, novoStatus: StatusAgendamento) => void;
   onViewPatient: (paciente: Paciente) => void;
   onGoToEstoque: () => void;
+  onGoToBens?: () => void;
   onOpenCompleteModal?: (agendamento: Agendamento) => void;
   onOpenCheckInModal?: (agendamento: Agendamento) => void;
   searchQuery: string;
@@ -42,6 +46,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   agendamentos,
   estoque,
   pacientes,
+  bens = [],
   profissionais = [],
   onOpenNewAppointment,
   onOpenNewPatient,
@@ -49,6 +54,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onUpdateStatus,
   onViewPatient,
   onGoToEstoque,
+  onGoToBens,
   onOpenCompleteModal,
   onOpenCheckInModal,
   searchQuery,
@@ -94,6 +100,33 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const completedToday = todayAppointments.filter(a => a.status === 'concluido').length;
 
   const lowStockItems = estoque.filter(item => item.quantidade <= item.alerta_minimo);
+
+  // Alertas de Manutenção Preventiva de Equipamentos
+  const hojeDashboardStr = new Date().toISOString().slice(0, 10);
+  const limite15d = new Date();
+  limite15d.setDate(limite15d.getDate() + 15);
+  const limite15dStr = limite15d.toISOString().slice(0, 10);
+
+  const equipamentosManutVencida = bens.filter(b => 
+    b.requerManutencao && 
+    b.dataProximaManutencao && 
+    b.dataProximaManutencao < hojeDashboardStr &&
+    b.estado_conservacao !== 'manutencao'
+  );
+
+  const equipamentosManutProxima = bens.filter(b => 
+    b.requerManutencao && 
+    b.dataProximaManutencao && 
+    b.dataProximaManutencao >= hojeDashboardStr && 
+    b.dataProximaManutencao <= limite15dStr &&
+    b.estado_conservacao !== 'manutencao'
+  );
+
+  const equipamentosEmManutencao = bens.filter(b =>
+    b.estado_conservacao === 'manutencao' || b.statusManutencao === 'em_manutencao'
+  );
+
+  const totalAlertasManutencao = equipamentosManutVencida.length + equipamentosManutProxima.length + equipamentosEmManutencao.length;
 
   const formatTime = (isoString: string) => {
     try {
@@ -433,6 +466,56 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Maintenance Preventive Alerts (6.1) */}
+      {totalAlertasManutencao > 0 && (
+        <div className="bg-gradient-to-r from-amber-50 via-rose-50 to-indigo-50 border border-amber-200/90 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Wrench className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-xs sm:text-sm font-bold text-slate-900">
+                  Engenharia Clínica: {totalAlertasManutencao} equipamento(s) requerem atenção
+                </h4>
+                {equipamentosManutVencida.length > 0 && (
+                  <span className="px-2 py-0.5 text-[10px] font-extrabold bg-rose-600 text-white rounded-full animate-pulse">
+                    {equipamentosManutVencida.length} VENCIDA(S)
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-600 mt-1">
+                {equipamentosManutVencida.length > 0 && (
+                  <span className="text-rose-700 font-semibold mr-2">
+                    🚨 Vencidas: {equipamentosManutVencida.map(e => e.nome).slice(0, 2).join(', ')}
+                  </span>
+                )}
+                {equipamentosManutProxima.length > 0 && (
+                  <span className="text-amber-800 font-medium mr-2">
+                    ⚠️ Próximas (15d): {equipamentosManutProxima.map(e => e.nome).slice(0, 2).join(', ')}
+                  </span>
+                )}
+                {equipamentosEmManutencao.length > 0 && (
+                  <span className="text-sky-800 font-medium">
+                    🛠️ Na Assistência: {equipamentosEmManutencao.map(e => e.nome).slice(0, 2).join(', ')}
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+          
+          {onGoToBens && (
+            <button
+              onClick={onGoToBens}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer flex items-center gap-1.5"
+            >
+              <Wrench className="w-3.5 h-3.5" />
+              <span>Gerenciar Manutenções</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Low Stock Warning Alert */}
       {lowStockItems.length > 0 && (

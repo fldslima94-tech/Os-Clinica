@@ -13,7 +13,8 @@ import {
   ModeloAnamnese,
   FichaRetornoEvolucao,
   ClinicaConfig,
-  AlertaRetornoPos
+  AlertaRetornoPos,
+  Fornecedor
 } from '../types';
 
 export const MOCK_CLINICA_CONFIG: ClinicaConfig = {
@@ -30,15 +31,51 @@ export const MOCK_CLINICA_CONFIG: ClinicaConfig = {
 
 export const MOCK_USUARIOS: UsuarioEquipe[] = [
   {
+    id: 'user-super-admin',
+    nome: 'Fabio Lima',
+    nomeCompleto: 'Fabio Lima',
+    email: 'fldslima94@gmail.com',
+    senha: 'admin123',
+    cargo: 'Super Admin (Master)',
+    profissao: 'Proprietário & Administrador Geral',
+    role: 'admin_total',
+    telefone: '(11) 99999-8877',
+    status: 'ativo',
+    ultimo_acesso: 'Online agora',
+    avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
+    registro_profissional: 'ADM/SP 99.112',
+    especialidade: 'Governança & Gestão de Clínicas',
+    porcentagem_comissao: 100,
+    permissoes: {
+      ver_financeiro_completo: true,
+      emitir_recibo: true,
+      editar_prontuario_clinico: true,
+      gerenciar_estoque_custos: true,
+      configuracoes_sistema: true,
+      visualizar_bens_ativos: true,
+    },
+    permissoesCustomizadas: {
+      financeiro: { verEntradas: true, verSaidas: true, verRecorrentes: true, excluir: true, verRelatorios: true },
+      clientes: { criar: true, editar: true, excluir: true, verHistorico: true, preencherAnamnese: true },
+      agenda: { verTodos: true, verPropria: true, criar: true, cancelar: true, finalizar: true },
+      procedimentos: { verCustos: true, verMargem: true, criar: true, excluir: true, ajustarEstoque: true },
+      bens: { visualizar: true, cadastrar: true, editar: true, gerenciar: true, excluir: true, manutencao: true },
+      estoque: { ajustar: true, excluir: true },
+      orcamentos: { verTodos: true, responder: true, verEmails: true }
+    }
+  },
+  {
     id: 'user-01',
     nome: 'Dra. Camila Vasconcelos',
+    nomeCompleto: 'Dra. Camila Vasconcelos',
     email: 'admin@esteticaos.com.br',
     senha: 'admin123',
-    cargo: 'Gestora & Médica Dermatologista',
-    role: 'gestor',
+    cargo: 'Diretora Clínica Local',
+    profissao: 'Dermatologista & Gestora Local',
+    role: 'admin_local',
     telefone: '(11) 98111-2233',
     status: 'ativo',
-    ultimo_acesso: 'Há 5 minutos (Online agora)',
+    ultimo_acesso: 'Há 5 minutos',
     avatar_url: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&auto=format&fit=crop&q=80',
     registro_profissional: 'CRM/SP 189.442',
     especialidade: 'Dermatologia & Harmonização Facial',
@@ -48,16 +85,61 @@ export const MOCK_USUARIOS: UsuarioEquipe[] = [
       emitir_recibo: true,
       editar_prontuario_clinico: true,
       gerenciar_estoque_custos: true,
-      configuracoes_sistema: true,
+      configuracoes_sistema: false,
       visualizar_bens_ativos: true,
     },
+    permissoesCustomizadas: {
+      financeiro: { verEntradas: true, verSaidas: true, verRecorrentes: true, excluir: false, verRelatorios: true },
+      clientes: { criar: true, editar: true, excluir: false, verHistorico: true, preencherAnamnese: true },
+      agenda: { verTodos: true, verPropria: true, criar: true, cancelar: true, finalizar: true },
+      procedimentos: { verCustos: true, verMargem: true, criar: true, excluir: false, ajustarEstoque: true },
+      bens: { visualizar: true, cadastrar: true, editar: true, gerenciar: true, excluir: false, manutencao: true },
+      estoque: { ajustar: true, excluir: false },
+      orcamentos: { verTodos: true, responder: true, verEmails: true }
+    }
+  },
+  {
+    id: 'user-02-local',
+    nome: 'Juliana Paes Fontes',
+    nomeCompleto: 'Juliana Paes Fontes',
+    email: 'gerencia@esteticaos.com.br',
+    senha: 'gestor123',
+    cargo: 'Gestora da Unidade Matriz',
+    profissao: 'Administradora Hospitalar & Estética',
+    role: 'admin_local',
+    telefone: '(11) 98333-7788',
+    status: 'ativo',
+    ultimo_acesso: 'Hoje às 08:30',
+    avatar_url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80',
+    registro_profissional: 'CRA/SP 45.221',
+    especialidade: 'Gestão Operacional e Atendimento',
+    porcentagem_comissao: 10,
+    permissoes: {
+      ver_financeiro_completo: true,
+      emitir_recibo: true,
+      editar_prontuario_clinico: true,
+      gerenciar_estoque_custos: true,
+      configuracoes_sistema: false,
+      visualizar_bens_ativos: true,
+    },
+    permissoesCustomizadas: {
+      financeiro: { verEntradas: true, verSaidas: true, verRecorrentes: true, excluir: false, verRelatorios: true },
+      clientes: { criar: true, editar: true, excluir: false, verHistorico: true, preencherAnamnese: true },
+      agenda: { verTodos: true, verPropria: true, criar: true, cancelar: true, finalizar: true },
+      procedimentos: { verCustos: false, verMargem: false, criar: true, excluir: false, ajustarEstoque: true },
+      bens: { gerenciar: true, excluir: false },
+      estoque: { ajustar: true, excluir: false },
+      orcamentos: { verTodos: true, responder: true, verEmails: true }
+    }
   },
   {
     id: 'user-02',
     nome: 'Dra. Beatriz Albuquerque',
+    nomeCompleto: 'Dra. Beatriz Albuquerque',
     email: 'beatriz@esteticaos.com.br',
     senha: 'pro123',
     cargo: 'Biomédica Esteta',
+    profissao: 'Biomédica Esteta',
     role: 'profissional',
     telefone: '(11) 98444-5566',
     status: 'ativo',
@@ -74,13 +156,24 @@ export const MOCK_USUARIOS: UsuarioEquipe[] = [
       configuracoes_sistema: false,
       visualizar_bens_ativos: true,
     },
+    permissoesCustomizadas: {
+      financeiro: { verEntradas: false, verSaidas: false, verRecorrentes: false, excluir: false, verRelatorios: false },
+      clientes: { criar: true, editar: true, excluir: false, verHistorico: true, preencherAnamnese: true },
+      agenda: { verTodos: false, verPropria: true, criar: true, cancelar: false, finalizar: true },
+      procedimentos: { verCustos: false, verMargem: false, criar: false, excluir: false, ajustarEstoque: false },
+      bens: { gerenciar: false, excluir: false },
+      estoque: { ajustar: false, excluir: false },
+      orcamentos: { verTodos: false, responder: false, verEmails: false }
+    }
   },
   {
     id: 'user-03',
     nome: 'Renata Meireles',
+    nomeCompleto: 'Renata Meireles',
     email: 'renata@esteticaos.com.br',
     senha: 'pro123',
     cargo: 'Especialista em Micropigmentação & Lash',
+    profissao: 'Micropigmentadora',
     role: 'profissional',
     telefone: '(11) 97555-1122',
     status: 'ativo',
@@ -97,18 +190,29 @@ export const MOCK_USUARIOS: UsuarioEquipe[] = [
       configuracoes_sistema: false,
       visualizar_bens_ativos: false,
     },
+    permissoesCustomizadas: {
+      financeiro: { verEntradas: false, verSaidas: false, verRecorrentes: false, excluir: false, verRelatorios: false },
+      clientes: { criar: true, editar: true, excluir: false, verHistorico: true, preencherAnamnese: true },
+      agenda: { verTodos: false, verPropria: true, criar: true, cancelar: false, finalizar: true },
+      procedimentos: { verCustos: false, verMargem: false, criar: false, excluir: false, ajustarEstoque: false },
+      bens: { gerenciar: false, excluir: false },
+      estoque: { ajustar: false, excluir: false },
+      orcamentos: { verTodos: false, responder: false, verEmails: false }
+    }
   },
   {
     id: 'user-04',
     nome: 'Larissa Souza',
+    nomeCompleto: 'Larissa Souza',
     email: 'operador@esteticaos.com.br',
     senha: 'operador123',
     cargo: 'Recepcionista & Atendimento',
+    profissao: 'Recepcionista',
     role: 'recepcao',
     telefone: '(11) 97222-3344',
     status: 'ativo',
     ultimo_acesso: 'Há 12 minutos (Online)',
-    avatar_url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80',
+    avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
     permissoes: {
       ver_financeiro_completo: false,
       emitir_recibo: true,
@@ -117,13 +221,24 @@ export const MOCK_USUARIOS: UsuarioEquipe[] = [
       configuracoes_sistema: false,
       visualizar_bens_ativos: false,
     },
+    permissoesCustomizadas: {
+      financeiro: { verEntradas: true, verSaidas: false, verRecorrentes: false, excluir: false, verRelatorios: false },
+      clientes: { criar: true, editar: true, excluir: false, verHistorico: false, preencherAnamnese: false },
+      agenda: { verTodos: true, verPropria: false, criar: true, cancelar: true, finalizar: true },
+      procedimentos: { verCustos: false, verMargem: false, criar: false, excluir: false, ajustarEstoque: false },
+      bens: { gerenciar: false, excluir: false },
+      estoque: { ajustar: false, excluir: false },
+      orcamentos: { verTodos: true, responder: true, verEmails: true }
+    }
   },
   {
     id: 'user-05',
     nome: 'Fernanda Lima',
-    email: 'fldslima94@gmail.com',
+    nomeCompleto: 'Fernanda Lima',
+    email: 'fernanda.cliente@exemplo.com',
     senha: 'cliente123',
     cargo: 'Cliente / Paciente',
+    profissao: 'Paciente',
     role: 'cliente',
     telefone: '(11) 98765-4321',
     status: 'ativo',
@@ -136,6 +251,15 @@ export const MOCK_USUARIOS: UsuarioEquipe[] = [
       gerenciar_estoque_custos: false,
       configuracoes_sistema: false,
     },
+    permissoesCustomizadas: {
+      financeiro: { verEntradas: false, verSaidas: false, verRecorrentes: false, excluir: false, verRelatorios: false },
+      clientes: { criar: false, editar: false, excluir: false, verHistorico: false, preencherAnamnese: false },
+      agenda: { verTodos: false, verPropria: false, criar: false, cancelar: false, finalizar: false },
+      procedimentos: { verCustos: false, verMargem: false, criar: false, excluir: false, ajustarEstoque: false },
+      bens: { gerenciar: false, excluir: false },
+      estoque: { ajustar: false, excluir: false },
+      orcamentos: { verTodos: false, responder: false, verEmails: false }
+    }
   },
 ];
 
@@ -168,6 +292,10 @@ export const MOCK_AVISOS: AvisoQuadro[] = [
   },
 ];
 
+const now = new Date();
+const addDays = (d: number) => new Date(now.getTime() + d * 86400000).toISOString().slice(0, 10);
+const subDays = (d: number) => new Date(now.getTime() - d * 86400000).toISOString().slice(0, 10);
+
 export const MOCK_BENS: BemAtivo[] = [
   {
     id: 'bem-01',
@@ -182,6 +310,24 @@ export const MOCK_BENS: BemAtivo[] = [
     garantia_ate: '2027-03-15',
     nota_fiscal_nome: 'NF-e 004.918 - MedLaser Brasil',
     observacoes: 'Revisão óptica em dia. Inclui ponteira fracionada e não-fracionada.',
+    requerManutencao: true,
+    periodicidadeDias: 90,
+    dataUltimaManutencao: subDays(82),
+    dataProximaManutencao: addDays(8), // Alerta amarelo (próximos 7 a 15 dias)
+    empresaTecnica: 'MedLaser Engenharia Clínica (11) 98765-0011',
+    statusManutencao: 'alerta_proximo',
+    historicoManutencoes: [
+      {
+        id: 'hist-01',
+        dataRealizacao: subDays(82),
+        tipo: 'calibracao',
+        descricao: 'Calibração de potência óptica dos diodos e limpeza das lentes de safira',
+        custo: 1200,
+        tecnicoEmpresa: 'Eng. Roberto Alves (MedLaser)',
+        registradoPor: 'Fabio Lima',
+        laudoNome: 'Laudo_Calibracao_Lavieen_2024.pdf'
+      }
+    ],
     criado_em: '2024-03-15T10:00:00Z',
   },
   {
@@ -190,13 +336,31 @@ export const MOCK_BENS: BemAtivo[] = [
     categoria: 'dermografo',
     data_aquisicao: '2024-06-20',
     valor_compra: 6800,
-    estado_conservacao: 'excelente',
+    estado_conservacao: 'regular',
     numero_serie: 'CH-9941-GER',
     localizacao_sala: 'Sala 03 - Micropigmentação & Estética',
     responsavel_nome: 'Renata Meireles',
     garantia_ate: '2026-06-20',
     nota_fiscal_nome: 'NF-e 012.339 - Cheyenne Distribuidora',
     observacoes: 'Acompanha pedal wireless e 2 baterias recarregáveis de lítio.',
+    requerManutencao: true,
+    periodicidadeDias: 60,
+    dataUltimaManutencao: subDays(65),
+    dataProximaManutencao: subDays(5), // Alerta vermelho (Vencido)
+    empresaTecnica: 'Cheyenne Service Brasil (11) 97111-2299',
+    statusManutencao: 'vencida',
+    historicoManutencoes: [
+      {
+        id: 'hist-02',
+        dataRealizacao: subDays(65),
+        tipo: 'preventiva',
+        descricao: 'Troca de anéis de vedação internos e lubrificação do motor suíço',
+        custo: 350,
+        tecnicoEmpresa: 'Téc. Lucas Silva (Cheyenne)',
+        registradoPor: 'Renata Meireles',
+        laudoNome: 'Certificado_Revisao_Cheyenne.pdf'
+      }
+    ],
     criado_em: '2024-06-20T14:00:00Z',
   },
   {
@@ -205,13 +369,31 @@ export const MOCK_BENS: BemAtivo[] = [
     categoria: 'maca_mobiliario',
     data_aquisicao: '2024-01-10',
     valor_compra: 9400,
-    estado_conservacao: 'bom',
+    estado_conservacao: 'manutencao',
     numero_serie: 'MC-2024-01',
     localizacao_sala: 'Sala 01 - Procedimentos Avançados',
     responsavel_nome: 'Dra. Camila Vasconcelos',
     garantia_ate: '2026-01-10',
     nota_fiscal_nome: 'NF-e 089.120 - Estética Prime Móveis',
     observacoes: 'Revestimento em courvin hospitalar anti-mofo e aquecimento lombar integrado.',
+    requerManutencao: true,
+    periodicidadeDias: 180,
+    dataUltimaManutencao: subDays(190),
+    dataProximaManutencao: subDays(10),
+    empresaTecnica: 'MacaTech Hospitalar (11) 96444-5511',
+    statusManutencao: 'em_manutencao', // Tag azul
+    historicoManutencoes: [
+      {
+        id: 'hist-03',
+        dataRealizacao: subDays(190),
+        tipo: 'corretiva',
+        descricao: 'Substituição do atuador linear do pistão do encosto lombar',
+        custo: 480,
+        tecnicoEmpresa: 'MacaTech Hospitalar',
+        registradoPor: 'Fabio Lima',
+        laudoNome: 'OS_MacaTech_891.pdf'
+      }
+    ],
     criado_em: '2024-01-10T09:00:00Z',
   },
   {
@@ -227,6 +409,24 @@ export const MOCK_BENS: BemAtivo[] = [
     garantia_ate: '2025-11-05',
     nota_fiscal_nome: 'NF-e 033.411 - Dental & Hospitalar SP',
     observacoes: 'Testes biológicos mensais registrados no caderno de controle da vigilância sanitária.',
+    requerManutencao: true,
+    periodicidadeDias: 30,
+    dataUltimaManutencao: subDays(5),
+    dataProximaManutencao: addDays(25), // Em dia (verde)
+    empresaTecnica: 'Cristófoli Biossegurança Autorizada (11) 98222-3344',
+    statusManutencao: 'em_dia',
+    historicoManutencoes: [
+      {
+        id: 'hist-04',
+        dataRealizacao: subDays(5),
+        tipo: 'preventiva',
+        descricao: 'Teste biológico com indicador 3M e substituição da borracha de vedação da porta',
+        custo: 220,
+        tecnicoEmpresa: 'Cristófoli Biossegurança',
+        registradoPor: 'Larissa Souza',
+        laudoNome: 'Laudo_Teste_Biologico_3M.pdf'
+      }
+    ],
     criado_em: '2023-11-05T11:00:00Z',
   },
 ];
@@ -724,3 +924,67 @@ export const MOCK_ALERTAS_RETORNO: AlertaRetornoPos[] = [
     status: 'agendado',
   }
 ];
+
+export const MOCK_FORNECEDORES: Fornecedor[] = [
+  {
+    id: 'forn-01',
+    razao_social: 'Allergan Aesthetics Brasil Ltda',
+    nome_fantasia: 'Allergan / AbbVie',
+    cnpj_cpf: '08.258.248/0001-90',
+    telefone: '(11) 98765-1122',
+    email: 'pedidos@allergan.com.br',
+    categoria: 'insumos',
+    contato_responsavel: 'Fernanda Representante SP',
+    cidade_uf: 'São Paulo / SP',
+    pix_chave: 'financeiro@allergan.com.br',
+    observacoes: 'Fornecedor oficial de Botox 100U e linha de preenchedores Juvederm Voluma/Volift.',
+    status: 'ativo',
+    criado_em: '2025-01-01T10:00:00.000Z'
+  },
+  {
+    id: 'forn-02',
+    razao_social: 'MedSystems Importação e Comércio de Equipamentos Médicos',
+    nome_fantasia: 'MedSystems Laser & Tech',
+    cnpj_cpf: '05.123.456/0001-78',
+    telefone: '(11) 99888-4455',
+    email: 'suporte@medsystems.com.br',
+    categoria: 'equipamentos',
+    contato_responsavel: 'Eng. Roberto Alves (Assistência Técnica)',
+    cidade_uf: 'Campinas / SP',
+    pix_chave: '05.123.456/0001-78',
+    observacoes: 'Fabricante e assistência técnica autorizada do Laser Lavieen Thulium e Ultraformer.',
+    status: 'ativo',
+    criado_em: '2025-01-05T14:30:00.000Z'
+  },
+  {
+    id: 'forn-03',
+    razao_social: 'Mag Estética e Pigmentos Dermocosméticos ME',
+    nome_fantasia: 'Mag Color Micropigmentação',
+    cnpj_cpf: '12.345.678/0001-99',
+    telefone: '(11) 97123-9988',
+    email: 'vendas@magcolor.com.br',
+    categoria: 'insumos',
+    contato_responsavel: 'Juliana Castro',
+    cidade_uf: 'São Paulo / SP',
+    pix_chave: 'contato@magcolor.com.br',
+    observacoes: 'Linha completa de pigmentos inorgânicos e orgânicos, agulhas e dermógrafos.',
+    status: 'ativo',
+    criado_em: '2025-01-10T09:15:00.000Z'
+  },
+  {
+    id: 'forn-04',
+    razao_social: 'Engenharia Clínica Prime & Calibrações Hospitalares',
+    nome_fantasia: 'Prime Calibrações e Laudos',
+    cnpj_cpf: '23.456.789/0001-01',
+    telefone: '(11) 98222-3344',
+    email: 'laudos@primecalibracoes.com.br',
+    categoria: 'manutencao',
+    contato_responsavel: 'Dr. Lucas Engenheiro Clínico',
+    cidade_uf: 'São Paulo / SP',
+    pix_chave: '23.456.789/0001-01',
+    observacoes: 'Responsável pela emissão de laudos de conformidade, calibração e teste de segurança elétrica.',
+    status: 'ativo',
+    criado_em: '2025-01-12T11:00:00.000Z'
+  }
+];
+

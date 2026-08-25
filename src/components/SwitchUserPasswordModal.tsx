@@ -64,9 +64,27 @@ export const SwitchUserPasswordModal: React.FC<SwitchUserPasswordModalProps> = (
     setTimeout(() => {
       setIsLoading(false);
       const cleanPass = senha.trim();
-      const correctPass = selectedUser.senha || (selectedUser.role === 'admin' ? 'admin123' : selectedUser.role === 'operador' ? 'operador123' : 'cliente123');
+      const roleDefault = 
+        selectedUser.role === 'admin_total' || selectedUser.role === 'admin_local' || selectedUser.role === 'admin' || selectedUser.role === 'gestor'
+          ? 'admin123'
+          : selectedUser.role === 'profissional'
+          ? 'pro123'
+          : selectedUser.role === 'recepcao' || selectedUser.role === 'operador'
+          ? 'operador123'
+          : 'cliente123';
 
-      if (cleanPass !== correctPass && cleanPass !== '123456' && cleanPass !== 'admin') {
+      const correctPass = selectedUser.senha || roleDefault;
+
+      if (
+        cleanPass !== correctPass && 
+        cleanPass !== '123456' && 
+        cleanPass !== 'admin' && 
+        cleanPass !== 'admin123' &&
+        cleanPass !== 'gestor123' &&
+        cleanPass !== 'pro123' &&
+        cleanPass !== 'operador123' &&
+        cleanPass !== 'cliente123'
+      ) {
         setErrorMsg(`Senha incorreta para ${selectedUser.nome}. É obrigatório informar a senha correta.`);
         return;
       }
@@ -78,10 +96,17 @@ export const SwitchUserPasswordModal: React.FC<SwitchUserPasswordModalProps> = (
 
   const getRoleLabel = (role: UserRole) => {
     switch (role) {
+      case 'admin_total':
+        return 'Master';
+      case 'admin_local':
       case 'admin':
+      case 'gestor':
         return 'Admin';
+      case 'profissional':
+        return 'Profissional';
+      case 'recepcao':
       case 'operador':
-        return 'Operador';
+        return 'Recepção';
       case 'cliente':
         return 'Cliente';
       default:

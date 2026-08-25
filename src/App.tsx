@@ -11,7 +11,8 @@ import {
   MOCK_AVISOS,
   MOCK_CLINICA_CONFIG,
   MOCK_DESPESAS_RECORRENTES,
-  MOCK_BENS_PATRIMONIAIS
+  MOCK_BENS_PATRIMONIAIS,
+  MOCK_FORNECEDORES
 } from './data/mockData';
 import { 
   Paciente, 
@@ -32,7 +33,10 @@ import {
   ClinicaConfig,
   DespesaRecorrente,
   BemPatrimonial,
-  BemAtivo
+  BemAtivo,
+  ConfiguracaoCampos,
+  PermissoesCustomizadas,
+  Fornecedor
 } from './types';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -40,6 +44,7 @@ import { MobileNavigation } from './components/MobileNavigation';
 import { DashboardView } from './components/DashboardView';
 import { AppointmentsView } from './components/AppointmentsView';
 import { PatientsView } from './components/PatientsView';
+import { SuppliersView } from './components/SuppliersView';
 import { InventoryView } from './components/InventoryView';
 import { FinancialView } from './components/FinancialView';
 import { WhatsAppAutomationView } from './components/WhatsAppAutomationView';
@@ -49,11 +54,14 @@ import { UsersManagementView } from './components/UsersManagementView';
 import { PatientPortalView } from './components/PatientPortalView';
 import { NoticeBoardView } from './components/NoticeBoardView';
 import { AssetsView } from './components/AssetsView';
+import { PermissionsManagementView } from './components/PermissionsManagementView';
+import { UserProfileView } from './components/UserProfileView';
 import { LoginView } from './components/LoginView';
 import { UrgentAlertPopupModal } from './components/UrgentAlertPopupModal';
 import { SwitchUserPasswordModal } from './components/SwitchUserPasswordModal';
 import { NewAppointmentModal } from './components/NewAppointmentModal';
 import { NewPatientModal } from './components/NewPatientModal';
+import { NewSupplierModal } from './components/NewSupplierModal';
 import { NewInventoryModal } from './components/NewInventoryModal';
 import { ProcedureModal } from './components/ProcedureModal';
 import { NewUserModal } from './components/NewUserModal';
@@ -77,68 +85,33 @@ import {
   COLLECTIONS 
 } from './services/firebaseService';
 
-// Storage Helper
-const getStoredData = <T,>(key: string, fallback: T): T => {
-  try {
-    const item = localStorage.getItem(`esteticaos_${key}`);
-    return item ? JSON.parse(item) : fallback;
-  } catch (e) {
-    console.warn(`Erro ao carregar chave ${key} do localStorage`, e);
-    return fallback;
-  }
-};
-
 export default function App() {
-  // Application State with localStorage Persistence
-  const [clinicaConfig, setClinicaConfig] = useState<ClinicaConfig>(() =>
-    getStoredData<ClinicaConfig>('clinica_config', MOCK_CLINICA_CONFIG)
-  );
-  const [pacientes, setPacientes] = useState<Paciente[]>(() => 
-    getStoredData<Paciente[]>('pacientes', MOCK_PACIENTES)
-  );
-  const [agendamentos, setAgendamentos] = useState<Agendamento[]>(() => 
-    getStoredData<Agendamento[]>('agendamentos', MOCK_AGENDAMENTOS)
-  );
-  const [estoque, setEstoque] = useState<EstoqueInsumo[]>(() => 
-    getStoredData<EstoqueInsumo[]>('estoque', MOCK_ESTOQUE)
-  );
-  const [bensPatrimoniais, setBensPatrimoniais] = useState<BemPatrimonial[]>(() =>
-    getStoredData<BemPatrimonial[]>('bens_patrimoniais', MOCK_BENS_PATRIMONIAIS)
-  );
-  const [procedimentos, setProcedimentos] = useState<ProcedimentoClinico[]>(() =>
-    getStoredData<ProcedimentoClinico[]>('procedimentos', MOCK_PROCEDIMENTOS)
-  );
-  const [orcamentos, setOrcamentos] = useState<SolicitacaoOrcamento[]>(() =>
-    getStoredData<SolicitacaoOrcamento[]>('orcamentos', MOCK_ORCAMENTOS)
-  );
-  const [transacoes, setTransacoes] = useState<TransacaoFinanceira[]>(() => 
-    getStoredData<TransacaoFinanceira[]>('transacoes', MOCK_TRANSACOES)
-  );
-  const [despesasRecorrentes, setDespesasRecorrentes] = useState<DespesaRecorrente[]>(() =>
-    getStoredData<DespesaRecorrente[]>('despesas_recorrentes', MOCK_DESPESAS_RECORRENTES)
-  );
-  const [usuarios, setUsuarios] = useState<UsuarioEquipe[]>(() => 
-    getStoredData<UsuarioEquipe[]>('usuarios', MOCK_USUARIOS)
-  );
-  const [avisos, setAvisos] = useState<AvisoQuadro[]>(() => 
-    getStoredData<AvisoQuadro[]>('avisos', MOCK_AVISOS)
-  );
-  const [alertasRetorno, setAlertasRetorno] = useState<AlertaRetornoPos[]>(() => 
-    getStoredData<AlertaRetornoPos[]>('alertas_retorno', MOCK_ALERTAS_RETORNO)
-  );
-  const [currentUser, setCurrentUser] = useState<UsuarioEquipe>(() => 
-    getStoredData<UsuarioEquipe>('currentUser', MOCK_USUARIOS[0])
-  );
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => 
-    getStoredData<boolean>('isAuthenticated', true)
-  );
+  // Application State synchronized in Real-Time via Cloud Firestore
+  const [clinicaConfig, setClinicaConfig] = useState<ClinicaConfig>(MOCK_CLINICA_CONFIG);
+  const [pacientes, setPacientes] = useState<Paciente[]>(MOCK_PACIENTES);
+  const [agendamentos, setAgendamentos] = useState<Agendamento[]>(MOCK_AGENDAMENTOS);
+  const [estoque, setEstoque] = useState<EstoqueInsumo[]>(MOCK_ESTOQUE);
+  const [bensPatrimoniais, setBensPatrimoniais] = useState<BemPatrimonial[]>(MOCK_BENS_PATRIMONIAIS);
+  const [procedimentos, setProcedimentos] = useState<ProcedimentoClinico[]>(MOCK_PROCEDIMENTOS);
+  const [orcamentos, setOrcamentos] = useState<SolicitacaoOrcamento[]>(MOCK_ORCAMENTOS);
+  const [transacoes, setTransacoes] = useState<TransacaoFinanceira[]>(MOCK_TRANSACOES);
+  const [despesasRecorrentes, setDespesasRecorrentes] = useState<DespesaRecorrente[]>(MOCK_DESPESAS_RECORRENTES);
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>(MOCK_FORNECEDORES);
+  const [usuarios, setUsuarios] = useState<UsuarioEquipe[]>(MOCK_USUARIOS);
+  const [avisos, setAvisos] = useState<AvisoQuadro[]>(MOCK_AVISOS);
+  const [alertasRetorno, setAlertasRetorno] = useState<AlertaRetornoPos[]>(MOCK_ALERTAS_RETORNO);
+  const [configuracaoCampos, setConfiguracaoCampos] = useState<ConfiguracaoCampos>({
+    clinicaId: 'config_matriz',
+    camposOcultos: [],
+    camposObrigatorios: [],
+  });
+  const [currentUser, setCurrentUser] = useState<UsuarioEquipe>(MOCK_USUARIOS[0]);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
 
   // Quadro de Avisos / Pop-up Alerts State
   const [activePopupAviso, setActivePopupAviso] = useState<AvisoQuadro | null>(null);
   const [isPopupModalOpen, setIsPopupModalOpen] = useState(false);
-  const [acknowledgedAvisos, setAcknowledgedAvisos] = useState<string[]>(() => 
-    getStoredData<string[]>('acknowledged_avisos', [])
-  );
+  const [acknowledgedAvisos, setAcknowledgedAvisos] = useState<string[]>([]);
 
   // Switch User with Password Modal State
   const [isSwitchUserModalOpen, setIsSwitchUserModalOpen] = useState(false);
@@ -146,8 +119,7 @@ export default function App() {
 
   // UI Navigation & Search State
   const [activeTab, setActiveTab] = useState<TabType>(() => {
-    const initialUser = getStoredData<UsuarioEquipe>('currentUser', MOCK_USUARIOS[0]);
-    return initialUser.role === 'cliente' ? 'portal_paciente' : 'dashboard';
+    return MOCK_USUARIOS[0].role === 'cliente' ? 'portal_paciente' : 'dashboard';
   });
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -158,6 +130,8 @@ export default function App() {
   const [patientForPackages, setPatientForPackages] = useState<Paciente | null>(null);
   const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState(false);
   const [isNewPatientOpen, setIsNewPatientOpen] = useState(false);
+  const [isNewSupplierOpen, setIsNewSupplierOpen] = useState(false);
+  const [supplierToEdit, setSupplierToEdit] = useState<Fornecedor | null>(null);
   const [isNewInventoryOpen, setIsNewInventoryOpen] = useState(false);
   const [isNewProcedureOpen, setIsNewProcedureOpen] = useState(false);
   const [procedureToEdit, setProcedureToEdit] = useState<ProcedimentoClinico | null>(null);
@@ -179,97 +153,6 @@ export default function App() {
     }, 4000);
   };
 
-  // Auto-persist state changes into localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('esteticaos_clinica_config', JSON.stringify(clinicaConfig));
-    } catch (e) {}
-  }, [clinicaConfig]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('esteticaos_pacientes', JSON.stringify(pacientes));
-    } catch (e) {}
-  }, [pacientes]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('esteticaos_agendamentos', JSON.stringify(agendamentos));
-    } catch (e) {}
-  }, [agendamentos]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('esteticaos_estoque', JSON.stringify(estoque));
-    } catch (e) {}
-  }, [estoque]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('esteticaos_bens_patrimoniais', JSON.stringify(bensPatrimoniais));
-    } catch (e) {}
-  }, [bensPatrimoniais]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('esteticaos_procedimentos', JSON.stringify(procedimentos));
-    } catch (e) {}
-  }, [procedimentos]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('esteticaos_orcamentos', JSON.stringify(orcamentos));
-    } catch (e) {}
-  }, [orcamentos]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('esteticaos_transacoes', JSON.stringify(transacoes));
-    } catch (e) {}
-  }, [transacoes]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('esteticaos_despesas_recorrentes', JSON.stringify(despesasRecorrentes));
-    } catch (e) {}
-  }, [despesasRecorrentes]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('esteticaos_usuarios', JSON.stringify(usuarios));
-    } catch (e) {}
-  }, [usuarios]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('esteticaos_avisos', JSON.stringify(avisos));
-    } catch (e) {}
-  }, [avisos]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('esteticaos_alertas_retorno', JSON.stringify(alertasRetorno));
-    } catch (e) {}
-  }, [alertasRetorno]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('esteticaos_currentUser', JSON.stringify(currentUser));
-    } catch (e) {}
-  }, [currentUser]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('esteticaos_isAuthenticated', JSON.stringify(isAuthenticated));
-    } catch (e) {}
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('esteticaos_acknowledged_avisos', JSON.stringify(acknowledgedAvisos));
-    } catch (e) {}
-  }, [acknowledgedAvisos]);
-
   // Role-based Access Control Route Guard
   useEffect(() => {
     if (currentUser.role === 'cliente') {
@@ -283,40 +166,133 @@ export default function App() {
     }
   }, [currentUser.role, activeTab]);
 
-  // Firebase Firestore Real-Time Subscriptions and Cloud Seeding
+  // Firebase Cloud Firestore Real-Time Synchronizations (onSnapshot)
   useEffect(() => {
+    // Seed initial dataset into Cloud Firestore if not already seeded
     seedInitialFirestoreData({
-      pacientes,
-      agendamentos,
-      estoque,
-      procedimentos,
-      orcamentos,
-      transacoes,
-      usuarios,
-      avisos,
-      alertas_retorno: alertasRetorno
+      clinica_config: MOCK_CLINICA_CONFIG,
+      pacientes: MOCK_PACIENTES,
+      agendamentos: MOCK_AGENDAMENTOS,
+      estoque: MOCK_ESTOQUE,
+      procedimentos: MOCK_PROCEDIMENTOS,
+      orcamentos: MOCK_ORCAMENTOS,
+      transacoes: MOCK_TRANSACOES,
+      despesas_recorrentes: MOCK_DESPESAS_RECORRENTES,
+      bens: MOCK_BENS_PATRIMONIAIS,
+      usuarios: MOCK_USUARIOS,
+      avisos: MOCK_AVISOS,
+      alertas_retorno: MOCK_ALERTAS_RETORNO,
+      fornecedores: MOCK_FORNECEDORES
     });
 
-    const unsubPacientes = subscribeToCollection<Paciente>(COLLECTIONS.PACIENTES, (data) => setPacientes(data), pacientes);
-    const unsubAgendamentos = subscribeToCollection<Agendamento>(COLLECTIONS.AGENDAMENTOS, (data) => setAgendamentos(data), agendamentos);
-    const unsubEstoque = subscribeToCollection<EstoqueInsumo>(COLLECTIONS.ESTOQUE, (data) => setEstoque(data), estoque);
-    const unsubProcedimentos = subscribeToCollection<ProcedimentoClinico>(COLLECTIONS.PROCEDIMENTOS, (data) => setProcedimentos(data), procedimentos);
-    const unsubOrcamentos = subscribeToCollection<SolicitacaoOrcamento>(COLLECTIONS.ORCAMENTOS, (data) => setOrcamentos(data), orcamentos);
-    const unsubTransacoes = subscribeToCollection<TransacaoFinanceira>(COLLECTIONS.TRANSACOES, (data) => setTransacoes(data), transacoes);
-    const unsubUsuarios = subscribeToCollection<UsuarioEquipe>(COLLECTIONS.USUARIOS, (data) => setUsuarios(data), usuarios);
-    const unsubAvisos = subscribeToCollection<AvisoQuadro>(COLLECTIONS.AVISOS, (data) => setAvisos(data), avisos);
-    const unsubAlertas = subscribeToCollection<AlertaRetornoPos>(COLLECTIONS.ALERTAS_RETORNO, (data) => setAlertasRetorno(data), alertasRetorno);
+    // Real-Time onSnapshot Collection Subscriptions
+    const unsubClinica = subscribeToCollection<ClinicaConfig>(
+      COLLECTIONS.CLINICA_CONFIG,
+      (data) => {
+        if (data && data.length > 0) {
+          setClinicaConfig(data[0]);
+        }
+      },
+      [MOCK_CLINICA_CONFIG]
+    );
+
+    const unsubPacientes = subscribeToCollection<Paciente>(
+      COLLECTIONS.PACIENTES, 
+      (data) => setPacientes(data), 
+      MOCK_PACIENTES
+    );
+
+    const unsubFornecedores = subscribeToCollection<Fornecedor>(
+      COLLECTIONS.FORNECEDORES, 
+      (data) => setFornecedores(data), 
+      MOCK_FORNECEDORES
+    );
+
+    const unsubAgendamentos = subscribeToCollection<Agendamento>(
+      COLLECTIONS.AGENDAMENTOS, 
+      (data) => setAgendamentos(data), 
+      MOCK_AGENDAMENTOS
+    );
+
+    const unsubEstoque = subscribeToCollection<EstoqueInsumo>(
+      COLLECTIONS.ESTOQUE, 
+      (data) => setEstoque(data), 
+      MOCK_ESTOQUE
+    );
+
+    const unsubBens = subscribeToCollection<BemPatrimonial>(
+      COLLECTIONS.BENS, 
+      (data) => setBensPatrimoniais(data), 
+      MOCK_BENS_PATRIMONIAIS
+    );
+
+    const unsubProcedimentos = subscribeToCollection<ProcedimentoClinico>(
+      COLLECTIONS.PROCEDIMENTOS, 
+      (data) => setProcedimentos(data), 
+      MOCK_PROCEDIMENTOS
+    );
+
+    const unsubOrcamentos = subscribeToCollection<SolicitacaoOrcamento>(
+      COLLECTIONS.ORCAMENTOS, 
+      (data) => setOrcamentos(data), 
+      MOCK_ORCAMENTOS
+    );
+
+    const unsubTransacoes = subscribeToCollection<TransacaoFinanceira>(
+      COLLECTIONS.TRANSACOES, 
+      (data) => setTransacoes(data), 
+      MOCK_TRANSACOES
+    );
+
+    const unsubDespesas = subscribeToCollection<DespesaRecorrente>(
+      COLLECTIONS.DESPESAS_RECORRENTES, 
+      (data) => setDespesasRecorrentes(data), 
+      MOCK_DESPESAS_RECORRENTES
+    );
+
+    const unsubUsuarios = subscribeToCollection<UsuarioEquipe>(
+      COLLECTIONS.USUARIOS, 
+      (data) => setUsuarios(data), 
+      MOCK_USUARIOS
+    );
+
+    const unsubAvisos = subscribeToCollection<AvisoQuadro>(
+      COLLECTIONS.AVISOS, 
+      (data) => setAvisos(data), 
+      MOCK_AVISOS
+    );
+
+    const unsubAlertas = subscribeToCollection<AlertaRetornoPos>(
+      COLLECTIONS.ALERTAS_RETORNO, 
+      (data) => setAlertasRetorno(data), 
+      MOCK_ALERTAS_RETORNO
+    );
+
+    const unsubConfigCampos = subscribeToCollection<ConfiguracaoCampos>(
+      COLLECTIONS.CONFIGURACOES_CAMPOS,
+      (data) => {
+        if (data && data.length > 0) {
+          setConfiguracaoCampos(data[0]);
+        }
+      },
+      [{ clinicaId: 'config_matriz', camposOcultos: [], camposObrigatorios: [] }]
+    );
 
     return () => {
+      unsubClinica();
       unsubPacientes();
+      unsubFornecedores();
       unsubAgendamentos();
       unsubEstoque();
+      unsubBens();
       unsubProcedimentos();
       unsubOrcamentos();
       unsubTransacoes();
+      unsubDespesas();
       unsubUsuarios();
       unsubAvisos();
       unsubAlertas();
+      unsubConfigCampos();
     };
   }, []);
 
@@ -493,17 +469,22 @@ export default function App() {
   };
 
   const handleSavePatient = (novo: Partial<Paciente>) => {
+    if (!novo.nome || !novo.telefone) {
+      showToast('Nome e Telefone são obrigatórios para o cadastro.', 'info');
+      return;
+    }
+
     const createdPatient: Paciente = {
-      id: `pac-${Date.now()}`,
-      nome: novo.nome!,
-      telefone: novo.telefone!,
+      id: novo.id || `pac-${Date.now()}`,
+      nome: novo.nome.trim(),
+      telefone: novo.telefone.trim(),
       data_nascimento: novo.data_nascimento || '',
-      historico_clinico: novo.historico_clinico || '',
+      historico_clinico: novo.historico_clinico || 'Ficha clínica inicial cadastrada.',
       criado_em: new Date().toISOString(),
-      email: novo.email,
-      cpf: novo.cpf,
-      alergias: novo.alergias,
-      medicacoes: novo.medicacoes,
+      email: novo.email?.trim() || undefined,
+      cpf: novo.cpf?.trim() || undefined,
+      alergias: novo.alergias?.trim() || undefined,
+      medicacoes: novo.medicacoes?.trim() || undefined,
       fototipo: novo.fototipo || 'Fototipo III',
       fotos_antes_depois: [],
       evolucoes_retornos: [],
@@ -512,7 +493,49 @@ export default function App() {
 
     setPacientes(prev => [createdPatient, ...prev]);
     saveDocument(COLLECTIONS.PACIENTES, createdPatient);
-    showToast(`Ficha de ${createdPatient.nome} cadastrada com sucesso!`);
+    showToast(`Ficha do cliente "${createdPatient.nome}" cadastrada com sucesso!`);
+  };
+
+  const handleSaveSupplier = (novo: Partial<Fornecedor>) => {
+    if (!novo.razao_social || !novo.telefone) {
+      showToast('Razão Social e Telefone são obrigatórios para o cadastro de fornecedor.', 'info');
+      return;
+    }
+
+    if (novo.id) {
+      setFornecedores(prev => prev.map(f => f.id === novo.id ? { ...f, ...novo } as Fornecedor : f));
+      saveDocument(COLLECTIONS.FORNECEDORES, novo as Fornecedor);
+      showToast(`Fornecedor "${novo.razao_social || novo.nome_fantasia}" atualizado com sucesso!`);
+    } else {
+      const createdSupplier: Fornecedor = {
+        id: `forn-${Date.now()}`,
+        razao_social: novo.razao_social.trim(),
+        nome_fantasia: novo.nome_fantasia?.trim() || undefined,
+        cnpj_cpf: novo.cnpj_cpf?.trim() || undefined,
+        telefone: novo.telefone.trim(),
+        email: novo.email?.trim() || undefined,
+        categoria: novo.categoria || 'insumos',
+        contato_responsavel: novo.contato_responsavel?.trim() || undefined,
+        endereco: novo.endereco?.trim() || undefined,
+        cidade_uf: novo.cidade_uf?.trim() || undefined,
+        pix_chave: novo.pix_chave?.trim() || undefined,
+        banco_dados: novo.banco_dados?.trim() || undefined,
+        observacoes: novo.observacoes?.trim() || undefined,
+        status: novo.status || 'ativo',
+        criado_em: new Date().toISOString(),
+      };
+
+      setFornecedores(prev => [createdSupplier, ...prev]);
+      saveDocument(COLLECTIONS.FORNECEDORES, createdSupplier);
+      showToast(`Fornecedor "${createdSupplier.razao_social}" cadastrado com sucesso!`);
+    }
+  };
+
+  const handleDeleteSupplier = (id: string, motivo?: string) => {
+    const target = fornecedores.find(f => f.id === id);
+    setFornecedores(prev => prev.filter(f => f.id !== id));
+    removeDocument(COLLECTIONS.FORNECEDORES, id);
+    showToast(`Fornecedor "${target?.razao_social || 'Fornecedor'}" excluído.`);
   };
 
   const handleDeletePatient = (id: string) => {
@@ -657,16 +680,23 @@ export default function App() {
       id: `rec-${Date.now()}`,
     };
     setDespesasRecorrentes(prev => [created, ...prev]);
+    saveDocument(COLLECTIONS.DESPESAS_RECORRENTES, created);
     showToast(`Despesa recorrente "${created.descricao}" cadastrada!`);
   };
 
   const handleToggleDespesaRecorrenteStatus = (id: string) => {
-    setDespesasRecorrentes(prev =>
-      prev.map(d =>
-        d.id === id ? { ...d, status: d.status === 'ativo' ? 'inativo' : 'ativo' } : d
-      )
-    );
-    showToast('Status da despesa recorrente atualizado.');
+    const target = despesasRecorrentes.find(d => d.id === id);
+    if (target) {
+      const updated: DespesaRecorrente = {
+        ...target,
+        status: target.status === 'ativo' ? 'inativo' : 'ativo'
+      };
+      setDespesasRecorrentes(prev =>
+        prev.map(d => (d.id === id ? updated : d))
+      );
+      saveDocument(COLLECTIONS.DESPESAS_RECORRENTES, updated);
+      showToast('Status da despesa recorrente atualizado.');
+    }
   };
 
   // Asset Management Handlers
@@ -727,6 +757,7 @@ export default function App() {
 
   const handleSaveClinicConfig = (newConfig: ClinicaConfig) => {
     setClinicaConfig(newConfig);
+    saveDocument(COLLECTIONS.CLINICA_CONFIG, newConfig);
     showToast('Identidade visual e dados da clínica salvos com sucesso!');
   };
 
@@ -1001,6 +1032,16 @@ export default function App() {
   const lowStockCount = estoque.filter(i => i.quantidade <= i.alerta_minimo).length;
   const pendingCount = agendamentos.filter(a => a.status === 'pendente' || a.status === 'em_espera').length;
 
+  const hojeStrApp = new Date().toISOString().slice(0, 10);
+  const limite15dApp = new Date();
+  limite15dApp.setDate(limite15dApp.getDate() + 15);
+  const limite15dAppStr = limite15dApp.toISOString().slice(0, 10);
+
+  const manutencaoAlertCount = bensPatrimoniais.filter(b => 
+    b.requerManutencao && 
+    (b.estado_conservacao === 'manutencao' || b.statusManutencao === 'em_manutencao' || (b.dataProximaManutencao && b.dataProximaManutencao <= limite15dAppStr))
+  ).length;
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col antialiased">
       
@@ -1024,6 +1065,7 @@ export default function App() {
         onOpenNoticeBoard={() => setActiveTab('quadro_avisos')}
         unreadNoticesCount={unreadNoticesCount}
         lowStockCount={lowStockCount}
+        manutencaoAlertCount={manutencaoAlertCount}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         currentUser={currentUser}
@@ -1069,6 +1111,7 @@ export default function App() {
               agendamentos={agendamentos}
               estoque={estoque}
               pacientes={pacientes}
+              bens={bensPatrimoniais}
               profissionais={usuarios}
               onOpenNewAppointment={() => setIsNewAppointmentOpen(true)}
               onOpenNewPatient={() => setIsNewPatientOpen(true)}
@@ -1076,6 +1119,7 @@ export default function App() {
               onUpdateStatus={handleUpdateStatus}
               onViewPatient={(p) => setSelectedPatientForDetails(p)}
               onGoToEstoque={() => setActiveTab('estoque')}
+              onGoToBens={() => setActiveTab('bens')}
               onOpenCompleteModal={(ag) => setAppointmentToComplete(ag)}
               searchQuery={searchQuery}
             />
@@ -1102,6 +1146,28 @@ export default function App() {
               onViewPatient={(p) => setSelectedPatientForDetails(p)}
               onOpenPackages={(p) => setPatientForPackages(p)}
               onDeletePatient={handleDeletePatient}
+              onOpenNewSupplier={() => {
+                setSupplierToEdit(null);
+                setIsNewSupplierOpen(true);
+              }}
+              onGoToSuppliers={() => setActiveTab('fornecedores')}
+              currentUser={currentUser}
+            />
+          )}
+
+          {activeTab === 'fornecedores' && currentUser.role !== 'cliente' && (
+            <SuppliersView
+              fornecedores={fornecedores}
+              transacoes={transacoes}
+              onOpenNewSupplier={() => {
+                setSupplierToEdit(null);
+                setIsNewSupplierOpen(true);
+              }}
+              onEditSupplier={(forn) => {
+                setSupplierToEdit(forn);
+                setIsNewSupplierOpen(true);
+              }}
+              onDeleteSupplier={handleDeleteSupplier}
               currentUser={currentUser}
             />
           )}
@@ -1138,6 +1204,7 @@ export default function App() {
                 setIsNewAssetOpen(true);
               }}
               onDeleteBem={handleDeleteBemPatrimonial}
+              onSaveBem={handleSaveBem}
               currentUser={currentUser}
             />
           )}
@@ -1168,11 +1235,16 @@ export default function App() {
             <FinancialView
               transacoes={transacoes}
               despesasRecorrentes={despesasRecorrentes}
+              fornecedores={fornecedores}
               onAddTransaction={handleAddTransaction}
               onUpdateTransactionStatus={handleUpdateTransactionStatus}
               onSoftDeleteTransaction={handleSoftDeleteTransaction}
               onAddDespesaRecorrente={handleAddDespesaRecorrente}
               onToggleDespesaRecorrenteStatus={handleToggleDespesaRecorrenteStatus}
+              onOpenNewSupplier={() => {
+                setSupplierToEdit(null);
+                setIsNewSupplierOpen(true);
+              }}
               currentUser={currentUser}
             />
           )}
@@ -1202,7 +1274,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'usuarios' && (currentUser.role === 'admin' || currentUser.role === 'gestor') && (
+          {(activeTab === 'usuarios' || activeTab === 'equipe') && (currentUser.role === 'admin_total' || currentUser.role === 'admin_local' || currentUser.role === 'gestor' || currentUser.role === 'admin') && (
             <UsersManagementView
               usuarios={usuarios}
               currentUser={currentUser}
@@ -1215,7 +1287,46 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'supabase_guide' && (currentUser.role === 'admin' || currentUser.role === 'gestor') && (
+          {activeTab === 'permissoes' && (currentUser.role === 'admin_total' || currentUser.role === 'admin') && (
+            <PermissionsManagementView
+              usuarios={usuarios}
+              currentUser={currentUser}
+              configuracaoCampos={configuracaoCampos}
+              onUpdateUserPermissions={(userId, perms, role) => {
+                setUsuarios(prev => prev.map(u => u.id === userId ? { 
+                  ...u, 
+                  permissoesCustomizadas: perms, 
+                  ...(role ? { role, cargo: role } : {}) 
+                } : u));
+                if (currentUser.id === userId) {
+                  setCurrentUser(prev => ({ 
+                    ...prev, 
+                    permissoesCustomizadas: perms, 
+                    ...(role ? { role, cargo: role } : {}) 
+                  }));
+                }
+                showToast('Permissões do usuário atualizadas com sucesso!');
+              }}
+              onUpdateFieldConfig={(newConf) => {
+                setConfiguracaoCampos(newConf);
+                showToast('Configurações de visibilidade de campos atualizadas!');
+              }}
+            />
+          )}
+
+          {activeTab === 'perfil' && (
+            <UserProfileView
+              currentUser={currentUser}
+              onUpdateCurrentUser={(updated) => {
+                const newObj = { ...currentUser, ...updated };
+                setCurrentUser(newObj);
+                setUsuarios(prev => prev.map(u => u.id === newObj.id ? newObj : u));
+                showToast('Perfil atualizado com sucesso!');
+              }}
+            />
+          )}
+
+          {activeTab === 'supabase_guide' && (currentUser.role === 'admin_total' || currentUser.role === 'admin_local' || currentUser.role === 'admin' || currentUser.role === 'gestor') && (
             <SupabaseGuideView />
           )}
         </main>
@@ -1278,12 +1389,29 @@ export default function App() {
         procedimentos={procedimentos}
         profissionais={usuarios}
         onSave={handleSaveAppointment}
+        onSaveAppointment={handleSaveAppointment}
+        onOpenNewPatient={() => setIsNewPatientOpen(true)}
       />
 
       <NewPatientModal
         isOpen={isNewPatientOpen}
         onClose={() => setIsNewPatientOpen(false)}
         onSave={handleSavePatient}
+        onSavePatient={handleSavePatient}
+        configuracaoCampos={configuracaoCampos}
+        currentUser={currentUser}
+      />
+
+      <NewSupplierModal
+        isOpen={isNewSupplierOpen}
+        onClose={() => {
+          setIsNewSupplierOpen(false);
+          setSupplierToEdit(null);
+        }}
+        onSave={handleSaveSupplier}
+        onSaveSupplier={handleSaveSupplier}
+        fornecedorToEdit={supplierToEdit}
+        currentUser={currentUser}
       />
 
       <NewInventoryModal
@@ -1307,13 +1435,16 @@ export default function App() {
         isOpen={isNewUserOpen}
         onClose={() => setIsNewUserOpen(false)}
         onSave={handleSaveUser}
+        onSaveUser={handleSaveUser}
       />
 
       <EditUserModal
         isOpen={!!userToEdit}
         onClose={() => setUserToEdit(null)}
         user={userToEdit}
+        usuario={userToEdit}
         onSave={handleUpdateUser}
+        onSaveUser={handleUpdateUser}
       />
 
       <PatientDetailsModal

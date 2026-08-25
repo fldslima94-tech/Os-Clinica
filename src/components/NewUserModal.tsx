@@ -5,14 +5,17 @@ import { UsuarioEquipe, UserRole, PermissoesUsuario } from '../types';
 interface NewUserModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSaveUser: (novo: Partial<UsuarioEquipe>) => void;
+  onSaveUser?: (novo: Partial<UsuarioEquipe>) => void;
+  onSave?: (novo: Partial<UsuarioEquipe>) => void;
 }
 
 export const NewUserModal: React.FC<NewUserModalProps> = ({
   isOpen,
   onClose,
   onSaveUser,
+  onSave,
 }) => {
+  const saveHandler = onSaveUser || onSave;
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [cargo, setCargo] = useState('Operador');
@@ -67,16 +70,18 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
     e.preventDefault();
     if (!nome.trim() || !email.trim()) return;
 
-    onSaveUser({
-      nome: nome.trim(),
-      email: email.trim(),
-      senha: senha.trim() || (role === 'admin' ? 'admin123' : role === 'operador' ? 'operador123' : 'cliente123'),
-      cargo: cargo.trim() || (role === 'admin' ? 'Admin' : role === 'operador' ? 'Operador' : 'Cliente'),
-      role,
-      telefone: telefone.trim(),
-      status: 'ativo',
-      permissoes,
-    });
+    if (saveHandler) {
+      saveHandler({
+        nome: nome.trim(),
+        email: email.trim(),
+        senha: senha.trim() || (role === 'admin' ? 'admin123' : role === 'operador' ? 'operador123' : 'cliente123'),
+        cargo: cargo.trim() || (role === 'admin' ? 'Admin' : role === 'operador' ? 'Operador' : 'Cliente'),
+        role,
+        telefone: telefone.trim(),
+        status: 'ativo',
+        permissoes,
+      });
+    }
 
     // Reset and close
     setNome('');

@@ -3,8 +3,85 @@ export type UnidadeMedida = 'ml' | 'unidade' | 'unidades' | 'seringa' | 'seringa
 export type FormaPagamento = 'pix' | 'cartao_credito' | 'cartao_debito' | 'dinheiro' | 'transferencia' | 'boleto';
 export type StatusPagamento = 'pago' | 'pendente' | 'parcial' | 'estornado';
 
-// RBAC: gestor, recepcao, profissional, cliente (with admin/operador compatibility)
-export type UserRole = 'gestor' | 'recepcao' | 'profissional' | 'cliente' | 'admin' | 'operador';
+// RBAC: admin_total (Super Admin / Master), admin_local (Gestor), recepcao, profissional, cliente
+export type UserRole = 'admin_total' | 'admin_local' | 'recepcao' | 'profissional' | 'cliente' | 'gestor' | 'admin' | 'operador';
+
+export interface PermissoesCustomizadas {
+  financeiro: { 
+    verEntradas: boolean; 
+    verSaidas: boolean; 
+    verRecorrentes: boolean; 
+    excluir: boolean;
+    verRelatorios?: boolean;
+  };
+  clientes: { 
+    criar: boolean; 
+    editar: boolean; 
+    excluir: boolean; 
+    verHistorico: boolean;
+    preencherAnamnese?: boolean;
+  };
+  agenda: { 
+    verTodos: boolean; 
+    verPropria?: boolean;
+    criar: boolean; 
+    cancelar: boolean; 
+    finalizar: boolean; 
+  };
+  procedimentos: { 
+    verCustos: boolean; 
+    verMargem: boolean; 
+    criar: boolean; 
+    excluir: boolean;
+    ajustarEstoque?: boolean;
+  };
+  bens: { 
+    visualizar?: boolean;
+    cadastrar?: boolean;
+    editar?: boolean;
+    gerenciar: boolean; 
+    excluir: boolean; 
+    manutencao?: boolean;
+  };
+  estoque: { 
+    ajustar: boolean; 
+    excluir: boolean; 
+  };
+  fornecedores?: {
+    visualizar: boolean;
+    criar: boolean;
+    editar: boolean;
+    excluir: boolean;
+  };
+  orcamentos?: {
+    verTodos: boolean;
+    responder: boolean;
+    verEmails: boolean;
+  };
+}
+
+export interface PerfilUsuario {
+  id: string;
+  clinicaId: string;
+  nomeCompleto: string;
+  email: string;
+  avatarUrl?: string;
+  profissao?: string;
+  cargo: 'admin_total' | 'admin_local' | 'recepcao' | 'profissional' | 'cliente' | string;
+  role: UserRole;
+  permissoesCustomizadas?: PermissoesCustomizadas;
+  criadoEm?: any;
+  atualizadoEm?: any;
+}
+
+export interface ConfiguracaoCampos {
+  id?: string;
+  clinicaId: string;
+  camposOcultos: string[]; // Ex: ['cliente.cpf', 'procedimento.custoInsumos', 'insumo.lote', 'agendamento.observacoes']
+  camposObrigatorios?: string[];
+  atualizadoPor?: string;
+  atualizadoEm?: any;
+}
 
 export type PrioridadeAviso = 'urgente' | 'importante' | 'informativo';
 
@@ -87,21 +164,26 @@ export interface PermissoesUsuario {
 export interface UsuarioEquipe {
   id: string;
   clinica_id?: string;
+  clinicaId?: string;
   nome: string;
+  nomeCompleto?: string;
   email: string;
   senha?: string;
   cargo: string;
+  profissao?: string;
   role: UserRole;
   telefone?: string;
   status: 'ativo' | 'inativo';
   ultimo_acesso?: string;
   avatar_url?: string;
+  avatarUrl?: string;
   registro_profissional?: string; // CRM, CRBM, COREN, CRF, Esteticista
   especialidade?: string;
   porcentagem_comissao?: number;
   criado_em?: string;
   created_at?: string;
   permissoes: PermissoesUsuario;
+  permissoesCustomizadas?: PermissoesCustomizadas;
 }
 
 export interface FotoAntesDepois {
@@ -368,32 +450,92 @@ export type CategoriaBem = CategoriaBemAtivo;
 
 export type EstadoConservacaoBem = 'excelente' | 'bom' | 'regular' | 'manutencao';
 
+export interface HistoricoManutencaoItem {
+  id: string;
+  dataRealizacao: string; // ISO string ou Timestamp
+  tipo: 'preventiva' | 'corretiva' | 'calibracao';
+  descricao: string;
+  custo: number;
+  tecnicoEmpresa: string;
+  laudoUrl?: string;
+  laudoNome?: string;
+  registradoPor: string;
+}
+
 export interface BemAtivo {
   id: string;
   clinica_id?: string;
+  clinicaId?: string;
   nome: string;
+  nomeBem?: string;
   categoria: CategoriaBemAtivo;
   data_aquisicao: string;
+  dataAquisicao?: any;
   valor_compra: number;
+  valorCompra?: number;
   estado_conservacao: EstadoConservacaoBem;
+  estadoConservacao?: EstadoConservacaoBem;
   numero_serie?: string;
+  numeroSerie?: string;
   nota_fiscal_url?: string;
+  notaFiscalUrl?: string;
   nota_fiscal_nome?: string;
   foto_url?: string;
   localizacao_sala: string;
+  localizacaoSala?: string;
   responsavel_nome?: string;
   garantia_ate?: string;
   observacoes?: string;
   status?: 'ativo' | 'manutencao' | 'descartado' | 'inativo';
+
+  // --- Campos de Manutenção Preventiva (6.1) ---
+  requerManutencao?: boolean;
+  periodicidadeDias?: number; // Ex: 30, 90, 180, 365
+  dataUltimaManutencao?: string;
+  dataProximaManutencao?: string;
+  empresaTecnica?: string;
+  statusManutencao?: 'em_dia' | 'alerta_proximo' | 'vencida' | 'em_manutencao';
+  historicoManutencoes?: HistoricoManutencaoItem[];
+
   criado_em: string;
+  criadoEm?: any;
 }
 
 export type BemPatrimonial = BemAtivo;
+
+export type CategoriaFornecedor = 
+  | 'insumos' 
+  | 'equipamentos' 
+  | 'manutencao' 
+  | 'servicos' 
+  | 'software' 
+  | 'imobiliario'
+  | 'outros';
+
+export interface Fornecedor {
+  id: string;
+  clinica_id?: string;
+  razao_social: string; // Nome ou Razão Social
+  nome_fantasia?: string;
+  cnpj_cpf?: string;
+  telefone: string;
+  email?: string;
+  categoria: CategoriaFornecedor | string;
+  contato_responsavel?: string;
+  endereco?: string;
+  cidade_uf?: string;
+  pix_chave?: string;
+  banco_dados?: string;
+  observacoes?: string;
+  status?: 'ativo' | 'inativo';
+  criado_em: string;
+}
 
 export type TabType = 
   | 'dashboard' 
   | 'agendamentos' 
   | 'pacientes' // Fichas de Clientes
+  | 'fornecedores' // Gestão de Fornecedores e Parceiros
   | 'estoque' 
   | 'patrimonio'
   | 'bens' // Bens & Ativos do Studio
@@ -403,6 +545,8 @@ export type TabType =
   | 'portal_paciente'
   | 'quadro_avisos'
   | 'usuarios'
+  | 'permissoes' // Módulo de Gestão de Permissões e Campos do admin_total
+  | 'perfil' // Meu Perfil / Minha Conta
   | 'configuracoes'
   | 'supabase_guide';
 

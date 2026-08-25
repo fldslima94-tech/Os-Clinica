@@ -11,7 +11,8 @@ import {
   Bell,
   Megaphone,
   ShieldCheck,
-  UserCheck
+  UserCheck,
+  Wrench
 } from 'lucide-react';
 import { TabType, UsuarioEquipe, UserRole } from '../types';
 
@@ -24,6 +25,7 @@ interface HeaderProps {
   onOpenNoticeBoard?: () => void;
   unreadNoticesCount?: number;
   lowStockCount: number;
+  manutencaoAlertCount?: number;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   currentUser: UsuarioEquipe;
@@ -41,6 +43,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNoticeBoard,
   unreadNoticesCount = 0,
   lowStockCount,
+  manutencaoAlertCount = 0,
   searchQuery,
   setSearchQuery,
   currentUser,
@@ -62,14 +65,27 @@ export const Header: React.FC<HeaderProps> = ({
 
   const getRoleBadge = (role: UserRole) => {
     switch (role) {
-      case 'admin':
+      case 'admin_total':
         return {
-          label: '👑 Admin',
+          label: '👑 Master',
+          style: 'bg-amber-50 text-amber-700 border-amber-200/70',
+        };
+      case 'admin_local':
+      case 'admin':
+      case 'gestor':
+        return {
+          label: '⭐ Admin',
           style: 'bg-indigo-50 text-indigo-700 border-indigo-200/70',
         };
+      case 'profissional':
+        return {
+          label: '🩺 Profissional',
+          style: 'bg-teal-50 text-teal-700 border-teal-200/70',
+        };
+      case 'recepcao':
       case 'operador':
         return {
-          label: '🧑‍💼 Operador',
+          label: '🧑‍💼 Recepção',
           style: 'bg-emerald-50 text-emerald-700 border-emerald-200/70',
         };
       case 'cliente':
@@ -161,6 +177,27 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </button>
 
+          {/* Alertas de Manutenção Preventiva */}
+          {currentUser.role !== 'cliente' && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('bens')}
+              className={`relative p-2 rounded-xl border transition-colors cursor-pointer flex items-center justify-center ${
+                activeTab === 'bens' || activeTab === 'patrimonio'
+                  ? 'bg-indigo-50 border-indigo-300 text-indigo-700 shadow-2xs'
+                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600 hover:text-slate-900'
+              }`}
+              title="Alertas de Manutenção Preventiva dos Equipamentos"
+            >
+              <Wrench className="w-4 h-4 text-amber-600" />
+              {manutencaoAlertCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center border-2 border-white shadow-2xs">
+                  {manutencaoAlertCount}
+                </span>
+              )}
+            </button>
+          )}
+
           {/* User & Role Switcher Dropdown Button */}
           <div className="relative">
             <button
@@ -178,7 +215,15 @@ export const Header: React.FC<HeaderProps> = ({
                   {currentUser.nome.split(' ')[0]} {currentUser.nome.split(' ')[1] || ''}
                 </div>
                 <div className="text-[10px] text-slate-500 font-medium">
-                  {currentUser.role === 'admin' ? '👑 Admin' : currentUser.role === 'operador' ? '🧑‍💼 Operador' : '👤 Cliente'}
+                  {currentUser.role === 'admin_total' 
+                    ? '👑 Super Admin' 
+                    : currentUser.role === 'admin_local' || currentUser.role === 'admin' || currentUser.role === 'gestor'
+                    ? '⭐ Admin' 
+                    : currentUser.role === 'profissional'
+                    ? '🩺 Profissional'
+                    : currentUser.role === 'recepcao' || currentUser.role === 'operador'
+                    ? '🧑‍💼 Recepção'
+                    : '👤 Cliente'}
                 </div>
               </div>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
@@ -217,25 +262,45 @@ export const Header: React.FC<HeaderProps> = ({
                         <div>
                           <p className="font-semibold leading-tight">{u.nome}</p>
                           <p className="text-[10px] text-slate-400">
-                            {u.role === 'admin' ? 'Admin' : u.role === 'operador' ? 'Operador' : 'Cliente'}
+                            {u.role === 'admin_total'
+                              ? 'Super Admin'
+                              : u.role === 'admin_local' || u.role === 'admin' || u.role === 'gestor'
+                              ? 'Admin Local'
+                              : u.role === 'profissional'
+                              ? 'Profissional'
+                              : u.role === 'recepcao' || u.role === 'operador'
+                              ? 'Recepção'
+                              : 'Cliente'}
                           </p>
                         </div>
                       </div>
                       <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                        u.role === 'admin' 
+                        u.role === 'admin_total' 
+                          ? 'bg-amber-100 text-amber-800'
+                          : u.role === 'admin_local' || u.role === 'admin' || u.role === 'gestor'
                           ? 'bg-indigo-100 text-indigo-700' 
-                          : u.role === 'operador'
+                          : u.role === 'profissional'
+                          ? 'bg-teal-100 text-teal-700'
+                          : u.role === 'recepcao' || u.role === 'operador'
                           ? 'bg-emerald-100 text-emerald-700'
                           : 'bg-blue-100 text-blue-700'
                       }`}>
-                        {u.role === 'admin' ? 'Admin' : u.role === 'operador' ? 'Operador' : 'Cliente'}
+                        {u.role === 'admin_total'
+                          ? 'Master'
+                          : u.role === 'admin_local' || u.role === 'admin' || u.role === 'gestor'
+                          ? 'Admin'
+                          : u.role === 'profissional'
+                          ? 'Pro'
+                          : u.role === 'recepcao' || u.role === 'operador'
+                          ? 'Recepção'
+                          : 'Cliente'}
                       </span>
                     </button>
                   ))}
                 </div>
 
                 <div className="px-2 pt-2 mt-1 border-t border-slate-100 space-y-1">
-                  {currentUser.role === 'admin' && (
+                  {(currentUser.role === 'admin_total' || currentUser.role === 'admin_local' || currentUser.role === 'admin' || currentUser.role === 'gestor') && (
                     <button
                       onClick={() => setActiveTab('usuarios')}
                       className="w-full text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 px-2 py-1.5 rounded-md flex items-center gap-1.5"

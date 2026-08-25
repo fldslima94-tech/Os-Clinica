@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Sparkles, 
   Search, 
@@ -58,14 +58,23 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
   const [orcamentoToDelete, setOrcamentoToDelete] = useState<SolicitacaoOrcamento | null>(null);
 
   // Google Authentication State (null por padrão para não exibir contas pré-credenciadas)
-  const [googleProfile, setGoogleProfile] = useState<PacienteGoogleProfile | null>(() => {
-    try {
-      const saved = localStorage.getItem('esteticaos_google_user');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [googleProfile, setGoogleProfile] = useState<PacienteGoogleProfile | null>(null);
+
+  // Sync with Firebase Auth state in real-time
+  useEffect(() => {
+    const unsubscribe = onFirebaseAuthStateChange((user) => {
+      if (user) {
+        setGoogleProfile({
+          id: user.uid,
+          nome: user.displayName || 'Paciente Google',
+          email: user.email || '',
+          avatar_url: user.photoURL || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&auto=format&fit=crop&q=80',
+          telefone: user.phoneNumber || '(11) 99888-7766',
+        });
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const [isGoogleLoginModalOpen, setIsGoogleLoginModalOpen] = useState(false);
   const [customNameInput, setCustomNameInput] = useState('');
@@ -118,7 +127,6 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
           telefone: user.phoneNumber || '(11) 99888-7766',
         };
         setGoogleProfile(profile);
-        localStorage.setItem('esteticaos_google_user', JSON.stringify(profile));
         setIsGoogleLoginModalOpen(false);
       }
     } catch (err) {
@@ -149,14 +157,12 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
     }
 
     setGoogleProfile(profile);
-    localStorage.setItem('esteticaos_google_user', JSON.stringify(profile));
     setIsGoogleLoginModalOpen(false);
   };
 
   const handleGoogleLogout = async () => {
     await logoutFirebase();
     setGoogleProfile(null);
-    localStorage.removeItem('esteticaos_google_user');
   };
 
   // Submit quote request

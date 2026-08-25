@@ -1,14 +1,16 @@
-import React from 'react';
-import { AlertTriangle, Trash2, X, ShieldAlert } from 'lucide-react';
+import React, { useState } from 'react';
+import { AlertTriangle, Trash2, X, ShieldAlert, FileText } from 'lucide-react';
 
 interface DeleteConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (reason?: string) => void;
   title: string;
   itemName: string;
   itemType: string;
   description?: string;
+  requireReason?: boolean;
+  reasonPlaceholder?: string;
 }
 
 export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
@@ -19,8 +21,24 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
   itemName,
   itemType,
   description,
+  requireReason = false,
+  reasonPlaceholder = 'Ex: Lançamento duplicado, erro de digitação, estorno autorizado...',
 }) => {
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState(false);
+
   if (!isOpen) return null;
+
+  const handleConfirm = () => {
+    if (requireReason && !reason.trim()) {
+      setError(true);
+      return;
+    }
+    onConfirm(reason.trim());
+    setReason('');
+    setError(false);
+    onClose();
+  };
 
   return (
     <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
@@ -43,7 +61,11 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
           </div>
 
           <button
-            onClick={onClose}
+            onClick={() => {
+              setReason('');
+              setError(false);
+              onClose();
+            }}
             className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
@@ -65,10 +87,42 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
             </p>
           </div>
 
+          {/* Reason Input for Audit (Mandatory for Financial) */}
+          {requireReason && (
+            <div className="space-y-1.5 pt-1">
+              <label className="block text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-rose-500" />
+                <span>Motivo da Exclusão (Obrigatório para Auditoria):</span>
+                <span className="text-rose-500">*</span>
+              </label>
+              <textarea
+                rows={2}
+                required
+                value={reason}
+                onChange={(e) => {
+                  setReason(e.target.value);
+                  if (error && e.target.value.trim()) setError(false);
+                }}
+                placeholder={reasonPlaceholder}
+                className={`w-full p-2.5 text-xs bg-slate-50 border rounded-xl focus:outline-none focus:ring-2 ${
+                  error 
+                    ? 'border-rose-400 focus:ring-rose-400/20 bg-rose-50/30' 
+                    : 'border-slate-300 focus:ring-indigo-500/20 focus:border-indigo-500'
+                }`}
+              />
+              {error && (
+                <p className="text-[11px] text-rose-600 font-semibold flex items-center gap-1">
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                  Por favor, informe a justificativa ou motivo antes de excluir.
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="flex items-start gap-2.5 p-3 rounded-lg bg-amber-50 border border-amber-200/80 text-amber-900 text-xs">
             <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
             <p className="leading-relaxed">
-              {description || 'Esta ação não poderá ser desfeita e todos os históricos e dados associados a este registro serão removidos do sistema.'}
+              {description || 'Esta ação não poderá ser desfeita e todos os históricos associados a este registro serão excluídos com registro de auditoria.'}
             </p>
           </div>
         </div>
@@ -77,17 +131,18 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
         <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => {
+              setReason('');
+              setError(false);
+              onClose();
+            }}
             className="px-4 py-2.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
           >
             Cancelar
           </button>
           <button
             type="button"
-            onClick={() => {
-              onConfirm();
-              onClose();
-            }}
+            onClick={handleConfirm}
             className="px-4 py-2.5 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-bold rounded-xl text-xs shadow-sm transition-all cursor-pointer inline-flex items-center gap-1.5"
           >
             <Trash2 className="w-4 h-4" />
@@ -99,3 +154,4 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
     </div>
   );
 };
+

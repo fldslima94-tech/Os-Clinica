@@ -20,8 +20,9 @@ interface NewAppointmentModalProps {
   pacientes: Paciente[];
   procedimentos?: ProcedimentoClinico[];
   profissionais?: UsuarioEquipe[];
-  onSaveAppointment: (novoAgendamento: Partial<Agendamento>) => void;
-  onOpenNewPatient: () => void;
+  onSave?: (novoAgendamento: Partial<Agendamento>) => void;
+  onSaveAppointment?: (novoAgendamento: Partial<Agendamento>) => void;
+  onOpenNewPatient?: () => void;
 }
 
 export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
@@ -30,6 +31,7 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
   pacientes,
   procedimentos = [],
   profissionais = [],
+  onSave,
   onSaveAppointment,
   onOpenNewPatient,
 }) => {
@@ -105,20 +107,23 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
 
     const selectedProf = profissionais.find(p => p.id === profissionalId);
 
-    onSaveAppointment({
-      paciente_id: pacienteId,
-      data_hora: dataHoraIso,
-      procedimento: procedureName,
-      status: status,
-      duracao_minutos: Number(duracao),
-      valor_estimado: valor ? parseFloat(valor) : undefined,
-      observacoes: observacoes.trim() || undefined,
-      profissional_id: profissionalId || undefined,
-      profissional_nome: selectedProf?.nome || undefined,
-      profissional_cargo: selectedProf?.cargo || undefined,
-      contrato_vinculado: currentProc?.contrato_padrao || undefined,
-      contrato_assinado: false,
-    });
+    const saveFunction = onSave || onSaveAppointment;
+    if (saveFunction) {
+      saveFunction({
+        paciente_id: pacienteId,
+        data_hora: dataHoraIso,
+        procedimento: procedureName,
+        status: status,
+        duracao_minutos: Number(duracao),
+        valor_estimado: valor ? parseFloat(valor) : undefined,
+        observacoes: observacoes.trim() || undefined,
+        profissional_id: profissionalId || undefined,
+        profissional_nome: selectedProf?.nome || undefined,
+        profissional_cargo: selectedProf?.cargo || undefined,
+        contrato_vinculado: currentProc?.contrato_padrao || undefined,
+        contrato_assinado: false,
+      });
+    }
 
     onClose();
   };

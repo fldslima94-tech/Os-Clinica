@@ -11,29 +11,44 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/perfis/$(request.auth.uid)).data;
     }
 
+    function isAdminTotal() {
+      return isAuthenticated() && (
+        getUserData().cargo == 'admin_total' || 
+        getUserData().role == 'admin_total'
+      );
+    }
+
     function isMemberOf(clinicaId) {
-      return isAuthenticated() && getUserData().clinicaId == clinicaId;
+      return isAuthenticated() && (isAdminTotal() || getUserData().clinicaId == clinicaId);
     }
 
     function hasRole(role) {
-      return isAuthenticated() && getUserData().cargo == role;
+      return isAuthenticated() && (isAdminTotal() || getUserData().cargo == role || getUserData().role == role);
     }
 
     function isStaff(clinicaId) {
-      return isMemberOf(clinicaId) && getUserData().cargo in ['gestor', 'recepcao', 'profissional'];
+      return isAdminTotal() || (
+        isMemberOf(clinicaId) && 
+        (getUserData().cargo in ['admin_local', 'gestor', 'admin', 'recepcao', 'profissional'] || 
+         getUserData().role in ['admin_local', 'gestor', 'admin', 'recepcao', 'profissional'])
+      );
     }
 
     function isGestor(clinicaId) {
-      return isMemberOf(clinicaId) && getUserData().cargo == 'gestor';
+      return isAdminTotal() || (
+        isMemberOf(clinicaId) && 
+        (getUserData().cargo in ['admin_local', 'gestor', 'admin'] || 
+         getUserData().role in ['admin_local', 'gestor', 'admin'])
+      );
     }
 
     // 1. Perfis de Usuários
     match /perfis/{userId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && (request.auth.uid == userId || hasRole('gestor'));
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdminTotal() || hasRole('admin_local') || hasRole('gestor'));
     }
 
-    // 2. Clínicas
+    // 2. Clínicas e Configurações
     match /clinicas/{clinicaId} {
       allow read: if isMemberOf(clinicaId);
       allow update: if isGestor(clinicaId);
@@ -47,6 +62,24 @@ service cloud.firestore {
       match /despesas_recorrentes/{despesaId} {
         allow read, write: if isGestor(clinicaId);
       }
+    }
+
+    // Configurações de Visibilidade de Campos (Exclusivo admin_total)
+    match /configuracoes_campos/{configId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdminTotal();
+    }
+
+    // Logs de Auditoria do Sistema
+    match /logs_auditoria/{logId} {
+      allow create: if isAuthenticated();
+      allow read: if isGestor(resource.data.clinicaId) || isAdminTotal();
+    }
+
+    // Permissões Customizadas de Usuários
+    match /permissoes_usuarios/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdminTotal();
     }
 
     // 3. Fichas de Clientes e Evolução
@@ -86,7 +119,7 @@ service cloud.firestore {
 
     // 7. Financeiro (Fluxo de Caixa com Soft Delete)
     match /fluxo_caixa/{lancamentoId} {
-      allow read, write: if isStaff(resource.data.clinicaId) && getUserData().cargo in ['gestor', 'recepcao'];
+      allow read, write: if isStaff(resource.data.clinicaId) && (isAdminTotal() || getUserData().cargo in ['admin_local', 'gestor', 'admin', 'recepcao']);
     }
 
     // 8. Bens e Ativos

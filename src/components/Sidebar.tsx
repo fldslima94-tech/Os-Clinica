@@ -45,12 +45,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenUserAvatarModal,
   onLogout,
 }) => {
-  const isGestor = currentUser.role === 'gestor' || currentUser.role === 'admin';
+  const isAdminTotal = currentUser.role === 'admin_total';
+  const isAdminLocal = currentUser.role === 'admin_local' || currentUser.role === 'gestor' || currentUser.role === 'admin';
+  const isGestor = isAdminTotal || isAdminLocal;
   const isRecepcao = currentUser.role === 'recepcao' || currentUser.role === 'operador';
   const isProfissional = currentUser.role === 'profissional';
   const isCliente = currentUser.role === 'cliente';
 
-  const roleLabel = isGestor ? 'Gestor' : isProfissional ? 'Profissional' : isRecepcao ? 'Recepção' : 'Cliente';
+  const roleLabel = isAdminTotal 
+    ? 'Admin Total (Master)' 
+    : isAdminLocal 
+    ? 'Admin Local (Gestor)' 
+    : isProfissional 
+    ? 'Profissional' 
+    : isRecepcao 
+    ? 'Recepção' 
+    : 'Cliente';
 
   // Role-based navigation modules
   const getSections = () => {
@@ -72,6 +82,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
               icon: Megaphone,
               badge: unreadNoticesCount > 0 ? `${unreadNoticesCount}` : undefined,
               badgeColor: 'bg-rose-100 text-rose-800 border-rose-200 font-bold',
+            },
+            {
+              id: 'perfil' as TabType,
+              label: 'Meu Perfil & Segurança',
+              icon: Users,
             },
           ]
         }
@@ -131,6 +146,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             badgeColor: 'bg-rose-100 text-rose-800 border-rose-200 font-semibold',
           },
           {
+            id: 'fornecedores' as TabType,
+            label: 'Fornecedores & Parceiros',
+            icon: Building,
+          },
+          {
             id: 'patrimonio' as TabType,
             label: 'Bens & Equipamentos',
             icon: Landmark,
@@ -168,23 +188,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
           },
         ]
       },
-      ...(isGestor ? [{
-        title: 'Configurações & Gestão',
+      {
+        title: 'Gestão & Segurança',
         items: [
-          {
+          ...(isAdminTotal ? [{
+            id: 'permissoes' as TabType,
+            label: 'Permissões & Matriz',
+            icon: Lock,
+            badge: 'Super Admin',
+            badgeColor: 'bg-amber-100 text-amber-800 border-amber-200 font-bold',
+          }] : []),
+          ...(isGestor ? [{
             id: 'usuarios' as TabType,
-            label: 'Equipe & Permissões',
+            label: 'Equipe & Usuários',
             icon: UserCheck,
-            badge: 'Gestor',
-            badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-          },
+          }] : []),
           {
+            id: 'perfil' as TabType,
+            label: 'Meu Perfil & Senha',
+            icon: Users,
+          },
+          ...(isGestor ? [{
             id: 'supabase_guide' as TabType,
             label: 'Arquitetura Firestore',
             icon: Code2,
-          },
+          }] : [])
         ]
-      }] : [])
+      }
     ];
   };
 

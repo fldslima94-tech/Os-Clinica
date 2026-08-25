@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import { 
   collection, 
   doc, 
@@ -8,6 +9,10 @@ import {
   writeBatch,
   runTransaction,
   getDoc,
+  updateDoc,
+  arrayUnion,
+  query,
+  where,
   serverTimestamp,
   Timestamp
 } from 'firebase/firestore';
@@ -16,9 +21,13 @@ import {
   signOut, 
   onAuthStateChanged, 
   User as FirebaseUser,
-  updateProfile
+  updateProfile,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider
 } from 'firebase/auth';
 import { db, auth, googleProvider } from '../lib/firebase';
+export { db, auth, googleProvider };
 import {
   Paciente,
   Agendamento,
@@ -36,14 +45,22 @@ import {
   ClinicaConfig,
   InsumoConsumido,
   FormaPagamento,
-  StatusPagamento
+  StatusPagamento,
+  UserRole,
+  PermissoesCustomizadas,
+  PerfilUsuario,
+  ConfiguracaoCampos,
+  Fornecedor
 } from '../types';
 
 // Collection Names & Canonical Firestore Paths
 export const COLLECTIONS = {
   CLINICA_CONFIG: 'clinica_config',
+  CONFIGURACOES_CAMPOS: 'configuracoes_campos',
+  CONFIGURACOES_SISTEMA: 'configuracoes_sistema',
   PACIENTES: 'pacientes',
   FICHAS_CLIENTES: 'fichas_clientes',
+  FORNECEDORES: 'fornecedores',
   AGENDAMENTOS: 'agendamentos',
   ESTOQUE: 'estoque',
   ESTOQUE_INSUMOS: 'estoque_insumos',
@@ -359,6 +376,7 @@ export async function seedInitialFirestoreData(mockData: {
   usuarios: UsuarioEquipe[];
   avisos: AvisoQuadro[];
   alertas_retorno: AlertaRetornoPos[];
+  fornecedores?: Fornecedor[];
 }): Promise<void> {
   try {
     const checkPacientes = await getDocs(collection(db, COLLECTIONS.PACIENTES));
@@ -373,6 +391,7 @@ export async function seedInitialFirestoreData(mockData: {
       batch.set(doc(db, COLLECTIONS.CLINICA_CONFIG, mockData.clinica_config.id), mockData.clinica_config);
     }
     mockData.pacientes.forEach(p => batch.set(doc(db, COLLECTIONS.PACIENTES, p.id), p));
+    if (mockData.fornecedores) mockData.fornecedores.forEach(f => batch.set(doc(db, COLLECTIONS.FORNECEDORES, f.id), f));
     mockData.agendamentos.forEach(a => batch.set(doc(db, COLLECTIONS.AGENDAMENTOS, a.id), a));
     mockData.estoque.forEach(e => batch.set(doc(db, COLLECTIONS.ESTOQUE, e.id), e));
     mockData.procedimentos.forEach(pr => batch.set(doc(db, COLLECTIONS.PROCEDIMENTOS, pr.id), pr));
@@ -424,6 +443,29 @@ export function subscribeToCollection<T>(
   }
 }
 
+// React Hook for Real-time Firestore Collection Synchronization
+export function useCollectionData<T extends { id: string }>(
+  collectionName: string, 
+  initialFallbackData: T[] = []
+): [T[], React.Dispatch<React.SetStateAction<T[]>>, boolean] {
+  const [data, setData] = useState<T[]>(initialFallbackData);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToCollection<T>(
+      collectionName,
+      (incomingData) => {
+        setData(incomingData);
+        setLoading(false);
+      },
+      initialFallbackData
+    );
+    return () => unsubscribe();
+  }, [collectionName]);
+
+  return [data, setData, loading];
+}
+
 // Firebase Google Authentication Handlers
 export async function loginWithFirebaseGoogle(): Promise<FirebaseUser | null> {
   try {
@@ -447,7 +489,7 @@ export function onFirebaseAuthStateChange(callback: (user: FirebaseUser | null) 
   return onAuthStateChanged(auth, callback);
 }
 
-// Helper to update user profile in Firebase Auth and Firestore
+// Helper to update user profile in Firebase Auth and Firestore (perfis & usuarios)
 export async function updateUserAvatarAndName(usuarioId: string, avatarUrl: string, nome?: string): Promise<void> {
   try {
     if (auth.currentUser) {
@@ -457,11 +499,470 @@ export async function updateUserAvatarAndName(usuarioId: string, avatarUrl: stri
       });
     }
     const userRef = doc(db, COLLECTIONS.USUARIOS, usuarioId);
-    await setDoc(userRef, { 
+    const perfilRef = doc(db, COLLECTIONS.PERFIS, usuarioId);
+    
+    const updateData: Record<string, any> = { 
       avatar_url: avatarUrl,
-      ...(nome ? { nome } : {})
-    }, { merge: true });
+      avatarUrl: avatarUrl,
+      ...(nome ? { nome, nomeCompleto: nome } : {})
+    };
+
+    await setDoc(userRef, updateData, { merge: true });
+    await setDoc(perfilRef, updateData, { merge: true });
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `${COLLECTIONS.USUARIOS}/${usuarioId}`);
   }
 }
+
+// Complete profile updater for self-management
+export async function atualizarDadosPerfil(
+  usuarioId: string, 
+  dados: { nomeCompleto?: string; profissao?: string; avatarUrl?: string; telefone?: string }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (auth.currentUser && dados.nomeCompleto) {
+      await updateProfile(auth.currentUser, {
+        displayName: dados.nomeCompleto,
+        photoURL: dados.avatarUrl || auth.currentUser.photoURL
+      });
+    }
+
+    const payload: Record<string, any> = {
+      atualizadoEm: serverTimestamp(),
+      ...(dados.nomeCompleto ? { nome: dados.nomeCompleto, nomeCompleto: dados.nomeCompleto } : {}),
+      ...(dados.profissao !== undefined ? { profissao: dados.profissao, cargo: dados.profissao } : {}),
+      ...(dados.avatarUrl ? { avatar_url: dados.avatarUrl, avatarUrl: dados.avatarUrl } : {}),
+      ...(dados.telefone ? { telefone: dados.telefone } : {})
+    };
+
+    const userRef = doc(db, COLLECTIONS.USUARIOS, usuarioId);
+    const perfilRef = doc(db, COLLECTIONS.PERFIS, usuarioId);
+
+    await setDoc(userRef, payload, { merge: true });
+    await setDoc(perfilRef, payload, { merge: true });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('[Firebase] Erro ao atualizar dados do perfil:', error);
+    return { success: false, error: error.message || 'Erro ao atualizar dados do perfil' };
+  }
+}
+
+// Secure password update with Firebase Auth re-authentication
+export async function reautenticarEAtualizarSenha(
+  senhaAtual: string, 
+  novaSenha: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const user = auth.currentUser;
+    if (!user || !user.email) {
+      return { success: false, error: 'Usuário não autenticado no Firebase Auth.' };
+    }
+
+    if (novaSenha.length < 6) {
+      return { success: false, error: 'A nova senha deve ter no mínimo 6 caracteres.' };
+    }
+
+    // Step 1: Re-authenticate with current credentials
+    const credential = EmailAuthProvider.credential(user.email, senhaAtual);
+    await reauthenticateWithCredential(user, credential);
+
+    // Step 2: Update to new password
+    await updatePassword(user, novaSenha);
+
+    return { success: true };
+  } catch (error: any) {
+    console.warn('[Firebase Auth] Erro ao atualizar senha:', error);
+    let friendlyMessage = 'Não foi possível alterar a senha. Verifique os dados informados.';
+    
+    if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+      friendlyMessage = 'A senha atual informada está incorreta.';
+    } else if (error.code === 'auth/weak-password') {
+      friendlyMessage = 'A nova senha é muito fraca. Utilize pelo menos 6 caracteres.';
+    } else if (error.code === 'auth/requires-recent-login') {
+      friendlyMessage = 'Por motivos de segurança, faça login novamente antes de redefinir sua senha.';
+    }
+
+    return { success: false, error: friendlyMessage };
+  }
+}
+
+// Save field visibility configurations (admin_total)
+export async function salvarConfiguracaoCampos(
+  clinicaId: string, 
+  configuracao: ConfiguracaoCampos
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const configDocRef = doc(db, COLLECTIONS.CONFIGURACOES_CAMPOS, clinicaId || 'config_matriz');
+    await setDoc(configDocRef, {
+      ...configuracao,
+      clinicaId: clinicaId || 'config_matriz',
+      atualizadoEm: serverTimestamp()
+    }, { merge: true });
+    return { success: true };
+  } catch (error: any) {
+    handleFirestoreError(error, OperationType.UPDATE, `${COLLECTIONS.CONFIGURACOES_CAMPOS}/${clinicaId}`);
+    return { success: false, error: error.message };
+  }
+}
+
+// Save user permissions (admin_total)
+export async function salvarPermissoesUsuario(
+  usuarioId: string,
+  permissoes: PermissoesCustomizadas,
+  role?: UserRole
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const userRef = doc(db, COLLECTIONS.USUARIOS, usuarioId);
+    const perfilRef = doc(db, COLLECTIONS.PERFIS, usuarioId);
+
+    const updateData: Record<string, any> = {
+      permissoesCustomizadas: permissoes,
+      ...(role ? { role, cargo: role } : {}),
+      atualizadoEm: serverTimestamp()
+    };
+
+    await setDoc(userRef, updateData, { merge: true });
+    await setDoc(perfilRef, updateData, { merge: true });
+
+    return { success: true };
+  } catch (error: any) {
+    handleFirestoreError(error, OperationType.UPDATE, `${COLLECTIONS.USUARIOS}/${usuarioId}`);
+    return { success: false, error: error.message };
+  }
+}
+
+// Permission & Role Helper Checking Utilities
+export function isUserAdminTotal(user?: UsuarioEquipe | null): boolean {
+  if (!user) return false;
+  return user.role === 'admin_total';
+}
+
+export function isUserAdminLocalOrTotal(user?: UsuarioEquipe | null): boolean {
+  if (!user) return false;
+  return user.role === 'admin_total' || user.role === 'admin_local' || user.role === 'gestor' || user.role === 'admin';
+}
+
+export function checkUserCustomPermission(
+  user: UsuarioEquipe | null | undefined, 
+  modulo: keyof PermissoesCustomizadas, 
+  acao: string
+): boolean {
+  if (!user) return false;
+  
+  // admin_total always has full privileges across all modules
+  if (user.role === 'admin_total') return true;
+
+  // Custom permissions matrix check
+  if (user.permissoesCustomizadas && (user.permissoesCustomizadas as any)[modulo]) {
+    const val = (user.permissoesCustomizadas as any)[modulo][acao];
+    if (typeof val === 'boolean') return val;
+  }
+
+  // Fallback defaults based on role & legacy flags
+  if (modulo === 'financeiro') {
+    if (acao === 'excluir') return false; // Only explicitly granted or admin_total can delete
+    if (user.role === 'admin_local' || user.role === 'gestor' || user.role === 'admin') return true;
+    if (acao === 'verEntradas' && user.role === 'recepcao') return true;
+    return Boolean(user.permissoes?.ver_financeiro_completo);
+  }
+
+  if (modulo === 'clientes') {
+    if (acao === 'excluir') return false;
+    if (user.role === 'cliente') return false;
+    return true;
+  }
+
+  if (modulo === 'procedimentos') {
+    if (acao === 'verCustos' || acao === 'verMargem') return isUserAdminLocalOrTotal(user);
+    if (acao === 'excluir') return false;
+    return true;
+  }
+
+  if (modulo === 'bens') {
+    if (acao === 'excluir') return false;
+    return isUserAdminLocalOrTotal(user);
+  }
+
+  if (modulo === 'estoque') {
+    if (acao === 'excluir') return false;
+    return isUserAdminLocalOrTotal(user);
+  }
+
+  return true;
+}
+
+// ==========================================
+// 6.1 Gestão de Manutenção Preventiva & Alertas
+// ==========================================
+
+export interface AlertaManutencaoItem {
+  id: string;
+  nome: string;
+  categoria: string;
+  localizacao_sala?: string;
+  responsavel_nome?: string;
+  empresaTecnica?: string;
+  dataUltimaManutencao?: string;
+  dataProximaManutencao?: string;
+  periodicidadeDias?: number;
+  statusManutencao: 'em_dia' | 'alerta_proximo' | 'vencida' | 'em_manutencao';
+  diasDiferenca?: number;
+  diasRestantes?: number;
+}
+
+export interface AlertasManutencaoResultado {
+  vencidos: AlertaManutencaoItem[];
+  proximos: AlertaManutencaoItem[];
+  emManutencao: AlertaManutencaoItem[];
+  emDia: AlertaManutencaoItem[];
+  totalAlertas: number;
+}
+
+/**
+ * Busca equipamentos com manutenção próxima (7 a 15 dias) ou vencida para exibição no Dashboard e cabeçalho
+ */
+export async function buscarAlertasManutencao(
+  clinicaId?: string, 
+  diasMargemAlerta: number = 15
+): Promise<AlertasManutencaoResultado> {
+  const agora = new Date();
+  const hojeStr = agora.toISOString().slice(0, 10);
+  const dataLimiteAlerta = new Date();
+  dataLimiteAlerta.setDate(agora.getDate() + diasMargemAlerta);
+  const limiteStr = dataLimiteAlerta.toISOString().slice(0, 10);
+
+  const resultado: AlertasManutencaoResultado = {
+    vencidos: [],
+    proximos: [],
+    emManutencao: [],
+    emDia: [],
+    totalAlertas: 0,
+  };
+
+  try {
+    const bensRef = collection(db, COLLECTIONS.BENS_ATIVOS);
+    const snapshot = await getDocs(bensRef);
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data() as BemAtivo;
+      if (!data.requerManutencao) return;
+
+      const proximaStr = data.dataProximaManutencao || '';
+      if (!proximaStr) return;
+
+      const dataProxima = new Date(proximaStr);
+      const isEmManutencao = data.statusManutencao === 'em_manutencao' || data.estado_conservacao === 'manutencao';
+
+      if (isEmManutencao) {
+        resultado.emManutencao.push({
+          id: docSnap.id,
+          nome: data.nome,
+          categoria: data.categoria,
+          localizacao_sala: data.localizacao_sala,
+          responsavel_nome: data.responsavel_nome,
+          empresaTecnica: data.empresaTecnica,
+          dataUltimaManutencao: data.dataUltimaManutencao,
+          dataProximaManutencao: proximaStr,
+          periodicidadeDias: data.periodicidadeDias,
+          statusManutencao: 'em_manutencao',
+        });
+      } else if (proximaStr < hojeStr) {
+        const diffDias = Math.max(1, Math.floor((agora.getTime() - dataProxima.getTime()) / (1000 * 3600 * 24)));
+        resultado.vencidos.push({
+          id: docSnap.id,
+          nome: data.nome,
+          categoria: data.categoria,
+          localizacao_sala: data.localizacao_sala,
+          responsavel_nome: data.responsavel_nome,
+          empresaTecnica: data.empresaTecnica,
+          dataUltimaManutencao: data.dataUltimaManutencao,
+          dataProximaManutencao: proximaStr,
+          periodicidadeDias: data.periodicidadeDias,
+          statusManutencao: 'vencida',
+          diasDiferenca: diffDias,
+        });
+      } else if (proximaStr <= limiteStr) {
+        const diasRestantes = Math.max(0, Math.ceil((dataProxima.getTime() - agora.getTime()) / (1000 * 3600 * 24)));
+        resultado.proximos.push({
+          id: docSnap.id,
+          nome: data.nome,
+          categoria: data.categoria,
+          localizacao_sala: data.localizacao_sala,
+          responsavel_nome: data.responsavel_nome,
+          empresaTecnica: data.empresaTecnica,
+          dataUltimaManutencao: data.dataUltimaManutencao,
+          dataProximaManutencao: proximaStr,
+          periodicidadeDias: data.periodicidadeDias,
+          statusManutencao: 'alerta_proximo',
+          diasRestantes,
+        });
+      } else {
+        resultado.emDia.push({
+          id: docSnap.id,
+          nome: data.nome,
+          categoria: data.categoria,
+          localizacao_sala: data.localizacao_sala,
+          responsavel_nome: data.responsavel_nome,
+          empresaTecnica: data.empresaTecnica,
+          dataUltimaManutencao: data.dataUltimaManutencao,
+          dataProximaManutencao: proximaStr,
+          periodicidadeDias: data.periodicidadeDias,
+          statusManutencao: 'em_dia',
+        });
+      }
+    });
+
+    resultado.totalAlertas = resultado.vencidos.length + resultado.proximos.length + resultado.emManutencao.length;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, COLLECTIONS.BENS_ATIVOS);
+  }
+
+  return resultado;
+}
+
+/**
+ * Registra intervenção de manutenção no bem, atualiza a data da última,
+ * recalcula a próxima com base na periodicidade e arquiva no histórico.
+ */
+export async function registrarNovaManutencao(
+  bemId: string,
+  dados: {
+    tipo: 'preventiva' | 'corretiva' | 'calibracao';
+    descricao: string;
+    custo: number;
+    tecnicoEmpresa: string;
+    periodicidadeDias: number;
+    registradoPor: string;
+    dataRealizacao?: string;
+    laudoUrl?: string;
+    laudoNome?: string;
+  }
+): Promise<{ success: boolean; dataProximaManutencao: string }> {
+  const dataExecucao = dados.dataRealizacao ? new Date(dados.dataRealizacao) : new Date();
+  const proxima = new Date(dataExecucao.getTime() + dados.periodicidadeDias * 86400000);
+  const dataExecucaoStr = dataExecucao.toISOString().slice(0, 10);
+  const dataProximaStr = proxima.toISOString().slice(0, 10);
+
+  const novoHistoricoItem = {
+    id: `manut-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+    dataRealizacao: dataExecucaoStr,
+    tipo: dados.tipo,
+    descricao: dados.descricao,
+    custo: Number(dados.custo) || 0,
+    tecnicoEmpresa: dados.tecnicoEmpresa,
+    laudoUrl: dados.laudoUrl || '',
+    laudoNome: dados.laudoNome || '',
+    registradoPor: dados.registradoPor,
+  };
+
+  try {
+    const bemRef = doc(db, COLLECTIONS.BENS_ATIVOS, bemId);
+    const snap = await getDoc(bemRef);
+    const atual = snap.exists() ? snap.data() : {};
+    const historicoAntigo = atual.historicoManutencoes || [];
+
+    await updateDoc(bemRef, {
+      dataUltimaManutencao: dataExecucaoStr,
+      dataProximaManutencao: dataProximaStr,
+      periodicidadeDias: dados.periodicidadeDias,
+      empresaTecnica: dados.tecnicoEmpresa || atual.empresaTecnica || '',
+      statusManutencao: 'em_dia',
+      estado_conservacao: 'excelente',
+      historicoManutencoes: [novoHistoricoItem, ...historicoAntigo],
+      atualizadoEm: serverTimestamp(),
+    });
+
+    return { success: true, dataProximaManutencao: dataProximaStr };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `${COLLECTIONS.BENS_ATIVOS}/${bemId}`);
+    return { success: false, dataProximaManutencao: dataProximaStr };
+  }
+}
+
+// ==========================================
+// Script de Migração: Promoção de Fabio Lima e Rebaixamento de Admins
+// ==========================================
+
+export async function migrarHierarquiaUsuarios(emailSuperAdmin: string = 'fldslima94@gmail.com') {
+  try {
+    const perfisRef = collection(db, COLLECTIONS.PERFIS);
+    const usuariosRef = collection(db, COLLECTIONS.USUARIOS);
+    const snapshot = await getDocs(perfisRef);
+
+    let totalMigrados = 0;
+    let superAdminDefinido = false;
+
+    const batch = writeBatch(db);
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      const docRef = doc(db, COLLECTIONS.PERFIS, docSnap.id);
+      const userDocRef = doc(db, COLLECTIONS.USUARIOS, docSnap.id);
+
+      const emailMatch = data.email?.toLowerCase().trim() === emailSuperAdmin.toLowerCase().trim();
+      const nameMatch = data.nomeCompleto?.toLowerCase().includes('fabio lima') || data.nome?.toLowerCase().includes('fabio lima');
+
+      // 1. Identificar Fabio Lima como Super Admin ('admin_total')
+      if (emailMatch || nameMatch) {
+        const updateSuper = {
+          cargo: 'Super Admin (Master)',
+          role: 'admin_total' as UserRole,
+          superAdmin: true,
+          permissoesCompletas: true,
+          atualizadoEm: serverTimestamp(),
+        };
+        batch.set(docRef, updateSuper, { merge: true });
+        batch.set(userDocRef, updateSuper, { merge: true });
+        superAdminDefinido = true;
+      } 
+      // 2. Rebaixar qualquer outro admin/gestor para 'admin_local'
+      else if (data.cargo === 'gestor' || data.cargo === 'admin' || data.role === 'admin' || data.role === 'gestor') {
+        const updateLocal = {
+          cargo: 'Admin Local (Gestor)',
+          role: 'admin_local' as UserRole,
+          superAdmin: false,
+          atualizadoEm: serverTimestamp(),
+        };
+        batch.set(docRef, updateLocal, { merge: true });
+        batch.set(userDocRef, updateLocal, { merge: true });
+        totalMigrados++;
+      }
+    });
+
+    await batch.commit();
+
+    return {
+      success: true,
+      superAdminDefinido,
+      adminsRebaixados: totalMigrados,
+    };
+  } catch (error: any) {
+    handleFirestoreError(error, OperationType.WRITE, COLLECTIONS.PERFIS);
+    return {
+      success: false,
+      error: error.message,
+      superAdminDefinido: false,
+      adminsRebaixados: 0,
+    };
+  }
+}
+
+// React Hook para controle de renderização e permissões
+export function usePermissions(currentUser?: UsuarioEquipe | null) {
+  const isAdminTotal = isUserAdminTotal(currentUser);
+  const isAdminLocalOrTotal = isUserAdminLocalOrTotal(currentUser);
+
+  const can = (modulo: keyof PermissoesCustomizadas, acao: string) => {
+    return checkUserCustomPermission(currentUser, modulo, acao);
+  };
+
+  return {
+    isAdminTotal,
+    isAdminLocalOrTotal,
+    can,
+    canDelete: (modulo: keyof PermissoesCustomizadas) => checkUserCustomPermission(currentUser, modulo, 'excluir'),
+    canManageAssets: () => checkUserCustomPermission(currentUser, 'bens', 'gerenciar'),
+  };
+}
+

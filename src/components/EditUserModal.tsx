@@ -19,16 +19,22 @@ import { UsuarioEquipe, UserRole, PermissoesUsuario } from '../types';
 interface EditUserModalProps {
   isOpen: boolean;
   onClose: () => void;
-  usuario: UsuarioEquipe | null;
-  onSaveUser: (updatedUser: UsuarioEquipe) => void;
+  usuario?: UsuarioEquipe | null;
+  user?: UsuarioEquipe | null;
+  onSaveUser?: (updatedUser: UsuarioEquipe) => void;
+  onSave?: (updatedUser: UsuarioEquipe) => void;
 }
 
 export const EditUserModal: React.FC<EditUserModalProps> = ({
   isOpen,
   onClose,
-  usuario,
+  usuario: propUsuario,
+  user: propUser,
   onSaveUser,
+  onSave,
 }) => {
+  const usuario = propUsuario || propUser || null;
+  const saveHandler = onSaveUser || onSave;
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [cargo, setCargo] = useState('Operador');
@@ -93,18 +99,20 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nome.trim() || !email.trim()) return;
+    if (!nome.trim() || !email.trim() || !usuario) return;
 
-    onSaveUser({
-      ...usuario,
-      nome: nome.trim(),
-      email: email.trim(),
-      senha: senha.trim(),
-      cargo: cargo.trim() || (role === 'admin' ? 'Admin' : role === 'operador' ? 'Operador' : 'Cliente'),
-      role,
-      telefone: telefone.trim(),
-      permissoes,
-    });
+    if (saveHandler) {
+      saveHandler({
+        ...usuario,
+        nome: nome.trim(),
+        email: email.trim(),
+        senha: senha.trim(),
+        cargo: cargo.trim() || (role === 'admin' ? 'Admin' : role === 'operador' ? 'Operador' : 'Cliente'),
+        role,
+        telefone: telefone.trim(),
+        permissoes,
+      });
+    }
 
     onClose();
   };

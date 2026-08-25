@@ -14,17 +14,21 @@ import {
   Trash2,
   Sparkles,
   Camera,
-  HeartPulse
+  HeartPulse,
+  Building
 } from 'lucide-react';
 import { Paciente, UsuarioEquipe } from '../types';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
+import { checkUserCustomPermission } from '../services/firebaseService';
 
 interface PatientsViewProps {
   pacientes: Paciente[];
   onOpenNewPatient: () => void;
   onViewPatient: (paciente: Paciente) => void;
   onOpenPackages?: (paciente: Paciente) => void;
-  onDeletePatient?: (id: string) => void;
+  onDeletePatient?: (id: string, motivo?: string) => void;
+  onOpenNewSupplier?: () => void;
+  onGoToSuppliers?: () => void;
   currentUser?: UsuarioEquipe;
 }
 
@@ -34,9 +38,11 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
   onViewPatient,
   onOpenPackages,
   onDeletePatient,
+  onOpenNewSupplier,
+  onGoToSuppliers,
   currentUser,
 }) => {
-  const isGestor = !currentUser || currentUser.role === 'gestor' || currentUser.role === 'admin';
+  const canDelete = checkUserCustomPermission(currentUser, 'clientes', 'excluir');
   const [search, setSearch] = useState('');
   const [patientToDelete, setPatientToDelete] = useState<Paciente | null>(null);
 
@@ -96,13 +102,25 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={onOpenNewPatient}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-sm font-semibold transition-all cursor-pointer shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Cadastrar Nova Ficha</span>
-        </button>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {onOpenNewSupplier && (
+            <button
+              onClick={onOpenNewSupplier}
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold transition-all cursor-pointer shadow-2xs"
+            >
+              <Building className="w-4 h-4 text-amber-600" />
+              <span>+ Novo Fornecedor</span>
+            </button>
+          )}
+
+          <button
+            onClick={onOpenNewPatient}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-sm font-semibold transition-all cursor-pointer shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Cadastrar Nova Ficha</span>
+          </button>
+        </div>
       </div>
 
       {/* Search */}
@@ -215,11 +233,11 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
                     <ChevronRight className="w-3.5 h-3.5" />
                   </button>
 
-                  {isGestor && onDeletePatient && (
+                  {canDelete && onDeletePatient && (
                     <button
                       onClick={() => setPatientToDelete(paciente)}
                       className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                      title="Excluir Ficha"
+                      title="Excluir Ficha (Requer Justificativa de Auditoria)"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -235,12 +253,15 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
         <DeleteConfirmModal
           isOpen={true}
           onClose={() => setPatientToDelete(null)}
-          onConfirm={() => {
-            onDeletePatient(patientToDelete.id);
+          onConfirm={(motivo) => {
+            onDeletePatient(patientToDelete.id, motivo);
             setPatientToDelete(null);
           }}
           title="Excluir Ficha de Cliente"
-          description={`Tem certeza que deseja excluir a ficha de ${patientToDelete.nome}? Esta ação removerá o prontuário e registros associados.`}
+          description={`Tem certeza que deseja excluir o cadastro do cliente? Esta operação será registrada no log de auditoria.`}
+          itemName={patientToDelete.nome}
+          itemCategory="Ficha de Cliente / Prontuário"
+          requireReason={true}
         />
       )}
     </div>
