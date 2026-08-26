@@ -84,6 +84,7 @@ import {
   removeDocument, 
   excluirUsuario,
   isUserAdminTotal,
+  isUserAdminLocalOrTotal,
   executeAtomicCheckout,
   softDeleteTransacao,
   COLLECTIONS 
@@ -302,22 +303,8 @@ export default function App() {
     };
   }, []);
 
-  // Check for auto-triggering Urgent Alert Pop-ups on screen
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    const urgentPopupAviso = avisos.find(a => {
-      if (!a.ativo || !a.exibir_popup) return false;
-      if (a.destinatarios !== 'todos' && a.destinatarios !== currentUser.role) return false;
-      const userAcknowledged = acknowledgedAvisos.includes(`${currentUser.id}_${a.id}`);
-      return !userAcknowledged;
-    });
-
-    if (urgentPopupAviso) {
-      setActivePopupAviso(urgentPopupAviso);
-      setIsPopupModalOpen(true);
-    }
-  }, [isAuthenticated, currentUser.id, currentUser.role, avisos, acknowledgedAvisos]);
+  // Avisos exibidos exclusivamente na aba correspondente (Mural de Avisos), sem pop-up intrusivo ao abrir o app
+  // Conforme solicitação do usuário: "Avisos não devem aparecer ao abrir o app apenas na aba correspondente"
 
   // Unread Notices count
   const unreadNoticesCount = avisos.filter(a => {
@@ -665,23 +652,28 @@ export default function App() {
 
   const handleSaveInventory = (novo: Partial<EstoqueInsumo>) => {
     const createdItem: EstoqueInsumo = {
-      id: `est-${Date.now()}`,
-      nome_item: novo.nome_item!,
-      quantidade: novo.quantidade || 0,
+      id: novo.id || `est-${Date.now()}`,
+      nome_item: novo.nome_item || 'Novo Insumo',
+      quantidade: Number(novo.quantidade) || 0,
       unidade_medida: novo.unidade_medida || 'unidade',
-      alerta_minimo: novo.alerta_minimo || 5,
+      alerta_minimo: Number(novo.alerta_minimo) || 5,
       categoria: novo.categoria || 'Geral',
-      lote: novo.lote,
-      validade: novo.validade,
-      custo_unitario: novo.custo_unitario,
-      marca: novo.marca,
-      tom_cor: novo.tom_cor,
+      lote: novo.lote || undefined,
+      validade: novo.validade || undefined,
+      custo_unitario: novo.custo_unitario !== undefined ? Number(novo.custo_unitario) : undefined,
+      marca: novo.marca || undefined,
+      tom_cor: novo.tom_cor || undefined,
+      cor_tonalidade: novo.cor_tonalidade || undefined,
+      procedimento_vinculado_id: novo.procedimento_vinculado_id || undefined,
+      procedimento_vinculado_nome: novo.procedimento_vinculado_nome || undefined,
+      quantidade_por_procedimento: novo.quantidade_por_procedimento !== undefined ? Number(novo.quantidade_por_procedimento) : undefined,
+      procedimentos_vinculados: novo.procedimentos_vinculados || undefined,
       criado_em: new Date().toISOString(),
     };
 
     setEstoque(prev => [createdItem, ...prev]);
     saveDocument(COLLECTIONS.ESTOQUE, createdItem);
-    showToast(`Insumo/Pigmento "${createdItem.nome_item}" cadastrado!`);
+    showToast(`Insumo "${createdItem.nome_item}" cadastrado no estoque com sucesso!`);
   };
 
   const handleDeleteInventoryItem = (id: string) => {
@@ -751,6 +743,21 @@ export default function App() {
     setDespesasRecorrentes(prev => [created, ...prev]);
     saveDocument(COLLECTIONS.DESPESAS_RECORRENTES, created);
     showToast(`Despesa recorrente "${created.descricao}" cadastrada!`);
+  };
+
+  const handleUpdateDespesaRecorrente = (updated: DespesaRecorrente) => {
+    setDespesasRecorrentes(prev =>
+      prev.map(d => (d.id === updated.id ? updated : d))
+    );
+    saveDocument(COLLECTIONS.DESPESAS_RECORRENTES, updated);
+    showToast(`Despesa recorrente "${updated.descricao}" atualizada com sucesso!`);
+  };
+
+  const handleDeleteDespesaRecorrente = (id: string) => {
+    const target = despesasRecorrentes.find(d => d.id === id);
+    setDespesasRecorrentes(prev => prev.filter(d => d.id !== id));
+    removeDocument(COLLECTIONS.DESPESAS_RECORRENTES, id);
+    showToast(`Despesa recorrente "${target?.descricao || ''}" excluída.`);
   };
 
   const handleToggleDespesaRecorrenteStatus = (id: string) => {
@@ -868,6 +875,34 @@ export default function App() {
       saveDocument(COLLECTIONS.ALERTAS_RETORNO, updated);
     }
     showToast(`Status do alerta atualizado para "${status}"!`);
+  };
+
+  const handleSaveAlertaRetorno = (novoAlerta: Partial<AlertaRetornoPos>) => {
+    const created: AlertaRetornoPos = {
+      id: novoAlerta.id || `alerta-${Date.now()}`,
+      paciente_id: novoAlerta.paciente_id || '',
+      paciente_nome: novoAlerta.paciente_nome || 'Cliente',
+      telefone: novoAlerta.telefone || '',
+      tipo: novoAlerta.tipo || (novoAlerta.origem_venda === 'produto' ? 'pos_venda' : 'retorno'),
+      origem_venda: novoAlerta.origem_venda || (novoAlerta.tipo === 'pos_venda' ? 'produto' : 'servico'),
+      procedimento_origem: novoAlerta.procedimento_origem || novoAlerta.produto_nome || 'Procedimento',
+      produto_nome: novoAlerta.produto_nome,
+      data_procedimento: novoAlerta.data_procedimento || new Date().toISOString(),
+      dias_apos: Number(novoAlerta.dias_apos) || 15,
+      data_ideal_retorno: novoAlerta.data_ideal_retorno || (() => {
+        const d = new Date();
+        d.setDate(d.getDate() + (Number(novoAlerta.dias_apos) || 15));
+        return d.toISOString();
+      })(),
+      motivo: novoAlerta.motivo || (novoAlerta.tipo === 'pos_venda' ? 'Acompanhamento Pós-Venda & Cuidados' : 'Revisão Clínica / Retorno'),
+      observacao: novoAlerta.observacao,
+      status: 'pendente',
+      criado_em: new Date().toISOString(),
+    };
+
+    setAlertasRetorno(prev => [created, ...prev]);
+    saveDocument(COLLECTIONS.ALERTAS_RETORNO, created);
+    showToast(`Lembrete de ${created.tipo === 'pos_venda' ? 'Pós-Venda' : 'Retorno'} cadastrado com sucesso!`);
   };
 
   const handleDeleteAlertaRetorno = (alertaId: string) => {
@@ -1337,6 +1372,8 @@ export default function App() {
               onUpdateTransactionStatus={handleUpdateTransactionStatus}
               onSoftDeleteTransaction={handleSoftDeleteTransaction}
               onAddDespesaRecorrente={handleAddDespesaRecorrente}
+              onUpdateDespesaRecorrente={handleUpdateDespesaRecorrente}
+              onDeleteDespesaRecorrente={handleDeleteDespesaRecorrente}
               onToggleDespesaRecorrenteStatus={handleToggleDespesaRecorrenteStatus}
               currentUser={currentUser}
             />
@@ -1353,8 +1390,10 @@ export default function App() {
           {activeTab === 'retorno_pos' && currentUser.role !== 'cliente' && (
             <PostCareReturnView
               alertas={alertasRetorno}
+              pacientes={pacientes}
               onUpdateAlertaStatus={handleUpdateAlertaStatus}
               onDeleteAlerta={handleDeleteAlertaRetorno}
+              onAddAlerta={handleSaveAlertaRetorno}
               currentUser={currentUser}
               onViewPatientByName={(nome) => {
                 const found = pacientes.find(p => p.nome.toLowerCase() === nome.toLowerCase());
@@ -1367,7 +1406,7 @@ export default function App() {
             />
           )}
 
-          {(activeTab === 'usuarios' || activeTab === 'equipe') && (currentUser.role === 'admin_total' || currentUser.role === 'admin_local' || currentUser.role === 'gestor' || currentUser.role === 'admin') && (
+          {(activeTab === 'usuarios' || activeTab === 'equipe') && (isUserAdminLocalOrTotal(currentUser)) && (
             <UsersManagementView
               usuarios={usuarios}
               currentUser={currentUser}
@@ -1380,7 +1419,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'permissoes' && (currentUser.role === 'admin_total' || currentUser.role === 'admin') && (
+          {activeTab === 'permissoes' && (isUserAdminTotal(currentUser)) && (
             <PermissionsManagementView
               usuarios={usuarios}
               currentUser={currentUser}
@@ -1589,6 +1628,7 @@ export default function App() {
         estoque={estoque}
         onConfirmComplete={handleSaveProcedureCompletion}
         onComplete={handleSaveProcedureCompletion}
+        onSaveAlertaRetorno={handleSaveAlertaRetorno}
       />
 
       <NewAssetModal

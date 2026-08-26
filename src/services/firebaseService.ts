@@ -133,12 +133,35 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   console.warn(`[Firestore Info - ${operationType}] em ${path}:`, errInfo.error);
 }
 
+// Helper to remove undefined properties recursively for Firestore compatibility
+export function sanitizeForFirestore<T>(data: T): T {
+  if (data === null || data === undefined) {
+    return data;
+  }
+  if (Array.isArray(data)) {
+    return data
+      .filter(item => item !== undefined)
+      .map(item => sanitizeForFirestore(item)) as unknown as T;
+  }
+  if (typeof data === 'object' && !(data instanceof Date)) {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        cleaned[key] = sanitizeForFirestore(value);
+      }
+    }
+    return cleaned as T;
+  }
+  return data;
+}
+
 // Firestore generic save/update helper
 export async function saveDocument<T extends { id: string }>(collectionName: string, item: T): Promise<void> {
   const docPath = `${collectionName}/${item.id}`;
   try {
     const docRef = doc(db, collectionName, item.id);
-    await setDoc(docRef, item, { merge: true });
+    const sanitized = sanitizeForFirestore(item);
+    await setDoc(docRef, sanitized, { merge: true });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, docPath);
   }
@@ -669,20 +692,30 @@ export async function excluirUsuario(usuarioId: string): Promise<{ success: bool
   }
 }
 
-// Permission & Role Helper Checking Utilities
+// Permission & Role Helper Checking Utilities (Hierarquia: Admin Master > Admin Local > Usuário > Cliente)
 export function isUserAdminTotal(user?: UsuarioEquipe | null): boolean {
   if (!user) return false;
   return (
+    user.role === 'admin_master' || 
     user.role === 'admin_total' || 
     user.role === 'admin' || 
     user.email === 'fldslima94@gmail.com' ||
-    Boolean(user.cargo && user.cargo.toLowerCase().includes('super admin'))
+    Boolean(user.cargo && (user.cargo.toLowerCase().includes('master') || user.cargo.toLowerCase().includes('super admin')))
   );
+}
+
+export function isUserAdminMaster(user?: UsuarioEquipe | null): boolean {
+  return isUserAdminTotal(user);
 }
 
 export function isUserAdminLocalOrTotal(user?: UsuarioEquipe | null): boolean {
   if (!user) return false;
-  return user.role === 'admin_total' || user.role === 'admin_local' || user.role === 'gestor' || user.role === 'admin';
+  return (
+    isUserAdminTotal(user) || 
+    user.role === 'admin_local' || 
+    user.role === 'gestor' ||
+    Boolean(user.cargo && user.cargo.toLowerCase().includes('admin local'))
+  );
 }
 
 export function checkUserCustomPermission(
@@ -692,42 +725,47 @@ export function checkUserCustomPermission(
 ): boolean {
   if (!user) return false;
   
-  // admin_total always has full privileges across all modules
-  if (user.role === 'admin_total') return true;
+  // 1. Admin Master always has full irrevocable privileges across all modules
+  if (isUserAdminTotal(user)) return true;
 
-  // Custom permissions matrix check
+  // 2. Cliente has restricted portal-only access
+  if (user.role === 'cliente') {
+    if (modulo === 'orcamentos') return true;
+    return false;
+  }
+
+  // 3. Custom permissions matrix check (configured by Master or Local)
   if (user.permissoesCustomizadas && (user.permissoesCustomizadas as any)[modulo]) {
     const val = (user.permissoesCustomizadas as any)[modulo][acao];
     if (typeof val === 'boolean') return val;
   }
 
-  // Fallback defaults based on role & legacy flags
+  // 4. Fallback defaults based on role & hierarchy
   if (modulo === 'financeiro') {
-    if (acao === 'excluir') return false; // Only explicitly granted or admin_total can delete
-    if (user.role === 'admin_local' || user.role === 'gestor' || user.role === 'admin') return true;
-    if (acao === 'verEntradas' && user.role === 'recepcao') return true;
+    if (acao === 'excluir') return false; // Only explicitly granted or admin_master can delete
+    if (user.role === 'admin_local' || user.role === 'gestor') return true;
+    if (acao === 'verEntradas' && (user.role === 'recepcao' || user.role === 'usuario')) return true;
     return Boolean(user.permissoes?.ver_financeiro_completo);
   }
 
   if (modulo === 'clientes') {
-    if (acao === 'excluir') return false;
-    if (user.role === 'cliente') return false;
+    if (acao === 'excluir') return isUserAdminTotal(user);
     return true;
   }
 
   if (modulo === 'procedimentos') {
     if (acao === 'verCustos' || acao === 'verMargem') return isUserAdminLocalOrTotal(user);
-    if (acao === 'excluir') return false;
+    if (acao === 'excluir') return isUserAdminTotal(user);
     return true;
   }
 
   if (modulo === 'bens') {
-    if (acao === 'excluir') return false;
+    if (acao === 'excluir') return isUserAdminTotal(user);
     return isUserAdminLocalOrTotal(user);
   }
 
   if (modulo === 'estoque') {
-    if (acao === 'excluir') return false;
+    if (acao === 'excluir') return isUserAdminTotal(user);
     return isUserAdminLocalOrTotal(user);
   }
 

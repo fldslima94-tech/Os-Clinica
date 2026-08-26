@@ -3,10 +3,21 @@ export type UnidadeMedida = 'ml' | 'unidade' | 'unidades' | 'seringa' | 'seringa
 export type FormaPagamento = 'pix' | 'cartao_credito' | 'cartao_debito' | 'dinheiro' | 'transferencia' | 'boleto';
 export type StatusPagamento = 'pago' | 'pendente' | 'parcial' | 'estornado';
 
-// RBAC: admin_total (Super Admin / Master), admin_local (Gestor), recepcao, profissional, cliente
-export type UserRole = 'admin_total' | 'admin_local' | 'recepcao' | 'profissional' | 'cliente' | 'gestor' | 'admin' | 'operador';
+// RBAC Hierarquia: admin_master / admin_total (Master Total), admin_local (Admin Local / Gestor), usuario / profissional / recepcao / operador (Usuário da Equipe), cliente (Portal do Paciente)
+export type UserRole = 
+  | 'admin_master' 
+  | 'admin_total' 
+  | 'admin_local' 
+  | 'usuario' 
+  | 'profissional' 
+  | 'recepcao' 
+  | 'cliente' 
+  | 'gestor' 
+  | 'admin' 
+  | 'operador';
 
 export interface PermissoesCustomizadas {
+  modulosLiberados?: string[]; // Ex: ['dashboard', 'agendamentos', 'pacientes', 'estoque', 'financeiro', 'patrimonio', 'fornecedores', 'whatsapp', 'quadro_avisos', 'portal_paciente']
   financeiro: { 
     verEntradas: boolean; 
     verSaidas: boolean; 
@@ -163,12 +174,17 @@ export interface AlertaRetornoPos {
   paciente_id: string;
   paciente_nome: string;
   telefone: string;
+  tipo?: 'retorno' | 'pos_venda'; // 'retorno': Retorno Clínico | 'pos_venda': Pós-Venda de Produto / Home Care
+  origem_venda?: 'produto' | 'servico' | 'procedimento';
   procedimento_origem: string;
+  produto_nome?: string;
   data_procedimento: string;
   dias_apos: number;
   data_ideal_retorno: string;
   motivo: string;
+  observacao?: string;
   status: 'pendente' | 'agendado' | 'contatado';
+  criado_em?: string;
 }
 
 export interface PermissoesUsuario {
@@ -619,14 +635,31 @@ export interface Fornecedor {
   razao_social: string; // Nome ou Razão Social
   nome_fantasia?: string;
   cnpj_cpf?: string;
+  inscricao_estadual?: string;
   telefone: string;
   email?: string;
+  site?: string;
   categoria: CategoriaFornecedor | string;
   contato_responsavel?: string;
+  cargo_contato?: string;
+  // Endereço completo padronizado
+  cep?: string;
   endereco?: string;
+  numero?: string;
+  complemento?: string;
+  bairro?: string;
+  cidade?: string;
+  uf?: string;
   cidade_uf?: string;
+  // Dados Bancários & Condições Comerciais
   pix_chave?: string;
+  tipo_chave_pix?: string;
   banco_dados?: string;
+  banco_nome?: string;
+  agencia?: string;
+  conta_corrente?: string;
+  condicoes_pagamento?: string;
+  prazo_entrega_medio?: string;
   observacoes?: string;
   status?: 'ativo' | 'inativo';
   criado_em: string;

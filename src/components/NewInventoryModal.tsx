@@ -17,16 +17,21 @@ import { EstoqueInsumo, UnidadeMedida, ProcedimentoClinico, VinculoProcedimentoI
 interface NewInventoryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSaveInventory: (novoInsumo: Partial<EstoqueInsumo>) => void;
+  onSave?: (novoInsumo: Partial<EstoqueInsumo>) => void;
+  onSaveInventory?: (novoInsumo: Partial<EstoqueInsumo>) => void;
+  procedimentos?: ProcedimentoClinico[];
   procedimentosDisponiveis?: ProcedimentoClinico[];
 }
 
 export const NewInventoryModal: React.FC<NewInventoryModalProps> = ({
   isOpen,
   onClose,
+  onSave,
   onSaveInventory,
+  procedimentos = [],
   procedimentosDisponiveis = [],
 }) => {
+  const listaProcedimentos = procedimentosDisponiveis.length > 0 ? procedimentosDisponiveis : procedimentos;
   const [nomeItem, setNomeItem] = useState('');
   const [quantidade, setQuantidade] = useState<number>(10);
   const [unidadeMedida, setUnidadeMedida] = useState<UnidadeMedida>('unidade');
@@ -41,6 +46,7 @@ export const NewInventoryModal: React.FC<NewInventoryModalProps> = ({
     return d.toISOString().slice(0, 10);
   });
   const [custoUnitario, setCustoUnitario] = useState<number>(150);
+  const [formError, setFormError] = useState('');
 
   // Vínculo com Procedimento Cadastrado & Consumo por Procedimento
   const [procedimentoVinculadoId, setProcedimentoVinculadoId] = useState<string>('');
@@ -53,7 +59,7 @@ export const NewInventoryModal: React.FC<NewInventoryModalProps> = ({
 
   const handleAddVinculoExtra = (procId: string) => {
     if (!procId) return;
-    const proc = procedimentosDisponiveis.find(p => p.id === procId);
+    const proc = listaProcedimentos.find(p => p.id === procId);
     if (!proc) return;
     if (vinculosExtras.some(v => v.procedimento_id === procId) || procId === procedimentoVinculadoId) return;
 
@@ -80,9 +86,19 @@ export const NewInventoryModal: React.FC<NewInventoryModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nomeItem.trim()) return;
+    setFormError('');
+    if (!nomeItem.trim()) {
+      setFormError('Por favor, informe o nome do item / insumo.');
+      return;
+    }
 
-    const procPrincipal = procedimentosDisponiveis.find(p => p.id === procedimentoVinculadoId);
+    const saveFn = onSave || onSaveInventory;
+    if (!saveFn) {
+      console.error('Nenhuma função onSave/onSaveInventory repassada.');
+      return;
+    }
+
+    const procPrincipal = listaProcedimentos.find(p => p.id === procedimentoVinculadoId);
 
     const todosVinculos: VinculoProcedimentoInsumo[] = [];
     if (procPrincipal) {
@@ -102,13 +118,14 @@ export const NewInventoryModal: React.FC<NewInventoryModalProps> = ({
       }
     });
 
-    onSaveInventory({
+    saveFn({
       nome_item: nomeItem.trim(),
       quantidade: Number(quantidade) || 0,
       unidade_medida: unidadeMedida,
       alerta_minimo: Number(alertaMinimo) || 5,
       categoria: categoria.trim() || undefined,
       marca: marca.trim() || undefined,
+      tom_cor: corTonalidade.trim() || undefined,
       cor_tonalidade: corTonalidade.trim() || undefined,
       lote: lote.trim() || undefined,
       validade: validade || undefined,
@@ -149,6 +166,14 @@ export const NewInventoryModal: React.FC<NewInventoryModalProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Error Alert */}
+        {formError && (
+          <div className="mx-6 mt-4 p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2.5 text-rose-700 text-xs font-semibold animate-in fade-in">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
+            <span>{formError}</span>
+          </div>
+        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs sm:text-sm max-h-[80vh] overflow-y-auto">

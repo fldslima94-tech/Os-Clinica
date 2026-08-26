@@ -10,14 +10,19 @@ import {
   Plus,
   Trash2,
   Sparkles,
-  Receipt
+  Receipt,
+  Calendar,
+  Clock,
+  HeartHandshake,
+  Tag
 } from 'lucide-react';
 import { 
   Agendamento, 
   EstoqueInsumo, 
   FormaPagamento, 
   InsumoConsumido, 
-  StatusPagamento 
+  StatusPagamento,
+  AlertaRetornoPos
 } from '../types';
 import { RECEITA_INSUMOS_PADRAO } from '../data/mockData';
 
@@ -34,7 +39,8 @@ export interface CompleteProcedureModalProps {
       forma: FormaPagamento;
       status: StatusPagamento;
       observacao?: string;
-    }
+    },
+    dataRetornoSugerida?: string
   ) => void;
   onComplete?: (
     agendamentoOrId: any,
@@ -44,8 +50,10 @@ export interface CompleteProcedureModalProps {
       forma: FormaPagamento;
       status: StatusPagamento;
       observacao?: string;
-    }
+    },
+    dataRetornoSugerida?: string
   ) => void;
+  onSaveAlertaRetorno?: (alerta: Partial<AlertaRetornoPos>) => void;
 }
 
 export const CompleteProcedureModal: React.FC<CompleteProcedureModalProps> = ({
@@ -55,6 +63,7 @@ export const CompleteProcedureModal: React.FC<CompleteProcedureModalProps> = ({
   estoque,
   onConfirmComplete,
   onComplete,
+  onSaveAlertaRetorno,
 }) => {
   const [insumosUsados, setInsumosUsados] = useState<InsumoConsumido[]>([]);
   const [valorFinal, setValorFinal] = useState<number>(0);
@@ -63,12 +72,22 @@ export const CompleteProcedureModal: React.FC<CompleteProcedureModalProps> = ({
   const [observacaoPagamento, setObservacaoPagamento] = useState('');
   const [selectedInsumoToAdd, setSelectedInsumoToAdd] = useState('');
 
+  // Acompanhamento Pós-Procedimento / Venda
+  const [gerarAcompanhamento, setGerarAcompanhamento] = useState(true);
+  const [tipoAcompanhamento, setTipoAcompanhamento] = useState<'retorno' | 'pos_venda'>('retorno');
+  const [diasAcompanhamento, setDiasAcompanhamento] = useState<number>(15);
+  const [motivoAcompanhamento, setMotivoAcompanhamento] = useState('');
+
   useEffect(() => {
     if (agendamento) {
       setValorFinal(agendamento.valor_estimado || 0);
       setFormaPagamento(agendamento.forma_pagamento || 'pix');
       setStatusPagamento(agendamento.status_pagamento || 'pago');
       setObservacaoPagamento('');
+      setGerarAcompanhamento(true);
+      setTipoAcompanhamento('retorno');
+      setDiasAcompanhamento(15);
+      setMotivoAcompanhamento(`Revisão de 15 dias de ${agendamento.procedimento}`);
 
       // Check if this procedure has a default recipe in mockData
       const receita = RECEITA_INSUMOS_PADRAO[agendamento.procedimento];
@@ -85,11 +104,31 @@ export const CompleteProcedureModal: React.FC<CompleteProcedureModalProps> = ({
         });
         setInsumosUsados(mapped);
       } else {
-        // Fallback or empty
         setInsumosUsados([]);
       }
     }
   }, [agendamento, estoque, isOpen]);
+
+  // Update default motivo when tipo or days change
+  const handleTipoChange = (novoTipo: 'retorno' | 'pos_venda') => {
+    setTipoAcompanhamento(novoTipo);
+    if (!agendamento) return;
+    if (novoTipo === 'retorno') {
+      setMotivoAcompanhamento(`Revisão de ${diasAcompanhamento} dias de ${agendamento.procedimento}`);
+    } else {
+      setMotivoAcompanhamento(`Pós-venda & Acompanhamento de cuidados/home care (${agendamento.procedimento})`);
+    }
+  };
+
+  const handleDiasChange = (dias: number) => {
+    setDiasAcompanhamento(dias);
+    if (!agendamento) return;
+    if (tipoAcompanhamento === 'retorno') {
+      setMotivoAcompanhamento(`Revisão de ${dias} dias de ${agendamento.procedimento}`);
+    } else {
+      setMotivoAcompanhamento(`Pós-venda (${dias} dias) & Acompanhamento de cuidados/home care`);
+    }
+  };
 
   if (!isOpen || !agendamento) return null;
 
@@ -98,7 +137,6 @@ export const CompleteProcedureModal: React.FC<CompleteProcedureModalProps> = ({
     const item = estoque.find(e => e.id === selectedInsumoToAdd);
     if (!item) return;
 
-    // Check if already in list
     const existingIndex = insumosUsados.findIndex(i => i.insumo_id === item.id);
     if (existingIndex >= 0) {
       const copy = [...insumosUsados];
@@ -138,41 +176,70 @@ export const CompleteProcedureModal: React.FC<CompleteProcedureModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!agendamento) return;
+
     const paymentData = {
       valor: valorFinal,
       forma: formaPagamento,
       status: statusPagamento,
       observacao: observacaoPagamento,
     };
+
+    // Calculate ideal return/post-sale date
+    let dataIdealStr: string | undefined = undefined;
+    if (gerarAcompanhamento) {
+      const targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() + Number(diasAcompanhamento));
+      dataIdealStr = targetDate.toISOString();
+
+      if (onSaveAlertaRetorno) {
+        onSaveAlertaRetorno({
+          paciente_id: agendamento.paciente_id,
+          paciente_nome: agendamento.paciente?.nome || 'Cliente',
+          telefone: agendamento.paciente?.telefone || '',
+          tipo: tipoAcompanhamento,
+          origem_venda: 'procedimento',
+          procedimento_origem: agendamento.procedimento,
+          data_procedimento: new Date().toISOString(),
+          dias_apos: diasAcompanhamento,
+          data_ideal_retorno: dataIdealStr,
+          motivo: motivoAcompanhamento.trim() || (tipoAcompanhamento === 'retorno' ? 'Revisão Clínica' : 'Pós-Venda & Cuidados'),
+          status: 'pendente',
+        });
+      }
+    }
+
     if (typeof onConfirmComplete === 'function') {
       onConfirmComplete(
         agendamento.id,
         insumosUsados,
-        paymentData
+        paymentData,
+        dataIdealStr
       );
     } else if (typeof onComplete === 'function') {
       onComplete(
         agendamento,
         insumosUsados,
-        paymentData
+        paymentData,
+        dataIdealStr
       );
     }
+
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 my-6">
         
         {/* Header */}
-        <div className="p-5 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-slate-100 bg-slate-50 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-emerald-600 text-white shadow-xs">
+            <div className="p-2 rounded-xl bg-emerald-600 text-white shadow-xs">
               <CheckCircle2 className="w-5 h-5" />
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900">
-                Finalizar Procedimento & Dar Baixa
+                Finalizar Procedimento, Baixa & Checkout
               </h3>
               <p className="text-xs text-slate-500 font-medium mt-0.5">
                 Paciente: <strong className="text-slate-800">{agendamento.paciente?.nome || 'Paciente'}</strong> • {agendamento.procedimento}
@@ -189,11 +256,11 @@ export const CompleteProcedureModal: React.FC<CompleteProcedureModalProps> = ({
         </div>
 
         {/* Content Body */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 flex-1 text-xs sm:text-sm">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1 text-xs sm:text-sm">
           
           {/* Section 1: Insumos consumidos */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
                 <Package className="w-4 h-4 text-indigo-600" />
                 <span>1. Baixa Automática de Insumos no Estoque</span>
@@ -204,7 +271,7 @@ export const CompleteProcedureModal: React.FC<CompleteProcedureModalProps> = ({
             </div>
 
             {insumosUsados.length === 0 ? (
-              <div className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center text-slate-500 text-xs">
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center text-slate-500 text-xs">
                 Nenhum insumo selecionado para baixa automática neste procedimento.
               </div>
             ) : (
@@ -294,12 +361,10 @@ export const CompleteProcedureModal: React.FC<CompleteProcedureModalProps> = ({
             </div>
           </div>
 
-          <hr className="border-slate-100" />
-
-          {/* Section 2: Informações de Pagamento */}
+          {/* Section 2: Registro Financeiro */}
           <div className="space-y-4">
-            <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
-              <CreditCard className="w-4 h-4 text-indigo-600" />
+            <div className="flex items-center gap-2 font-bold text-slate-900 text-sm border-b border-slate-100 pb-2">
+              <CreditCard className="w-4 h-4 text-emerald-600" />
               <span>2. Registro Financeiro & Meio de Pagamento</span>
             </div>
 
@@ -338,6 +403,7 @@ export const CompleteProcedureModal: React.FC<CompleteProcedureModalProps> = ({
                   <option value="cartao_debito">Cartão de Débito</option>
                   <option value="dinheiro">Dinheiro em Espécie</option>
                   <option value="transferencia">Transferência / TED</option>
+                  <option value="boleto">Boleto Bancário</option>
                 </select>
               </div>
             </div>
@@ -379,7 +445,7 @@ export const CompleteProcedureModal: React.FC<CompleteProcedureModalProps> = ({
                 </label>
                 <input
                   type="text"
-                  placeholder="Ex: Parcelado em 3x, comprovante salvo..."
+                  placeholder="Ex: 3x sem juros, comprovante anexo..."
                   value={observacaoPagamento}
                   onChange={(e) => setObservacaoPagamento(e.target.value)}
                   className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
@@ -388,8 +454,112 @@ export const CompleteProcedureModal: React.FC<CompleteProcedureModalProps> = ({
             </div>
           </div>
 
+          {/* Section 3: Acompanhamento (Retorno Clínico vs Pós-Venda) */}
+          <div className="space-y-3 bg-gradient-to-br from-indigo-50/50 via-slate-50 to-purple-50/50 p-4 rounded-xl border border-indigo-100">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
+                <HeartHandshake className="w-4 h-4 text-indigo-600" />
+                <span>3. Configurar Acompanhamento (Retorno / Pós-Venda)</span>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={gerarAcompanhamento}
+                  onChange={(e) => setGerarAcompanhamento(e.target.checked)}
+                  className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                />
+                <span className="text-xs font-semibold text-slate-700">Ativar Lembrete</span>
+              </label>
+            </div>
+
+            {gerarAcompanhamento && (
+              <div className="space-y-3 pt-2">
+                {/* Switch Retorno Clínico vs Pós-Venda */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Caso do Acompanhamento:
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleTipoChange('retorno')}
+                      className={`p-2.5 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
+                        tipoAcompanhamento === 'retorno'
+                          ? 'bg-blue-50 border-blue-300 text-blue-900 shadow-2xs'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className={`p-1.5 rounded-lg ${tipoAcompanhamento === 'retorno' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                        <Calendar className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <span className="block font-bold text-xs">🔵 Retorno Clínico</span>
+                        <span className="block text-[11px] text-slate-500 mt-0.5">Revisão, retoque ou avaliação de procedimento</span>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleTipoChange('pos_venda')}
+                      className={`p-2.5 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
+                        tipoAcompanhamento === 'pos_venda'
+                          ? 'bg-purple-50 border-purple-300 text-purple-900 shadow-2xs'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className={`p-1.5 rounded-lg ${tipoAcompanhamento === 'pos_venda' ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                        <Sparkles className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <span className="block font-bold text-xs">🟣 Pós-Venda</span>
+                        <span className="block text-[11px] text-slate-500 mt-0.5">Fidelização, satisfação e acompanhamento de home care</span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Prazo em dias */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Prazo do Acompanhamento:
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {[7, 15, 21, 30, 45, 60].map((dias) => (
+                      <button
+                        key={dias}
+                        type="button"
+                        onClick={() => handleDiasChange(dias)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                          diasAcompanhamento === dias
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        {dias} dias
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Motivo */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Motivo / Mensagem do Lembrete
+                  </label>
+                  <input
+                    type="text"
+                    value={motivoAcompanhamento}
+                    onChange={(e) => setMotivoAcompanhamento(e.target.value)}
+                    placeholder="Ex: Revisão de 15 dias de Toxina Botulínica"
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Footer Submit Buttons */}
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+          <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3 shrink-0">
             <button
               type="button"
               onClick={onClose}

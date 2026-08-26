@@ -24,7 +24,9 @@ import {
   FileText,
   Building,
   Sparkles,
-  Info
+  Info,
+  Edit3,
+  Save
 } from 'lucide-react';
 import { 
   TransacaoFinanceira, 
@@ -44,6 +46,8 @@ interface FinancialViewProps {
   onUpdateTransactionStatus: (id: string, status: StatusPagamento) => void;
   onSoftDeleteTransaction?: (id: string, motivo: string) => void;
   onAddDespesaRecorrente?: (nova: Omit<DespesaRecorrente, 'id'>) => void;
+  onUpdateDespesaRecorrente?: (despesa: DespesaRecorrente) => void;
+  onDeleteDespesaRecorrente?: (id: string) => void;
   onToggleDespesaRecorrenteStatus?: (id: string) => void;
   currentUser?: UsuarioEquipe;
 }
@@ -56,6 +60,8 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
   onUpdateTransactionStatus,
   onSoftDeleteTransaction,
   onAddDespesaRecorrente,
+  onUpdateDespesaRecorrente,
+  onDeleteDespesaRecorrente,
   onToggleDespesaRecorrenteStatus,
   currentUser,
 }) => {
@@ -95,6 +101,18 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
   const [recValor, setRecValor] = useState<number>(0);
   const [recDiaVencimento, setRecDiaVencimento] = useState<number>(10);
   const [recForma, setRecForma] = useState<FormaPagamento>('boleto');
+
+  // Edit Recurring Expense State
+  const [editingDespesa, setEditingDespesa] = useState<DespesaRecorrente | null>(null);
+  const [editDescricao, setEditDescricao] = useState('');
+  const [editCategoria, setEditCategoria] = useState<DespesaRecorrente['categoria']>('aluguel');
+  const [editValor, setEditValor] = useState<number>(0);
+  const [editDiaVencimento, setEditDiaVencimento] = useState<number>(10);
+  const [editForma, setEditForma] = useState<FormaPagamento>('boleto');
+  const [editRecorrencia, setEditRecorrencia] = useState<'mensal' | 'anual' | 'semanal'>('mensal');
+  const [editStatus, setEditStatus] = useState<'ativo' | 'inativo'>('ativo');
+  const [editObs, setEditObs] = useState('');
+  const [despesaToDelete, setDespesaToDelete] = useState<DespesaRecorrente | null>(null);
 
   // Filter Active (Non-deleted) vs Soft-deleted Transactions
   const activeTransacoes = transacoes.filter(t => !t.excluido);
@@ -170,6 +188,44 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
     setIsNewRecorrenteModalOpen(false);
     setRecDescricao('');
     setRecValor(0);
+  };
+
+  const handleStartEditDespesa = (desp: DespesaRecorrente) => {
+    setEditingDespesa(desp);
+    setEditDescricao(desp.descricao);
+    setEditCategoria(desp.categoria);
+    setEditValor(desp.valor);
+    setEditDiaVencimento(desp.dia_vencimento);
+    setEditForma(desp.forma_pagamento_preferencial);
+    setEditRecorrencia(desp.recorrencia || 'mensal');
+    setEditStatus(desp.status);
+    setEditObs(desp.observacoes || '');
+  };
+
+  const handleSaveEditDespesa = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDespesa || !editDescricao.trim() || editValor <= 0 || !onUpdateDespesaRecorrente) return;
+
+    const updated: DespesaRecorrente = {
+      ...editingDespesa,
+      descricao: editDescricao.trim(),
+      categoria: editCategoria,
+      valor: Number(editValor),
+      dia_vencimento: Number(editDiaVencimento),
+      forma_pagamento_preferencial: editForma,
+      recorrencia: editRecorrencia,
+      status: editStatus,
+      observacoes: editObs.trim() || undefined,
+    };
+
+    onUpdateDespesaRecorrente(updated);
+    setEditingDespesa(null);
+  };
+
+  const handleConfirmDeleteDespesa = () => {
+    if (!despesaToDelete || !onDeleteDespesaRecorrente) return;
+    onDeleteDespesaRecorrente(despesaToDelete.id);
+    setDespesaToDelete(null);
   };
 
   const handleConfirmSoftDelete = (e: React.FormEvent) => {
@@ -507,7 +563,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
               {despesasRecorrentes.map((desp) => (
                 <div 
                   key={desp.id}
-                  className="bg-slate-50 rounded-2xl border border-slate-200 p-4 flex flex-col justify-between"
+                  className="bg-slate-50 rounded-2xl border border-slate-200 p-4 flex flex-col justify-between hover:shadow-xs transition-shadow"
                 >
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-2">
@@ -530,22 +586,51 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
                     <div className="mt-3 space-y-1 text-xs text-slate-600">
                       <p>Vencimento todo <strong>dia {desp.dia_vencimento}</strong> de cada mês</p>
                       <p>Forma de Pgto: <strong>{getFormaLabel(desp.forma_pagamento_preferencial)}</strong></p>
+                      {desp.observacoes && (
+                        <p className="text-[11px] text-slate-500 italic line-clamp-1">
+                          {desp.observacoes}
+                        </p>
+                      )}
                     </div>
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between">
+                  <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between gap-2">
                     <span className="text-base font-bold text-rose-700">
                       {formatCurrency(desp.valor)}
                     </span>
 
-                    {onToggleDespesaRecorrenteStatus && (
+                    <div className="flex items-center gap-1.5">
                       <button
-                        onClick={() => onToggleDespesaRecorrenteStatus(desp.id)}
-                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                        type="button"
+                        onClick={() => handleStartEditDespesa(desp)}
+                        className="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer text-xs font-semibold flex items-center gap-1 border border-slate-200 bg-white"
+                        title="Editar Valores e Dados da Despesa"
                       >
-                        {desp.status === 'ativo' ? 'Pausar' : 'Reativar'}
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>Editar</span>
                       </button>
-                    )}
+
+                      {onToggleDespesaRecorrenteStatus && (
+                        <button
+                          type="button"
+                          onClick={() => onToggleDespesaRecorrenteStatus(desp.id)}
+                          className="px-2 py-1 text-[11px] font-semibold text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors cursor-pointer"
+                        >
+                          {desp.status === 'ativo' ? 'Pausar' : 'Ativar'}
+                        </button>
+                      )}
+
+                      {onDeleteDespesaRecorrente && canDelete && (
+                        <button
+                          type="button"
+                          onClick={() => setDespesaToDelete(desp)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          title="Excluir Despesa Recorrente"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -553,6 +638,213 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Edit Recurring Expense Modal */}
+      {editingDespesa && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95">
+            <div className="p-5 border-b border-slate-100 bg-indigo-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Edit3 className="w-5 h-5 text-indigo-300" />
+                <h3 className="text-base font-bold">Editar Despesa Recorrente</h3>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setEditingDespesa(null)} 
+                className="text-indigo-200 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditDespesa} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Descrição da Conta / Despesa *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Aluguel da Clínica, Enel Energia, Internet Fibra..."
+                  value={editDescricao}
+                  onChange={(e) => setEditDescricao(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Categoria
+                  </label>
+                  <select
+                    value={editCategoria}
+                    onChange={(e) => setEditCategoria(e.target.value as DespesaRecorrente['categoria'])}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                  >
+                    <option value="aluguel">Aluguel / Imóvel</option>
+                    <option value="energia">Energia Elétrica</option>
+                    <option value="internet">Internet / Telefonia</option>
+                    <option value="software">Sistemas & Software</option>
+                    <option value="contabilidade">Contabilidade</option>
+                    <option value="marketing">Marketing & Tráfego</option>
+                    <option value="manutencao">Manutenção Predial</option>
+                    <option value="limpeza">Limpeza & Higiene</option>
+                    <option value="outros">Outros</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Dia de Vencimento (1 a 31)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="31"
+                    required
+                    value={editDiaVencimento}
+                    onChange={(e) => setEditDiaVencimento(parseInt(e.target.value) || 1)}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Valor Mensal (R$) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    value={editValor || ''}
+                    onChange={(e) => setEditValor(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-rose-700"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Forma de Pagamento
+                  </label>
+                  <select
+                    value={editForma}
+                    onChange={(e) => setEditForma(e.target.value as FormaPagamento)}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                  >
+                    <option value="boleto">Boleto Bancário</option>
+                    <option value="pix">Pix Instantâneo</option>
+                    <option value="cartao_credito">Cartão de Crédito</option>
+                    <option value="cartao_debito">Cartão de Débito</option>
+                    <option value="transferencia">Transferência Bancária</option>
+                    <option value="dinheiro">Dinheiro</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Recorrência
+                  </label>
+                  <select
+                    value={editRecorrencia}
+                    onChange={(e) => setEditRecorrencia(e.target.value as any)}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                  >
+                    <option value="mensal">Mensal</option>
+                    <option value="anual">Anual</option>
+                    <option value="semanal">Semanal</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value as any)}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                  >
+                    <option value="ativo">Ativo</option>
+                    <option value="inativo">Inativo / Pausado</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Observações Internas (Opcional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Ex: Código do cliente na concessionária, link do portal, etc..."
+                  value={editObs}
+                  onChange={(e) => setEditObs(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                />
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingDespesa(null)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Salvar Alterações</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Recurring Expense Confirmation Modal */}
+      {despesaToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full border border-slate-200 shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mb-4">
+              <Trash2 className="w-6 h-6" />
+            </div>
+
+            <h3 className="text-lg font-bold text-slate-900">
+              Excluir Despesa Recorrente?
+            </h3>
+            
+            <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+              Você está prestes a excluir o item recorrente <strong>"{despesaToDelete.descricao}"</strong> no valor de <strong>{formatCurrency(despesaToDelete.valor)}</strong>. Esta ação removerá a conta das projeções automáticas.
+            </p>
+
+            <div className="mt-6 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setDespesaToDelete(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteDespesa}
+                className="px-5 py-2 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-xs transition-colors cursor-pointer"
+              >
+                Confirmar Exclusão
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mandatory Soft Delete Audit Modal */}
       {txToDelete && (
