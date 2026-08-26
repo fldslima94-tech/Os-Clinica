@@ -649,10 +649,35 @@ export async function salvarPermissoesUsuario(
   }
 }
 
+// Excluir usuário com acesso ao sistema (Super Admin)
+export async function excluirUsuario(usuarioId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const userRef = doc(db, COLLECTIONS.USUARIOS, usuarioId);
+    const perfilRef = doc(db, COLLECTIONS.PERFIS, usuarioId);
+
+    await deleteDoc(userRef);
+    try {
+      await deleteDoc(perfilRef);
+    } catch {
+      // Perfil doc might be optional
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    handleFirestoreError(error, OperationType.DELETE, `${COLLECTIONS.USUARIOS}/${usuarioId}`);
+    return { success: false, error: error.message };
+  }
+}
+
 // Permission & Role Helper Checking Utilities
 export function isUserAdminTotal(user?: UsuarioEquipe | null): boolean {
   if (!user) return false;
-  return user.role === 'admin_total';
+  return (
+    user.role === 'admin_total' || 
+    user.role === 'admin' || 
+    user.email === 'fldslima94@gmail.com' ||
+    Boolean(user.cargo && user.cargo.toLowerCase().includes('super admin'))
+  );
 }
 
 export function isUserAdminLocalOrTotal(user?: UsuarioEquipe | null): boolean {

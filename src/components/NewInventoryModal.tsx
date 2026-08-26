@@ -32,6 +32,8 @@ export const NewInventoryModal: React.FC<NewInventoryModalProps> = ({
   const [unidadeMedida, setUnidadeMedida] = useState<UnidadeMedida>('unidade');
   const [alertaMinimo, setAlertaMinimo] = useState<number>(5);
   const [categoria, setCategoria] = useState('Injetáveis');
+  const [marca, setMarca] = useState('');
+  const [corTonalidade, setCorTonalidade] = useState('');
   const [lote, setLote] = useState('');
   const [validade, setValidade] = useState<string>(() => {
     const d = new Date();
@@ -106,6 +108,8 @@ export const NewInventoryModal: React.FC<NewInventoryModalProps> = ({
       unidade_medida: unidadeMedida,
       alerta_minimo: Number(alertaMinimo) || 5,
       categoria: categoria.trim() || undefined,
+      marca: marca.trim() || undefined,
+      cor_tonalidade: corTonalidade.trim() || undefined,
       lote: lote.trim() || undefined,
       validade: validade || undefined,
       custo_unitario: Number(custoUnitario) || undefined,
@@ -176,11 +180,13 @@ export const NewInventoryModal: React.FC<NewInventoryModalProps> = ({
                 onChange={(e) => setCategoria(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 cursor-pointer"
               >
+                <option value="Pigmento">Pigmento</option>
+                <option value="Descartáveis">Descartáveis</option>
+                <option value="Cosméticos">Cosméticos</option>
+                <option value="Agulhas">Agulhas & Lâminas</option>
                 <option value="Injetáveis">Injetáveis</option>
                 <option value="Preenchedores">Preenchedores</option>
                 <option value="Bioestimuladores">Bioestimuladores</option>
-                <option value="Pigmento">Pigmento</option>
-                <option value="Descartáveis">Descartáveis</option>
                 <option value="Tópicos & Anestésicos">Tópicos & Anestésicos</option>
                 <option value="Diluentes">Diluentes</option>
                 <option value="Outros">Outros</option>
@@ -193,10 +199,39 @@ export const NewInventoryModal: React.FC<NewInventoryModalProps> = ({
               </label>
               <input
                 type="text"
-                placeholder="Ex: BTX-2026-098"
+                placeholder="Ex: BTX-2026-098 ou PIG-904"
                 value={lote}
                 onChange={(e) => setLote(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+              />
+            </div>
+          </div>
+
+          {/* Marca e Cor / Tonalidade (Especialmente para Pigmentos e Cosméticos) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50/70 p-3 rounded-xl border border-slate-200">
+            <div>
+              <label className="font-bold text-slate-700 block mb-1 uppercase text-[11px] tracking-wide">
+                Marca / Fabricante
+              </label>
+              <input
+                type="text"
+                placeholder="Ex: Iron Works, RB Kollors, Rennova, Allergan"
+                value={marca}
+                onChange={(e) => setMarca(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="font-bold text-slate-700 block mb-1 uppercase text-[11px] tracking-wide">
+                Cor / Tonalidade {categoria === 'Pigmento' && <span className="text-amber-600 font-bold">*</span>}
+              </label>
+              <input
+                type="text"
+                placeholder="Ex: Castanho Escuro, Chocolate, Red Rose, Natural"
+                value={corTonalidade}
+                onChange={(e) => setCorTonalidade(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-xs"
               />
             </div>
           </div>

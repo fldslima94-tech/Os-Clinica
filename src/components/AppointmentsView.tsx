@@ -7,16 +7,18 @@ import {
   XCircle, 
   MessageCircle, 
   Calendar as CalendarIcon, 
-  List,
-  AlertCircle,
-  Trash2,
-  User,
-  Users,
-  DollarSign,
-  FileText,
-  UserCheck,
-  Sparkles,
-  Columns
+  List, 
+  AlertCircle, 
+  Trash2, 
+  User, 
+  Users, 
+  DollarSign, 
+  FileText, 
+  UserCheck, 
+  Sparkles, 
+  Columns,
+  Store,
+  ArrowRight
 } from 'lucide-react';
 import { Agendamento, Paciente, StatusAgendamento, UsuarioEquipe } from '../types';
 import { CalendarGridView } from './CalendarGridView';
@@ -32,6 +34,7 @@ interface AppointmentsViewProps {
   onOpenCheckInModal?: (agendamento: Agendamento) => void;
   onDeleteAppointment?: (id: string) => void;
   currentUser?: UsuarioEquipe;
+  initialBalcaoMode?: boolean;
 }
 
 export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
@@ -45,16 +48,36 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
   onOpenCheckInModal,
   onDeleteAppointment,
   currentUser,
+  initialBalcaoMode = false,
 }) => {
   const isAdmin = !currentUser || currentUser.role === 'admin';
-  const [viewFormat, setViewFormat] = useState<'cards' | 'profissionais' | 'calendario'>('cards');
+  const [viewFormat, setViewFormat] = useState<'cards' | 'profissionais' | 'calendario' | 'balcao'>(initialBalcaoMode ? 'balcao' : 'cards');
   const [filterStatus, setFilterStatus] = useState<string>('todos');
   const [filterProfissional, setFilterProfissional] = useState<string>('todos');
   const [search, setSearch] = useState('');
   const [appointmentToDelete, setAppointmentToDelete] = useState<Agendamento | null>(null);
   const [selectedContratoAgendamento, setSelectedContratoAgendamento] = useState<Agendamento | null>(null);
 
-  // Filter appointments
+  // Today filter for Balcão (00:00 to 23:59)
+  const isToday = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr);
+      const today = new Date();
+      return (
+        d.getDate() === today.getDate() &&
+        d.getMonth() === today.getMonth() &&
+        d.getFullYear() === today.getFullYear()
+      );
+    } catch {
+      return false;
+    }
+  };
+
+  const balcaoAgendamentos = agendamentos
+    .filter(ag => isToday(ag.data_horario))
+    .sort((a, b) => new Date(a.data_horario).getTime() - new Date(b.data_horario).getTime());
+
+  // Filter appointments for standard views
   const filtered = agendamentos.filter(ag => {
     const matchesStatus = filterStatus === 'todos' || ag.status === filterStatus;
     const matchesProfissional = filterProfissional === 'todos' || 
@@ -125,7 +148,23 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
 
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Toggle Views */}
-          <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-semibold">
+          <div className="flex flex-wrap bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-semibold">
+            <button
+              onClick={() => setViewFormat('balcao')}
+              className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer ${
+                viewFormat === 'balcao'
+                  ? 'bg-indigo-600 text-white shadow-2xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Store className="w-3.5 h-3.5" />
+              <span>Balcão do Dia</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                viewFormat === 'balcao' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-800'
+              }`}>
+                {balcaoAgendamentos.length}
+              </span>
+            </button>
             <button
               onClick={() => setViewFormat('cards')}
               className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer ${
@@ -171,8 +210,157 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
         </div>
       </div>
 
-      {/* RENDER VIEW: CALENDAR OR CARDS OR PER-PROFESSIONAL */}
-      {viewFormat === 'calendario' ? (
+      {/* RENDER VIEW: BALCAO DO DIA, CALENDAR, CARDS OR PER-PROFESSIONAL */}
+      {viewFormat === 'balcao' ? (
+        /* VISÃO BALCÃO DO DIA (RECEPÇÃO RESUMIDA: 00:00 ÀS 23:59) */
+        <div className="space-y-4">
+          <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 text-white p-5 rounded-2xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-indigo-300">
+                <Store className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold">Balcão da Recepção — Atendimentos de Hoje</h3>
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                    Vigência: 00:00 às 23:59
+                  </span>
+                </div>
+                <p className="text-xs text-indigo-200 mt-0.5">
+                  Visualização resumida e segura para recepcionistas: apenas Horário, Cliente, Profissional e Status.
+                </p>
+              </div>
+            </div>
+
+            <div className="text-right flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-1">
+              <span className="text-xs text-indigo-200">Total Hoje</span>
+              <span className="text-xl font-black text-white">{balcaoAgendamentos.length} Pacientes</span>
+            </div>
+          </div>
+
+          {balcaoAgendamentos.length === 0 ? (
+            <div className="bg-white rounded-2xl p-12 border border-slate-200 text-center shadow-xs">
+              <Clock className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+              <h4 className="text-base font-bold text-slate-800">Nenhum atendimento agendado para hoje</h4>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">
+                Todos os horários do dia estão livres ou os agendamentos pertencem a outras datas do calendário.
+              </p>
+              <button
+                onClick={onOpenNewAppointment}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                Agendar Paciente para Hoje
+              </button>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      <th className="py-3.5 px-4">Horário</th>
+                      <th className="py-3.5 px-4">Nome do Cliente</th>
+                      <th className="py-3.5 px-4">Profissional Responsável</th>
+                      <th className="py-3.5 px-4 text-center">Status</th>
+                      <th className="py-3.5 px-4 text-right">Ação Balcão</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs">
+                    {balcaoAgendamentos.map((ag) => {
+                      const dt = formatDateTime(ag.data_horario);
+                      return (
+                        <tr key={ag.id} className="hover:bg-slate-50/60 transition-colors">
+                          {/* Horário */}
+                          <td className="py-3.5 px-4 font-bold text-indigo-700 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5 text-indigo-500" />
+                              <span>{dt.time}</span>
+                            </div>
+                          </td>
+
+                          {/* Nome do Cliente */}
+                          <td className="py-3.5 px-4 font-semibold text-slate-800">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 font-bold text-xs shrink-0">
+                                {ag.paciente?.nome.charAt(0) || 'C'}
+                              </div>
+                              <div>
+                                <span className="block font-bold text-slate-900">{ag.paciente?.nome || 'Cliente sem nome'}</span>
+                                {ag.paciente && (
+                                  <button
+                                    onClick={() => onViewPatient(ag.paciente!)}
+                                    className="text-[10px] text-indigo-600 hover:text-indigo-800 underline font-medium cursor-pointer"
+                                  >
+                                    Ver prontuário rápido
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Profissional */}
+                          <td className="py-3.5 px-4 text-slate-700 font-medium whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <User className="w-3.5 h-3.5 text-slate-400" />
+                              <span>{ag.profissional_nome || 'Profissional da Unidade'}</span>
+                            </div>
+                          </td>
+
+                          {/* Status */}
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                              ag.status === 'concluido'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : ag.status === 'confirmado'
+                                ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                : ag.status === 'cancelado'
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                : 'bg-amber-50 text-amber-700 border border-amber-200'
+                            }`}>
+                              {ag.status === 'concluido' && <CheckCircle2 className="w-3 h-3 text-emerald-600" />}
+                              {ag.status === 'confirmado' && <CheckCircle2 className="w-3 h-3 text-blue-600" />}
+                              {ag.status === 'cancelado' && <XCircle className="w-3 h-3 text-rose-600" />}
+                              {ag.status === 'pendente' && <Clock className="w-3 h-3 text-amber-600" />}
+                              <span className="capitalize">{ag.status}</span>
+                            </span>
+                          </td>
+
+                          {/* Ações Rápidas */}
+                          <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-2">
+                              {ag.status !== 'concluido' && (
+                                <button
+                                  onClick={() => handleCheckInClick(ag)}
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                                  title="Check-In de Chegada, Registro de Pagamento e Agendamento de Retorno"
+                                >
+                                  <UserCheck className="w-3.5 h-3.5" />
+                                  <span>Check-In & Retorno</span>
+                                </button>
+                              )}
+
+                              {ag.status !== 'concluido' && (
+                                <button
+                                  onClick={() => handleConcludeClick(ag)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                                  title="Concluir Procedimento e Baixar Insumos"
+                                >
+                                  <span>Concluir</span>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : viewFormat === 'calendario' ? (
         <CalendarGridView
           agendamentos={filtered}
           pacientes={pacientes}

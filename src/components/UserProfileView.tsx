@@ -21,6 +21,7 @@ import {
   atualizarDadosPerfil, 
   reautenticarEAtualizarSenha 
 } from '../services/firebaseService';
+import { compressImageFile } from '../lib/image-utils';
 
 interface UserProfileViewProps {
   currentUser: UsuarioEquipe;
@@ -62,16 +63,28 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   const [passwordSuccessMsg, setPasswordSuccessMsg] = useState('');
   const [passwordErrorMsg, setPasswordErrorMsg] = useState('');
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          setAvatarUrl(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressedBase64 = await compressImageFile(file, {
+          maxWidth: 400,
+          maxHeight: 400,
+          quality: 0.7,
+          targetMaxKB: 30,
+          mimeType: 'image/webp'
+        });
+        setAvatarUrl(compressedBase64);
+      } catch {
+        // Fallback para FileReader padrão
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (typeof reader.result === 'string') {
+            setAvatarUrl(reader.result);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 

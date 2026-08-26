@@ -55,6 +55,7 @@ import {
   SYSTEM_MODULES, 
   SystemFieldDefinition 
 } from '../data/systemFields';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
 
 interface PermissionsManagementViewProps {
   usuarios: UsuarioEquipe[];
@@ -62,6 +63,7 @@ interface PermissionsManagementViewProps {
   configuracaoCampos: ConfiguracaoCampos;
   onUpdateUserPermissions: (userId: string, permissoes: PermissoesCustomizadas, role?: UserRole) => void;
   onUpdateFieldConfig: (config: ConfiguracaoCampos) => void;
+  onDeleteUser?: (userId: string) => void;
 }
 
 const DEFAULT_PRESETS: Record<string, PermissoesCustomizadas> = {
@@ -109,6 +111,7 @@ export const PermissionsManagementView: React.FC<PermissionsManagementViewProps>
   configuracaoCampos,
   onUpdateUserPermissions,
   onUpdateFieldConfig,
+  onDeleteUser,
 }) => {
   const [activeTab, setActiveTab] = useState<'permissoes' | 'campos'>('campos');
   const [selectedUser, setSelectedUser] = useState<UsuarioEquipe | null>(null);
@@ -116,6 +119,9 @@ export const PermissionsManagementView: React.FC<PermissionsManagementViewProps>
   const [customPerms, setCustomPerms] = useState<PermissoesCustomizadas>(
     DEFAULT_PRESETS.recepcao
   );
+  const [userToDelete, setUserToDelete] = useState<UsuarioEquipe | null>(null);
+
+  const isSuperAdmin = isUserAdminTotal(currentUser) || currentUser.role === 'admin_total' || currentUser.role === 'admin';
 
   // Field Customization state
   const [selectedModule, setSelectedModule] = useState<string>('Clientes');
@@ -1193,15 +1199,29 @@ export const PermissionsManagementView: React.FC<PermissionsManagementViewProps>
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={handleSaveUserPermissions}
-                    disabled={isSavingUser}
-                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold rounded-xl text-xs shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
-                  >
-                    {isSavingUser ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    <span>{isSavingUser ? 'Gravando...' : 'Salvar Permissões do Usuário'}</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {onDeleteUser && isSuperAdmin && selectedUser.id !== currentUser.id && (
+                      <button
+                        type="button"
+                        onClick={() => setUserToDelete(selectedUser)}
+                        className="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                        title="Excluir usuário do sistema (Super Admin)"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Excluir Usuário</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleSaveUserPermissions}
+                      disabled={isSavingUser}
+                      className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold rounded-xl text-xs shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      {isSavingUser ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      <span>{isSavingUser ? 'Gravando...' : 'Salvar Permissões do Usuário'}</span>
+                    </button>
+                  </div>
                 </div>
 
                 {savedUserSuccess && (
@@ -1491,6 +1511,27 @@ export const PermissionsManagementView: React.FC<PermissionsManagementViewProps>
             </form>
           </div>
         </div>
+      )}
+
+      {/* Delete User Confirmation Modal for Super Admin */}
+      {userToDelete && (
+        <DeleteConfirmModal
+          isOpen={!!userToDelete}
+          onClose={() => setUserToDelete(null)}
+          onConfirm={() => {
+            if (userToDelete && onDeleteUser) {
+              onDeleteUser(userToDelete.id);
+              if (selectedUser?.id === userToDelete.id) {
+                setSelectedUser(null);
+              }
+            }
+            setUserToDelete(null);
+          }}
+          title="Excluir Usuário com Acesso ao Sistema"
+          itemType="Usuário do Sistema"
+          itemName={`${userToDelete.nome || userToDelete.email} (${userToDelete.email}) - Cargo: ${userToDelete.cargo || userToDelete.role}`}
+          description={`Tem certeza que deseja excluir o usuário "${userToDelete.nome || userToDelete.email}"? Esta ação revogará permanentemente o login (${userToDelete.email}) e removerá todos os privilégios de acesso ao sistema.`}
+        />
       )}
 
     </div>

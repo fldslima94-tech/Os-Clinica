@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { RotateCcw, Check, PenTool, ShieldCheck } from 'lucide-react';
+import { compressCanvasToLightBase64, getBase64SizeInKB } from '../lib/image-utils';
 
 interface CanvasAssinaturaProps {
   onSalvar: (dataUrl: string) => void;
@@ -103,10 +104,10 @@ export const CanvasAssinatura: React.FC<CanvasAssinaturaProps> = ({
   const finalizarDesenho = () => {
     if (desenhando) {
       setDesenhando(false);
-      // Auto-salva no state para conveniência
+      // Auto-salva no state para conveniência com compressão leve (WebP/JPEG)
       const canvas = canvasRef.current;
       if (canvas) {
-        const dataUrl = canvas.toDataURL('image/png');
+        const dataUrl = compressCanvasToLightBase64(canvas, { quality: 0.8, mimeType: 'image/webp' });
         onSalvar(dataUrl);
       }
     }
@@ -126,7 +127,7 @@ export const CanvasAssinatura: React.FC<CanvasAssinaturaProps> = ({
   const confirmar = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const dataUrl = canvas.toDataURL('image/png');
+    const dataUrl = compressCanvasToLightBase64(canvas, { quality: 0.8, mimeType: 'image/webp' });
     onSalvar(dataUrl);
     setConfirmada(true);
   };

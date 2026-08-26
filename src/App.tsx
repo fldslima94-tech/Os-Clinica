@@ -82,6 +82,8 @@ import {
   subscribeToCollection, 
   saveDocument, 
   removeDocument, 
+  excluirUsuario,
+  isUserAdminTotal,
   executeAtomicCheckout,
   softDeleteTransacao,
   COLLECTIONS 
@@ -1088,10 +1090,12 @@ export default function App() {
     }
   };
 
-  const handleDeleteUser = (userId: string) => {
-    const isGestor = currentUser.role === 'gestor' || currentUser.role === 'admin';
+  const handleDeleteUser = async (userId: string) => {
+    const isSuperAdmin = isUserAdminTotal(currentUser) || currentUser.role === 'admin_total' || currentUser.role === 'admin';
+    const isGestor = isSuperAdmin || currentUser.role === 'admin_local' || currentUser.role === 'gestor';
+    
     if (!isGestor) {
-      showToast('Apenas gestores têm permissão para excluir usuários.', 'info');
+      showToast('Apenas o Super Admin ou Gestores têm permissão para excluir usuários.', 'info');
       return;
     }
     if (currentUser.id === userId) {
@@ -1100,8 +1104,8 @@ export default function App() {
     }
     const user = usuarios.find(u => u.id === userId);
     setUsuarios(prev => prev.filter(u => u.id !== userId));
-    removeDocument(COLLECTIONS.USUARIOS, userId);
-    showToast(`Usuário "${user?.nome || 'Usuário'}" excluído do sistema.`);
+    await excluirUsuario(userId);
+    showToast(`Usuário "${user?.nome || 'Usuário'}" excluído do sistema com sucesso.`);
   };
 
   // If user is not authenticated, display full secure Login screen
@@ -1400,6 +1404,7 @@ export default function App() {
                 setConfiguracaoCampos(newConf);
                 showToast('Configurações de visibilidade de campos atualizadas!');
               }}
+              onDeleteUser={handleDeleteUser}
             />
           )}
 

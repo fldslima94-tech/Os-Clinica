@@ -13,6 +13,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { ClinicaConfig } from '../types';
+import { compressImageFile } from '../lib/image-utils';
 
 interface ClinicSettingsModalProps {
   isOpen: boolean;
@@ -37,16 +38,27 @@ export const ClinicSettingsModal: React.FC<ClinicSettingsModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          setLogomarcaUrl(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressedBase64 = await compressImageFile(file, {
+          maxWidth: 600,
+          maxHeight: 600,
+          quality: 0.75,
+          targetMaxKB: 35,
+          mimeType: 'image/webp'
+        });
+        setLogomarcaUrl(compressedBase64);
+      } catch {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (typeof reader.result === 'string') {
+            setLogomarcaUrl(reader.result);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
