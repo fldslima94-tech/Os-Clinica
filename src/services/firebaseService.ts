@@ -412,16 +412,18 @@ export async function seedInitialFirestoreData(mockData: {
   }
 }
 
-// Real-time listener subscription helper
+// Real-time listener subscription helper with optional clinicaId filtering
 export function subscribeToCollection<T>(
   collectionName: string, 
   onData: (data: T[]) => void,
-  fallbackData: T[]
+  fallbackData: T[],
+  clinicaId?: string
 ): () => void {
   try {
     const colRef = collection(db, collectionName);
+    const q = clinicaId ? query(colRef, where('clinicaId', '==', clinicaId)) : colRef;
     const unsubscribe = onSnapshot(
-      colRef, 
+      q, 
       (snapshot) => {
         if (!snapshot.empty) {
           const items = snapshot.docs.map(d => ({ ...d.data(), id: d.id }) as T);
@@ -443,10 +445,24 @@ export function subscribeToCollection<T>(
   }
 }
 
+// Fetch documents filtered by clinicaId
+export async function getClinicaDocs<T>(collectionName: string, clinicaId?: string): Promise<T[]> {
+  try {
+    const colRef = collection(db, collectionName);
+    const q = clinicaId ? query(colRef, where('clinicaId', '==', clinicaId)) : colRef;
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ ...d.data(), id: d.id }) as unknown as T);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, collectionName);
+    return [];
+  }
+}
+
 // React Hook for Real-time Firestore Collection Synchronization
 export function useCollectionData<T extends { id: string }>(
   collectionName: string, 
-  initialFallbackData: T[] = []
+  initialFallbackData: T[] = [],
+  clinicaId?: string
 ): [T[], React.Dispatch<React.SetStateAction<T[]>>, boolean] {
   const [data, setData] = useState<T[]>(initialFallbackData);
   const [loading, setLoading] = useState<boolean>(true);
@@ -458,10 +474,11 @@ export function useCollectionData<T extends { id: string }>(
         setData(incomingData);
         setLoading(false);
       },
-      initialFallbackData
+      initialFallbackData,
+      clinicaId
     );
     return () => unsubscribe();
-  }, [collectionName]);
+  }, [collectionName, clinicaId]);
 
   return [data, setData, loading];
 }

@@ -74,11 +74,30 @@ export interface PerfilUsuario {
   atualizadoEm?: any;
 }
 
+export interface CampoPersonalizado {
+  id: string;
+  categoria: string; // 'Clientes' | 'Procedimentos' | 'Estoque' | 'Agenda' | 'Bens' | 'Fornecedores' | 'Financeiro' | 'Anamnese'
+  label: string;
+  tipo: 'text' | 'number' | 'select' | 'date' | 'boolean' | 'textarea';
+  opcoes?: string[]; // Para selects
+  placeholder?: string;
+  obrigatorio?: boolean;
+  largura?: 'half' | 'full' | 'third';
+  ajuda?: string;
+  criadoEm?: string;
+}
+
 export interface ConfiguracaoCampos {
   id?: string;
   clinicaId: string;
   camposOcultos: string[]; // Ex: ['cliente.cpf', 'procedimento.custoInsumos', 'insumo.lote', 'agendamento.observacoes']
   camposObrigatorios?: string[];
+  labelsCustomizados?: Record<string, string>; // Mapeamento campoId -> Rótulo personalizado
+  ajudaCustomizada?: Record<string, string>; // Mapeamento campoId -> Descrição de ajuda personalizada
+  placeholdersCustomizados?: Record<string, string>; // Mapeamento campoId -> Placeholder personalizado
+  ordemCampos?: Record<string, string[]>; // Mapeamento categoria/tela -> Lista de IDs de campos em ordem customizada
+  larguraCampos?: Record<string, 'half' | 'full' | 'third'>; // Largura do campo no grid
+  camposPersonalizados?: CampoPersonalizado[]; // Novos campos criados dinamicamente pelo Admin Master
   atualizadoPor?: string;
   atualizadoEm?: any;
 }
@@ -188,13 +207,17 @@ export interface UsuarioEquipe {
 
 export interface FotoAntesDepois {
   id: string;
-  titulo: string;
+  titulo?: string;
   data: string;
-  foto_antes: string;
+  foto_antes?: string;
+  foto_antes_url?: string;
   foto_depois?: string;
+  foto_depois_url?: string;
   procedimento?: string;
+  procedimento_nome?: string;
   legenda?: string;
   observacoes?: string;
+  criado_em?: string;
 }
 
 export interface FotoEvolucaoSessao {
@@ -280,6 +303,77 @@ export interface ModeloAnamnese {
   ativo: boolean;
 }
 
+export interface AnamneseCompleta {
+  id: string;
+  clinicaId: string;
+  clienteId: string;
+  clienteNome?: string;
+  profissionalId?: string;
+  profissionalNome?: string;
+  procedimentoNome?: string;
+  
+  // 1. Dados Pessoais Snapshot
+  dadosPessoais: {
+    nomeCompleto: string;
+    dataNascimento: string;
+    idade: number;
+    telefone: string;
+    cpf?: string;
+    email?: string;
+    endereco?: string;
+    profissao?: string;
+    contatoEmergencia?: {
+      nome: string;
+      telefone: string;
+    };
+  };
+
+  // 2. Anamnese Geral (Saúde)
+  saudeGeral: {
+    gestanteOuAmamentando: boolean;
+    possuiAlergias: boolean;
+    detalhesAlergias?: string;
+    diabetesOuPressaoAlta: boolean;
+    historicoQueloide: boolean;
+    problemasCoagulacao: boolean;
+    herpesAtiva: boolean;
+    usoAcidos: boolean;
+    detalhesAcidos?: string;
+    cirurgiaEsteticaRecente: boolean;
+    detalhesCirurgia?: string;
+  };
+
+  // 3. Específico por Procedimento
+  procedimentoTipo: 'limpeza_pele' | 'injetaveis' | 'micropigmentacao' | 'outro';
+  detalhesProcedimento: {
+    limpezaPele?: {
+      tipoPele: string[]; // ['Seca', 'Oleosa', 'Mista', 'Sensível', 'Acneica']
+      usaProtetorSolar: boolean;
+      aparenciaAtual: string[]; // ['Cravos', 'Espinhas', 'Manchas', 'Desidratação']
+    };
+    injetaveis?: {
+      jaRealizouAntes: boolean;
+      historicoReacoes: boolean;
+      areaMaiorIncomodo: string;
+    };
+    micropigmentacao?: {
+      jaFezAntes: boolean;
+      corPreferencia: string;
+      observacoesFormato: string;
+    };
+    outro?: {
+      objetivoTratamento: string;
+      observacoesClinicas: string;
+    };
+  };
+
+  // 4. Consentimento
+  termoAceito: boolean;
+  assinaturaUrl: string; // Imagem em base64 ou URL no Storage
+  assinadoEm: string;
+  criadoEm: string;
+}
+
 export interface Paciente {
   id: string;
   clinica_id?: string;
@@ -290,6 +384,12 @@ export interface Paciente {
   criado_em: string;
   email?: string;
   cpf?: string;
+  endereco?: string;
+  profissao?: string;
+  contato_emergencia?: {
+    nome: string;
+    telefone: string;
+  };
   alergias?: string;
   medicacoes?: string;
   queixa_principal?: string;
@@ -298,6 +398,7 @@ export interface Paciente {
   fotos_antes_depois?: FotoAntesDepois[];
   galeria_fotos_evolucao?: FotoEvolucaoSessao[];
   fichas_anamnese?: FichaAnamnesePreenchida[];
+  anamneses_completas?: AnamneseCompleta[];
   evolucoes_retornos?: FichaRetornoEvolucao[];
   termo_consentimento?: TermoConsentimento;
   pacotes?: PacoteTratamento[];
@@ -558,6 +659,13 @@ export interface VariacaoProcedimento {
   descricao?: string;
 }
 
+export interface ProcedimentoInsumoVinculado {
+  insumo_id: string;
+  nome_item: string;
+  quantidade: number;
+  unidade_medida: UnidadeMedida;
+}
+
 export interface ProcedimentoClinico {
   id: string;
   clinica_id?: string;
@@ -570,13 +678,15 @@ export interface ProcedimentoClinico {
   quantidade_sessoes?: number;
   dias_retorno_padrao?: number;
   instrucoes_cuidados?: string;
-  contraindicacoes?: string[];
+  cuidados_pos?: string;
+  contraindicacoes?: string[] | string;
   profissional_id?: string;
   profissional_nome?: string;
   variacoes?: VariacaoProcedimento[];
   descricao: string;
   areas_aplicacao?: string[];
   indicacoes?: string[];
+  insumos_vinculados?: ProcedimentoInsumoVinculado[];
   fotos_antes_depois?: FotoAntesDepois[];
   contrato_id?: string;
   contrato_padrao?: string;

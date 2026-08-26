@@ -294,18 +294,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         </p>
                       </div>
 
-                      {/* Price Section & 3-Tier Variations */}
-                      <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 space-y-2.5">
+                      {/* Price Section */}
+                      <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 space-y-2">
                         <div className="flex items-center justify-between">
                           <div>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Valor Base / Tabela</span>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Preço do Procedimento</span>
                             <div className="flex items-baseline gap-2">
                               <span className="text-lg font-extrabold text-slate-900 font-mono">
-                                R$ {proc.valor_tabela.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                R$ {(proc.valor_tabela || proc.preco_sugerido || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                               </span>
                               {proc.valor_promocional && (
                                 <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                                  Promo: R$ {proc.valor_promocional.toLocaleString('pt-BR')}
+                                  Promo: R$ {proc.valor_promocional.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                 </span>
                               )}
                             </div>
@@ -317,34 +317,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                             </span>
                           )}
                         </div>
-
-                        {/* 3 Tabelas de Variações de Preço */}
-                        {proc.variacoes && proc.variacoes.length > 0 && (
-                          <div className="pt-2 border-t border-slate-200/80 space-y-1.5">
-                            <span className="text-[10px] font-bold text-indigo-900 uppercase tracking-wide flex items-center gap-1">
-                              <Layers className="w-3 h-3 text-indigo-600" />
-                              Tabela de 3 Variações de Valores:
-                            </span>
-                            <div className="grid grid-cols-1 gap-1">
-                              {proc.variacoes.map((v, i) => (
-                                <div key={v.id || i} className="flex items-center justify-between text-[11px] bg-white px-2.5 py-1 rounded-lg border border-slate-200/70">
-                                  <div className="flex items-center gap-1.5 truncate pr-1">
-                                    <span className="w-3.5 h-3.5 rounded-full bg-indigo-100 text-indigo-700 text-[9px] font-bold flex items-center justify-center shrink-0">
-                                      {i + 1}
-                                    </span>
-                                    <span className="font-semibold text-slate-700 truncate">{v.nome}</span>
-                                    {v.duracao_minutos && (
-                                      <span className="text-[10px] text-slate-400">({v.duracao_minutos}m)</span>
-                                    )}
-                                  </div>
-                                  <span className="font-bold text-emerald-700 font-mono whitespace-nowrap">
-                                    R$ {v.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                       </div>
 
                       {/* Insumos vinculados tag list */}

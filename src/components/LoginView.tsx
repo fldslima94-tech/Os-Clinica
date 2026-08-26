@@ -248,47 +248,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
               </label>
             </div>
 
-            {/* Quick Profile Fill Section */}
-            <div className="pt-2">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                  Perfis para acesso rápido:
-                </span>
-                <span className="text-[10px] text-indigo-600 font-medium">1-Clique preenche</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {usuarios.slice(0, 4).map(u => {
-                  const isSelected = email.toLowerCase() === u.email.toLowerCase();
-                  return (
-                    <button
-                      key={u.id}
-                      type="button"
-                      onClick={() => {
-                        setEmail(u.email);
-                        setSenha(u.senha || 'admin123');
-                        setErrorMessage(null);
-                      }}
-                      className={`p-2 rounded-xl border text-left transition-all flex items-center gap-2 cursor-pointer ${
-                        isSelected
-                          ? 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-500/20'
-                          : 'bg-slate-50 hover:bg-slate-100 border-slate-200'
-                      }`}
-                    >
-                      <img
-                        src={u.avatar_url || 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&auto=format&fit=crop&q=80'}
-                        alt={u.nome}
-                        className="w-7 h-7 rounded-lg object-cover border border-slate-200 shrink-0"
-                      />
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-900 truncate">{u.nome.split(' ')[0]}</p>
-                        <p className="text-[10px] text-slate-500 truncate">{u.cargo || u.profissao || 'Acesso'}</p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
             {/* Submit Login Button */}
             <button
               type="submit"

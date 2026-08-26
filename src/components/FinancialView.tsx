@@ -45,7 +45,6 @@ interface FinancialViewProps {
   onSoftDeleteTransaction?: (id: string, motivo: string) => void;
   onAddDespesaRecorrente?: (nova: Omit<DespesaRecorrente, 'id'>) => void;
   onToggleDespesaRecorrenteStatus?: (id: string) => void;
-  onOpenNewSupplier?: () => void;
   currentUser?: UsuarioEquipe;
 }
 
@@ -58,7 +57,6 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
   onSoftDeleteTransaction,
   onAddDespesaRecorrente,
   onToggleDespesaRecorrenteStatus,
-  onOpenNewSupplier,
   currentUser,
 }) => {
   const isGestor = !currentUser || currentUser.role === 'admin_total' || currentUser.role === 'admin_local' || currentUser.role === 'gestor' || currentUser.role === 'admin';
@@ -653,15 +651,6 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
                   <label className="block text-xs font-semibold text-slate-700">
                     {novoTipo === 'entrada' ? 'Nome do Paciente / Cliente *' : 'Favorecido / Fornecedor *'}
                   </label>
-                  {novoTipo === 'saida' && onOpenNewSupplier && (
-                    <button
-                      type="button"
-                      onClick={onOpenNewSupplier}
-                      className="text-[11px] text-amber-700 font-bold hover:underline cursor-pointer"
-                    >
-                      + Cadastrar Fornecedor
-                    </button>
-                  )}
                 </div>
                 <input
                   type="text"

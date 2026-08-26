@@ -11,16 +11,18 @@ import {
   Package, 
   User, 
   Sparkles, 
-  DoorOpen,
-  Filter,
-  Check,
-  ArrowRight,
-  UserCheck,
-  ChevronRight,
-  Eye,
-  EyeOff,
-  Wrench,
-  ShieldAlert
+  DoorOpen, 
+  Filter, 
+  Check, 
+  ArrowRight, 
+  UserCheck, 
+  ChevronRight, 
+  Eye, 
+  EyeOff, 
+  Wrench, 
+  ShieldAlert,
+  RotateCcw,
+  Undo2
 } from 'lucide-react';
 import { Agendamento, EstoqueInsumo, Paciente, StatusAgendamento, UsuarioEquipe, BemAtivo } from '../types';
 
@@ -415,10 +417,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         {getStatusBadge(ag.status)}
                       </td>
 
-                      {/* Ações Rápidas */}
+                      {/* Ações Rápidas & Controle de Status */}
                       <td className="py-3.5 px-4 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
-                          {ag.status === 'confirmado' && (
+                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                          {ag.status === 'pendente' && (
                             <button
                               onClick={() => onUpdateStatus(ag.id, 'em_espera')}
                               className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center gap-1"
@@ -429,32 +431,87 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                             </button>
                           )}
 
+                          {ag.status === 'confirmado' && (
+                            <>
+                              <button
+                                onClick={() => onUpdateStatus(ag.id, 'em_espera')}
+                                className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center gap-1"
+                                title="Marcar chegada do paciente na recepção"
+                              >
+                                <UserCheck className="w-3.5 h-3.5" />
+                                <span>Chegou</span>
+                              </button>
+                            </>
+                          )}
+
                           {ag.status === 'em_espera' && (
-                            <button
-                              onClick={() => onUpdateStatus(ag.id, 'em_atendimento')}
-                              className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center gap-1"
-                              title="Chamar para sala de atendimento"
-                            >
-                              <DoorOpen className="w-3.5 h-3.5" />
-                              <span>Chamar Sala</span>
-                            </button>
+                            <>
+                              <button
+                                onClick={() => onUpdateStatus(ag.id, 'em_atendimento')}
+                                className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center gap-1"
+                                title="Chamar para sala de atendimento"
+                              >
+                                <DoorOpen className="w-3.5 h-3.5" />
+                                <span>Chamar Sala</span>
+                              </button>
+
+                              <button
+                                onClick={() => onUpdateStatus(ag.id, 'confirmado')}
+                                className="p-1 text-slate-400 hover:text-amber-700 hover:bg-amber-50 rounded-md border border-slate-200 transition-colors cursor-pointer"
+                                title="Desfazer chegada (retornar para agendado)"
+                              >
+                                <Undo2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
                           )}
 
                           {ag.status === 'em_atendimento' && (
-                            <button
-                              onClick={() => onOpenCompleteModal ? onOpenCompleteModal(ag) : onUpdateStatus(ag.id, 'concluido')}
-                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center gap-1"
-                              title="Concluir procedimento e debitar insumos"
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>Finalizar & Retorno</span>
-                            </button>
+                            <>
+                              <button
+                                onClick={() => onOpenCompleteModal ? onOpenCompleteModal(ag) : onUpdateStatus(ag.id, 'concluido')}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center gap-1"
+                                title="Concluir procedimento e debitar insumos"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Finalizar</span>
+                              </button>
+
+                              {/* Botão de Retorno caso tenha chamado o cliente errado */}
+                              <button
+                                onClick={() => onUpdateStatus(ag.id, 'em_espera')}
+                                className="px-2 py-1 bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-800 rounded-lg text-xs font-semibold transition-all border border-slate-300 flex items-center gap-1 cursor-pointer"
+                                title="Chamou errado? Retornar para fila de espera na recepção"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
+                                <span>Voltar p/ Espera</span>
+                              </button>
+                            </>
                           )}
 
                           {ag.status === 'concluido' && (
-                            <span className="text-[11px] text-slate-400 font-semibold">
-                              Finalizado
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[11px] text-slate-400 font-semibold">
+                                Finalizado
+                              </span>
+                              <button
+                                onClick={() => onUpdateStatus(ag.id, 'em_atendimento')}
+                                className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md border border-slate-200 transition-colors cursor-pointer"
+                                title="Reabrir atendimento (retornar para em sala)"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
+
+                          {ag.status === 'cancelado' && (
+                            <button
+                              onClick={() => onUpdateStatus(ag.id, 'confirmado')}
+                              className="px-2 py-0.5 text-[11px] text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded border border-slate-200 transition-colors cursor-pointer flex items-center gap-1"
+                              title="Reativar agendamento"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              <span>Reativar</span>
+                            </button>
                           )}
                         </div>
                       </td>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Shield, 
   ShieldCheck, 
@@ -20,19 +20,41 @@ import {
   RefreshCw,
   HelpCircle,
   Zap,
-  Info
+  Info,
+  ArrowUp,
+  ArrowDown,
+  Edit3,
+  RotateCcw,
+  Plus,
+  Trash2,
+  Maximize2,
+  Columns,
+  Grid,
+  Search,
+  Check,
+  X,
+  Layers,
+  LayoutGrid,
+  User,
+  Briefcase
 } from 'lucide-react';
 import { 
   UsuarioEquipe, 
   UserRole, 
   PermissoesCustomizadas, 
-  ConfiguracaoCampos 
+  ConfiguracaoCampos,
+  CampoPersonalizado
 } from '../types';
 import { 
   salvarPermissoesUsuario, 
   salvarConfiguracaoCampos,
   isUserAdminTotal 
 } from '../services/firebaseService';
+import { 
+  DEFAULT_SYSTEM_FIELDS, 
+  SYSTEM_MODULES, 
+  SystemFieldDefinition 
+} from '../data/systemFields';
 
 interface PermissionsManagementViewProps {
   usuarios: UsuarioEquipe[];
@@ -81,25 +103,6 @@ const DEFAULT_PRESETS: Record<string, PermissoesCustomizadas> = {
   }
 };
 
-const SYSTEM_FIELDS = [
-  { id: 'cliente.cpf', label: 'CPF do Cliente', category: 'Clientes' },
-  { id: 'cliente.data_nascimento', label: 'Data de Nascimento / Idade', category: 'Clientes' },
-  { id: 'cliente.fototipo', label: 'Fototipo Fitzpatrick (Escala I a VI)', category: 'Clientes' },
-  { id: 'cliente.alergias', label: 'Histórico de Alergias / Medicamentos', category: 'Clientes' },
-  { id: 'cliente.queixa_principal', label: 'Queixa Principal & Observações', category: 'Clientes' },
-  { id: 'procedimento.custoInsumos', label: 'Custo de Insumos / Custo Unitário', category: 'Procedimentos' },
-  { id: 'procedimento.margem', label: 'Margem de Lucro Percentual', category: 'Procedimentos' },
-  { id: 'procedimento.duracao_minutos', label: 'Duração em Minutos', category: 'Procedimentos' },
-  { id: 'procedimento.contrato_padrao', label: 'Termo de Consentimento / Contrato', category: 'Procedimentos' },
-  { id: 'insumo.lote', label: 'Número de Lote do Insumo', category: 'Estoque' },
-  { id: 'insumo.marca', label: 'Marca / Fabricante', category: 'Estoque' },
-  { id: 'insumo.cor_tonalidade', label: 'Cor / Tonalidade de Pigmento', category: 'Estoque' },
-  { id: 'insumo.alerta_minimo', label: 'Ponto de Pedido / Alerta Mínimo', category: 'Estoque' },
-  { id: 'agendamento.observacoes', label: 'Observações do Agendamento', category: 'Agenda' },
-  { id: 'agendamento.forma_pagamento', label: 'Forma de Pagamento Prevista', category: 'Agenda' },
-  { id: 'agendamento.status_pagamento', label: 'Status de Pagamento Inicial', category: 'Agenda' },
-];
-
 export const PermissionsManagementView: React.FC<PermissionsManagementViewProps> = ({
   usuarios,
   currentUser,
@@ -107,616 +110,1245 @@ export const PermissionsManagementView: React.FC<PermissionsManagementViewProps>
   onUpdateUserPermissions,
   onUpdateFieldConfig,
 }) => {
-  const [activeTab, setActiveTab] = useState<'permissoes' | 'campos'>('permissoes');
-  const [selectedUserId, setSelectedUserId] = useState<string>(
-    usuarios.find(u => u.role !== 'admin_total')?.id || usuarios[0]?.id || ''
+  const [activeTab, setActiveTab] = useState<'permissoes' | 'campos'>('campos');
+  const [selectedUser, setSelectedUser] = useState<UsuarioEquipe | null>(null);
+  const [activePresetRole, setActivePresetRole] = useState<UserRole>('recepcao');
+  const [customPerms, setCustomPerms] = useState<PermissoesCustomizadas>(
+    DEFAULT_PRESETS.recepcao
   );
-  const [selectedRole, setSelectedRole] = useState<UserRole>('admin_local');
-  const [currentPermissions, setCurrentPermissions] = useState<PermissoesCustomizadas>(
-    DEFAULT_PRESETS.admin_local
-  );
-  const [isSaving, setIsSaving] = useState(false);
-  const [savedSuccess, setSavedSuccess] = useState(false);
 
-  // Field Visibility State
+  // Field Customization state
+  const [selectedModule, setSelectedModule] = useState<string>('Clientes');
   const [hiddenFields, setHiddenFields] = useState<string[]>(configuracaoCampos.camposOcultos || []);
   const [mandatoryFields, setMandatoryFields] = useState<string[]>(configuracaoCampos.camposObrigatorios || []);
+  const [labelsCustomizados, setLabelsCustomizados] = useState<Record<string, string>>(configuracaoCampos.labelsCustomizados || {});
+  const [ajudaCustomizada, setAjudaCustomizada] = useState<Record<string, string>>(configuracaoCampos.ajudaCustomizada || {});
+  const [placeholdersCustomizados, setPlaceholdersCustomizados] = useState<Record<string, string>>(configuracaoCampos.placeholdersCustomizados || {});
+  const [ordemCampos, setOrdemCampos] = useState<Record<string, string[]>>(configuracaoCampos.ordemCampos || {});
+  const [larguraCampos, setLarguraCampos] = useState<Record<string, 'half' | 'full' | 'third'>>(configuracaoCampos.larguraCampos || {});
+  const [camposPersonalizados, setCamposPersonalizados] = useState<CampoPersonalizado[]>(configuracaoCampos.camposPersonalizados || []);
+
+  // Modal / Inline Edit states
+  const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
+  const [editLabelValue, setEditLabelValue] = useState('');
+  const [editHelpValue, setEditHelpValue] = useState('');
+  const [editPlaceholderValue, setEditPlaceholderValue] = useState('');
+
+  // New Custom Field Modal
+  const [isAddingCustomField, setIsAddingCustomField] = useState(false);
+  const [newFieldName, setNewFieldName] = useState('');
+  const [newFieldType, setNewFieldType] = useState<'text' | 'number' | 'select' | 'date' | 'boolean' | 'textarea'>('text');
+  const [newFieldOptions, setNewFieldOptions] = useState('');
+  const [newFieldPlaceholder, setNewFieldPlaceholder] = useState('');
+  const [newFieldRequired, setNewFieldRequired] = useState(false);
+  const [newFieldWidth, setNewFieldWidth] = useState<'half' | 'full' | 'third'>('half');
+
+  // Preview Drawer
+  const [showLivePreview, setShowLivePreview] = useState(false);
+
+  // Feedback states
+  const [isSavingUser, setIsSavingUser] = useState(false);
   const [isSavingFields, setIsSavingFields] = useState(false);
+  const [savedUserSuccess, setSavedUserSuccess] = useState(false);
   const [savedFieldsSuccess, setSavedFieldsSuccess] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const selectedUser = usuarios.find(u => u.id === selectedUserId);
+  // Sync state when props change
+  useEffect(() => {
+    setHiddenFields(configuracaoCampos.camposOcultos || []);
+    setMandatoryFields(configuracaoCampos.camposObrigatorios || []);
+    setLabelsCustomizados(configuracaoCampos.labelsCustomizados || {});
+    setAjudaCustomizada(configuracaoCampos.ajudaCustomizada || {});
+    setPlaceholdersCustomizados(configuracaoCampos.placeholdersCustomizados || {});
+    setOrdemCampos(configuracaoCampos.ordemCampos || {});
+    setLarguraCampos(configuracaoCampos.larguraCampos || {});
+    setCamposPersonalizados(configuracaoCampos.camposPersonalizados || []);
+  }, [configuracaoCampos]);
 
-  // When selected user changes, initialize form
-  const handleSelectUser = (user: UsuarioEquipe) => {
-    setSelectedUserId(user.id);
-    setSelectedRole(user.role);
-    if (user.permissoesCustomizadas) {
-      setCurrentPermissions(JSON.parse(JSON.stringify(user.permissoesCustomizadas)));
-    } else {
-      const presetKey = user.role in DEFAULT_PRESETS ? user.role : 'admin_local';
-      setCurrentPermissions(JSON.parse(JSON.stringify(DEFAULT_PRESETS[presetKey])));
-    }
-  };
-
-  const applyPreset = (presetKey: keyof typeof DEFAULT_PRESETS) => {
-    setCurrentPermissions(JSON.parse(JSON.stringify(DEFAULT_PRESETS[presetKey])));
-    setSelectedRole(presetKey as UserRole);
-  };
-
-  const togglePermission = (modulo: keyof PermissoesCustomizadas, acao: string) => {
-    setCurrentPermissions(prev => ({
-      ...prev,
-      [modulo]: {
-        ...(prev as any)[modulo],
-        [acao]: !(prev as any)[modulo][acao]
+  // Load user permissions when selected
+  useEffect(() => {
+    if (selectedUser) {
+      setActivePresetRole(selectedUser.role || 'recepcao');
+      if (selectedUser.permissoesCustomizadas) {
+        setCustomPerms(selectedUser.permissoesCustomizadas);
+      } else if (DEFAULT_PRESETS[selectedUser.role]) {
+        setCustomPerms(DEFAULT_PRESETS[selectedUser.role]);
+      } else {
+        setCustomPerms(DEFAULT_PRESETS.recepcao);
       }
+    }
+  }, [selectedUser]);
+
+  const isAdminTotal = isUserAdminTotal(currentUser);
+
+  if (!isAdminTotal) {
+    return (
+      <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 shadow-xs max-w-lg mx-auto my-12">
+        <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto mb-4 text-amber-600">
+          <Lock className="w-7 h-7" />
+        </div>
+        <h3 className="text-lg font-bold text-slate-900 mb-2">Acesso Restrito ao Super Admin Master</h3>
+        <p className="text-xs text-slate-500 leading-relaxed">
+          O Painel de Controle de Permissões e Customização Livre de Layout de Campos é restrito exclusivamente ao usuário com nível <strong>Super Admin Master (admin_total)</strong>.
+        </p>
+      </div>
+    );
+  }
+
+  // Get current ordered fields for the selected module
+  const getOrderedFieldsForModule = (moduleName: string) => {
+    const defaultFields = DEFAULT_SYSTEM_FIELDS.filter(f => f.category === moduleName);
+    const customFields = camposPersonalizados.filter(f => f.categoria === moduleName);
+
+    const allCombined = [
+      ...defaultFields.map(f => ({
+        id: f.id,
+        defaultLabel: f.defaultLabel,
+        category: f.category,
+        description: f.description,
+        defaultRequired: f.defaultRequired,
+        defaultWidth: f.defaultWidth || 'half',
+        type: f.type || 'text',
+        isCustom: false,
+      })),
+      ...customFields.map(f => ({
+        id: f.id,
+        defaultLabel: f.label,
+        category: f.categoria,
+        description: `Campo personalizado (${f.tipo})`,
+        defaultRequired: f.obrigatorio,
+        defaultWidth: f.largura || 'half',
+        type: f.tipo,
+        isCustom: true,
+        opcoes: f.opcoes,
+      }))
+    ];
+
+    const savedOrder = ordemCampos[moduleName];
+    if (!savedOrder || savedOrder.length === 0) {
+      return allCombined;
+    }
+
+    // Sort according to saved order, putting any unlisted fields at the end
+    const sorted = [...allCombined].sort((a, b) => {
+      const idxA = savedOrder.indexOf(a.id);
+      const idxB = savedOrder.indexOf(b.id);
+      if (idxA === -1 && idxB === -1) return 0;
+      if (idxA === -1) return 1;
+      if (idxB === -1) return -1;
+      return idxA - idxB;
+    });
+
+    return sorted;
+  };
+
+  const activeModuleFields = getOrderedFieldsForModule(selectedModule);
+  const filteredModuleFields = activeModuleFields.filter(f => {
+    const label = labelsCustomizados[f.id] || f.defaultLabel;
+    return label.toLowerCase().includes(searchTerm.toLowerCase()) || f.id.toLowerCase().includes(searchTerm.toLowerCase());
+  });
+
+  // Reorder field up
+  const handleMoveFieldUp = (index: number) => {
+    if (index <= 0) return;
+    const currentOrder = activeModuleFields.map(f => f.id);
+    const temp = currentOrder[index];
+    currentOrder[index] = currentOrder[index - 1];
+    currentOrder[index - 1] = temp;
+
+    setOrdemCampos(prev => ({
+      ...prev,
+      [selectedModule]: currentOrder
     }));
   };
 
-  const handleSavePermissions = async () => {
-    if (!selectedUserId) return;
-    setIsSaving(true);
-    setSavedSuccess(false);
+  // Reorder field down
+  const handleMoveFieldDown = (index: number) => {
+    if (index >= activeModuleFields.length - 1) return;
+    const currentOrder = activeModuleFields.map(f => f.id);
+    const temp = currentOrder[index];
+    currentOrder[index] = currentOrder[index + 1];
+    currentOrder[index + 1] = temp;
 
-    try {
-      await salvarPermissoesUsuario(selectedUserId, currentPermissions, selectedRole);
-      onUpdateUserPermissions(selectedUserId, currentPermissions, selectedRole);
-      setSavedSuccess(true);
-      setTimeout(() => setSavedSuccess(false), 3000);
-    } catch (err) {
-      console.error('Erro ao salvar permissões:', err);
-    } finally {
-      setIsSaving(false);
-    }
+    setOrdemCampos(prev => ({
+      ...prev,
+      [selectedModule]: currentOrder
+    }));
   };
 
+  // Toggle Visibility (Remove / Hide)
   const handleToggleFieldHidden = (fieldId: string) => {
     setHiddenFields(prev => 
-      prev.includes(fieldId) ? prev.filter(f => f !== fieldId) : [...prev, fieldId]
+      prev.includes(fieldId) ? prev.filter(id => id !== fieldId) : [...prev, fieldId]
     );
   };
 
+  // Toggle Mandatory
   const handleToggleFieldMandatory = (fieldId: string) => {
     setMandatoryFields(prev => 
-      prev.includes(fieldId) ? prev.filter(f => f !== fieldId) : [...prev, fieldId]
+      prev.includes(fieldId) ? prev.filter(id => id !== fieldId) : [...prev, fieldId]
     );
   };
 
+  // Open Rename / Edit Modal
+  const handleStartRename = (field: any) => {
+    setEditingFieldId(field.id);
+    setEditLabelValue(labelsCustomizados[field.id] || field.defaultLabel);
+    setEditHelpValue(ajudaCustomizada[field.id] || '');
+    setEditPlaceholderValue(placeholdersCustomizados[field.id] || '');
+  };
+
+  // Save Rename / Custom Properties
+  const handleSaveRename = () => {
+    if (!editingFieldId) return;
+
+    setLabelsCustomizados(prev => {
+      const copy = { ...prev };
+      if (editLabelValue.trim()) {
+        copy[editingFieldId] = editLabelValue.trim();
+      } else {
+        delete copy[editingFieldId];
+      }
+      return copy;
+    });
+
+    setAjudaCustomizada(prev => {
+      const copy = { ...prev };
+      if (editHelpValue.trim()) {
+        copy[editingFieldId] = editHelpValue.trim();
+      } else {
+        delete copy[editingFieldId];
+      }
+      return copy;
+    });
+
+    setPlaceholdersCustomizados(prev => {
+      const copy = { ...prev };
+      if (editPlaceholderValue.trim()) {
+        copy[editingFieldId] = editPlaceholderValue.trim();
+      } else {
+        delete copy[editingFieldId];
+      }
+      return copy;
+    });
+
+    setEditingFieldId(null);
+  };
+
+  // Change Field Width
+  const handleChangeFieldWidth = (fieldId: string, width: 'half' | 'full' | 'third') => {
+    setLarguraCampos(prev => ({
+      ...prev,
+      [fieldId]: width
+    }));
+  };
+
+  // Reset Individual Field to Default
+  const handleResetIndividualField = (fieldId: string) => {
+    setLabelsCustomizados(prev => {
+      const copy = { ...prev };
+      delete copy[fieldId];
+      return copy;
+    });
+    setAjudaCustomizada(prev => {
+      const copy = { ...prev };
+      delete copy[fieldId];
+      return copy;
+    });
+    setPlaceholdersCustomizados(prev => {
+      const copy = { ...prev };
+      delete copy[fieldId];
+      return copy;
+    });
+    setHiddenFields(prev => prev.filter(id => id !== fieldId));
+    setMandatoryFields(prev => prev.filter(id => id !== fieldId));
+    setLarguraCampos(prev => {
+      const copy = { ...prev };
+      delete copy[fieldId];
+      return copy;
+    });
+  };
+
+  // Reset entire module / section to defaults
+  const handleResetSection = () => {
+    if (!confirm(`Deseja realmente redefinir todos os campos da seção "${selectedModule}" para os padrões originais de fábrica?`)) {
+      return;
+    }
+
+    const defaultFields = DEFAULT_SYSTEM_FIELDS.filter(f => f.category === selectedModule).map(f => f.id);
+
+    setHiddenFields(prev => prev.filter(id => !defaultFields.includes(id)));
+    setMandatoryFields(prev => prev.filter(id => !defaultFields.includes(id)));
+
+    setLabelsCustomizados(prev => {
+      const copy = { ...prev };
+      defaultFields.forEach(id => delete copy[id]);
+      return copy;
+    });
+
+    setAjudaCustomizada(prev => {
+      const copy = { ...prev };
+      defaultFields.forEach(id => delete copy[id]);
+      return copy;
+    });
+
+    setPlaceholdersCustomizados(prev => {
+      const copy = { ...prev };
+      defaultFields.forEach(id => delete copy[id]);
+      return copy;
+    });
+
+    setLarguraCampos(prev => {
+      const copy = { ...prev };
+      defaultFields.forEach(id => delete copy[id]);
+      return copy;
+    });
+
+    setOrdemCampos(prev => {
+      const copy = { ...prev };
+      delete copy[selectedModule];
+      return copy;
+    });
+  };
+
+  // Reset all application layout to factory defaults
+  const handleResetAllToFactory = () => {
+    if (!confirm('ATENÇÃO: Deseja realmente redefinir TODOS os campos, formulários e layouts de toda a clínica para o Padrão de Fábrica?')) {
+      return;
+    }
+
+    setHiddenFields([]);
+    setMandatoryFields([]);
+    setLabelsCustomizados({});
+    setAjudaCustomizada({});
+    setPlaceholdersCustomizados({});
+    setOrdemCampos({});
+    setLarguraCampos({});
+    setCamposPersonalizados([]);
+  };
+
+  // Add new Custom Field
+  const handleCreateCustomField = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFieldName.trim()) return;
+
+    const newId = `custom_${selectedModule.toLowerCase()}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+    const newField: CampoPersonalizado = {
+      id: newId,
+      categoria: selectedModule,
+      label: newFieldName.trim(),
+      tipo: newFieldType,
+      opcoes: newFieldType === 'select' ? newFieldOptions.split(',').map(s => s.trim()).filter(Boolean) : undefined,
+      placeholder: newFieldPlaceholder.trim() || undefined,
+      obrigatorio: newFieldRequired,
+      largura: newFieldWidth,
+      criadoEm: new Date().toISOString(),
+    };
+
+    setCamposPersonalizados(prev => [...prev, newField]);
+
+    if (newFieldRequired) {
+      setMandatoryFields(prev => [...prev, newId]);
+    }
+
+    // Add to order
+    const currentOrder = activeModuleFields.map(f => f.id);
+    setOrdemCampos(prev => ({
+      ...prev,
+      [selectedModule]: [...currentOrder, newId]
+    }));
+
+    // Reset modal
+    setNewFieldName('');
+    setNewFieldType('text');
+    setNewFieldOptions('');
+    setNewFieldPlaceholder('');
+    setNewFieldRequired(false);
+    setNewFieldWidth('half');
+    setIsAddingCustomField(false);
+  };
+
+  // Delete custom field
+  const handleDeleteCustomField = (fieldId: string) => {
+    if (!confirm('Deseja realmente remover este campo personalizado do formulário?')) return;
+    setCamposPersonalizados(prev => prev.filter(f => f.id !== fieldId));
+    setHiddenFields(prev => prev.filter(id => id !== fieldId));
+    setMandatoryFields(prev => prev.filter(id => id !== fieldId));
+    setOrdemCampos(prev => {
+      const copy = { ...prev };
+      if (copy[selectedModule]) {
+        copy[selectedModule] = copy[selectedModule].filter(id => id !== fieldId);
+      }
+      return copy;
+    });
+  };
+
+  // Save all fields configuration to Firestore
   const handleSaveFieldsConfig = async () => {
     setIsSavingFields(true);
     setSavedFieldsSuccess(false);
 
     const updatedConfig: ConfiguracaoCampos = {
-      clinicaId: currentUser.clinica_id || 'config_matriz',
+      ...configuracaoCampos,
+      clinicaId: configuracaoCampos.clinicaId || 'config_matriz',
       camposOcultos: hiddenFields,
       camposObrigatorios: mandatoryFields,
-      atualizadoPor: currentUser.nome,
+      labelsCustomizados,
+      ajudaCustomizada,
+      placeholdersCustomizados,
+      ordemCampos,
+      larguraCampos,
+      camposPersonalizados,
+      atualizadoPor: currentUser.nome || currentUser.email || 'Super Admin',
+      atualizadoEm: new Date().toISOString(),
     };
 
-    try {
-      await salvarConfiguracaoCampos(currentUser.clinica_id || 'config_matriz', updatedConfig);
-      onUpdateFieldConfig(updatedConfig);
+    const res = await salvarConfiguracaoCampos(configuracaoCampos.clinicaId || 'config_matriz', updatedConfig);
+    setIsSavingFields(false);
+
+    if (res.success) {
       setSavedFieldsSuccess(true);
-      setTimeout(() => setSavedFieldsSuccess(false), 3000);
-    } catch (err) {
-      console.error('Erro ao salvar campos:', err);
-    } finally {
-      setIsSavingFields(false);
+      onUpdateFieldConfig(updatedConfig);
+      setTimeout(() => setSavedFieldsSuccess(false), 4000);
+    } else {
+      alert(`Erro ao salvar configuração: ${res.error}`);
+    }
+  };
+
+  // Save User Permissions
+  const handleSaveUserPermissions = async () => {
+    if (!selectedUser) return;
+    setIsSavingUser(true);
+    setSavedUserSuccess(false);
+
+    const res = await salvarPermissoesUsuario(selectedUser.id, customPerms, activePresetRole);
+    setIsSavingUser(false);
+
+    if (res.success) {
+      setSavedUserSuccess(true);
+      onUpdateUserPermissions(selectedUser.id, customPerms, activePresetRole);
+      setTimeout(() => setSavedUserSuccess(false), 3000);
+    } else {
+      alert(`Erro ao salvar permissões: ${res.error}`);
+    }
+  };
+
+  const getModuleIcon = (iconName: string) => {
+    switch (iconName) {
+      case 'User': return <User className="w-4 h-4" />;
+      case 'FileText': return <FileText className="w-4 h-4" />;
+      case 'Calendar': return <Calendar className="w-4 h-4" />;
+      case 'Sparkles': return <Sparkles className="w-4 h-4" />;
+      case 'Package': return <Package className="w-4 h-4" />;
+      case 'Building': return <Building className="w-4 h-4" />;
+      case 'Briefcase': return <Briefcase className="w-4 h-4" />;
+      case 'DollarSign': return <DollarSign className="w-4 h-4" />;
+      default: return <Sliders className="w-4 h-4" />;
     }
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-150">
+    <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-in fade-in duration-150">
       
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 text-white border border-slate-800 shadow-md">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-indigo-300 shrink-0">
-              <Shield className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-500/30 text-indigo-200 border border-indigo-400/40">
-                  Painel de Controle Master • Super Admin
-                </span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/20 text-emerald-300">
-                  Acesso Total Irrestrito
-                </span>
-              </div>
-              <h2 className="text-xl font-bold text-white tracking-tight mt-1">
-                Gestão Granular de Permissões & Visibilidade de Campos
+      {/* Header Master */}
+      <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-300 shadow-inner">
+            <Sliders className="w-6 h-6 text-indigo-400" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-black tracking-tight text-white">
+                Painel Master: Layout de Telas & Permissões
               </h2>
-              <p className="text-xs text-indigo-200/80 mt-0.5">
-                Defina com precisão o que cada nível hierárquico pode visualizar, criar, editar e excluir no sistema.
-              </p>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500 text-slate-950 border border-amber-400">
+                Super Admin
+              </span>
             </div>
+            <p className="text-xs text-indigo-200 font-medium mt-0.5">
+              Personalização irrestrita de campos: remova, renomeie, redefina e reorganize a disposição dos formulários da clínica.
+            </p>
           </div>
+        </div>
 
-          {/* Sub Navigation */}
-          <div className="flex bg-white/10 p-1 rounded-xl border border-white/10 shrink-0">
-            <button
-              onClick={() => setActiveTab('permissoes')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'permissoes'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-indigo-200 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <Key className="w-4 h-4" />
-              <span>Matriz de Permissões</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('campos')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'campos'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-indigo-200 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <Sliders className="w-4 h-4" />
-              <span>Campos & Telas</span>
-            </button>
-          </div>
+        {/* Tab Navigation */}
+        <div className="flex items-center bg-slate-800/80 p-1.5 rounded-xl border border-slate-700/80 shrink-0">
+          <button
+            type="button"
+            onClick={() => setActiveTab('campos')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'campos'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+            }`}
+          >
+            <LayoutGrid className="w-4 h-4" />
+            <span>Layout & Campos</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('permissoes')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'permissoes'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Matriz de Permissões</span>
+          </button>
         </div>
       </div>
 
-      {/* TAB 1: MATRIZ DE PERMISSÕES */}
-      {activeTab === 'permissoes' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
-          {/* User Selector List */}
-          <div className="lg:col-span-4 space-y-4">
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-2">
-                <Users className="w-4 h-4 text-indigo-600" />
-                <span>Selecione o Usuário / Perfil</span>
-              </h3>
+      {/* ======================================================== */}
+      {/* TAB 1: GESTOR DE LAYOUT, CAMPOS, NOMES, ORDEM & LARGURAS */}
+      {/* ======================================================== */}
+      {activeTab === 'campos' && (
+        <div className="space-y-6">
 
-              <div className="space-y-2">
-                {usuarios.map(user => {
-                  const isSelected = user.id === selectedUserId;
-                  const isTotal = user.role === 'admin_total';
-
-                  return (
-                    <button
-                      key={user.id}
-                      onClick={() => handleSelectUser(user)}
-                      className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
-                        isSelected
-                          ? 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-500/20 shadow-xs'
-                          : 'bg-white border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={user.avatar_url || 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&auto=format&fit=crop&q=80'}
-                          alt={user.nome}
-                          className="w-10 h-10 rounded-xl object-cover border border-slate-200 shrink-0"
-                        />
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-900 truncate">
-                            {user.nome}
-                          </p>
-                          <p className="text-[11px] text-slate-500 truncate">
-                            {user.cargo || user.role}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="shrink-0">
-                        {isTotal ? (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                            👑 Master
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700">
-                            {user.role}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
+          {/* Module Selector Bar */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <Layers className="w-4 h-4 text-indigo-600" />
+                Selecione o Módulo / Tela para Personalizar o Layout:
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowLivePreview(!showLivePreview)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                    showLivePreview 
+                      ? 'bg-indigo-50 border-indigo-200 text-indigo-700' 
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>{showLivePreview ? 'Ocultar Prévia ao Vivo' : 'Ver Prévia ao Vivo'}</span>
+                </button>
               </div>
             </div>
 
-            {/* Role Presets */}
-            {selectedUser && selectedUser.role !== 'admin_total' && (
-              <div className="bg-slate-50 rounded-2xl border border-slate-200 p-4 space-y-3">
-                <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <Zap className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Aplicar Modelo Predefinido</span>
-                </h4>
-                <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Carregue um conjunto padrão de permissões e personalize as chaves conforme a necessidade da unidade.
-                </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+              {SYSTEM_MODULES.map(module => {
+                const isSelected = selectedModule === module.id;
+                const fieldsCount = getOrderedFieldsForModule(module.id).length;
+                const hiddenCount = getOrderedFieldsForModule(module.id).filter(f => hiddenFields.includes(f.id)).length;
 
-                <div className="grid grid-cols-2 gap-2">
+                return (
                   <button
+                    key={module.id}
                     type="button"
-                    onClick={() => applyPreset('admin_local')}
-                    className="p-2 text-[11px] font-semibold bg-white border border-slate-200 hover:border-indigo-400 rounded-xl text-slate-700 hover:text-indigo-600 transition-colors text-left"
+                    onClick={() => setSelectedModule(module.id)}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      isSelected
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-500/20'
+                        : 'bg-slate-50/70 border-slate-200 text-slate-700 hover:bg-slate-100/80'
+                    }`}
                   >
-                    🏢 Admin Local (Gestor)
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className={`p-1.5 rounded-lg ${isSelected ? 'bg-white/20 text-white' : 'bg-white border border-slate-200 text-indigo-600'}`}>
+                        {getModuleIcon(module.icon)}
+                      </div>
+                      {hiddenCount > 0 && (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${isSelected ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-800'}`}>
+                          {hiddenCount} oculto{hiddenCount > 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold truncate">{module.id}</h4>
+                      <p className={`text-[10px] truncate ${isSelected ? 'text-indigo-100' : 'text-slate-400'}`}>
+                        {fieldsCount} campos
+                      </p>
+                    </div>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => applyPreset('profissional')}
-                    className="p-2 text-[11px] font-semibold bg-white border border-slate-200 hover:border-indigo-400 rounded-xl text-slate-700 hover:text-indigo-600 transition-colors text-left"
-                  >
-                    👩‍⚕️ Profissional / Esteta
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyPreset('recepcao')}
-                    className="p-2 text-[11px] font-semibold bg-white border border-slate-200 hover:border-indigo-400 rounded-xl text-slate-700 hover:text-indigo-600 transition-colors text-left"
-                  >
-                    🛎️ Recepção / Caixa
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyPreset('cliente')}
-                    className="p-2 text-[11px] font-semibold bg-white border border-slate-200 hover:border-indigo-400 rounded-xl text-slate-700 hover:text-indigo-600 transition-colors text-left"
-                  >
-                    👤 Cliente / Portal
-                  </button>
-                </div>
-              </div>
-            )}
+                );
+              })}
+            </div>
           </div>
 
-          {/* Permissions Matrix Detail */}
-          <div className="lg:col-span-8 space-y-4">
+          {/* Action Toolbar & Search */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            
+            {/* Search Input */}
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder={`Pesquisar campos em ${selectedModule}...`}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              />
+            </div>
+
+            {/* Quick Actions Buttons */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsAddingCustomField(true)}
+                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Adicionar Campo Extra</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleResetSection}
+                title="Restaura nomes, ordem e visibilidade desta tela"
+                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer border border-slate-200"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                <span>Redefinir Seção</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleResetAllToFactory}
+                title="Restaura todas as telas do sistema para o padrão de fábrica"
+                className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer border border-rose-200"
+              >
+                <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                <span>Padrão de Fábrica</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveFieldsConfig}
+                disabled={isSavingFields}
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold rounded-xl text-xs shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isSavingFields ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                <span>{isSavingFields ? 'Gravando Layout...' : 'Salvar Alterações de Layout'}</span>
+              </button>
+            </div>
+
+          </div>
+
+          {/* Success Banner */}
+          {savedFieldsSuccess && (
+            <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs font-bold flex items-center justify-between gap-3 animate-in fade-in shadow-xs">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                <span>
+                  Layout e configurações de campos salvos com sucesso! Todas as alterações de nomes, ordem, visibilidade e novos campos já estão ativas em toda a clínica.
+                </span>
+              </div>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-200 text-emerald-900 font-bold uppercase">
+                Sincronizado
+              </span>
+            </div>
+          )}
+
+          {/* Live Preview Panel (if enabled) */}
+          {showLivePreview && (
+            <div className="bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 shadow-xl space-y-4 animate-in slide-in-from-top-4 duration-200">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-indigo-400" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-200">
+                    Prévia em Tempo Real da Tela: {selectedModule}
+                  </h4>
+                </div>
+                <span className="text-[11px] text-slate-400">
+                  Mostra como o formulário ficará para a equipe com a ordem, renomeações e larguras ativas
+                </span>
+              </div>
+
+              <div className="bg-slate-950 p-5 rounded-xl border border-slate-800/80">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {activeModuleFields.filter(f => !hiddenFields.includes(f.id)).map((field, idx) => {
+                    const activeLabel = labelsCustomizados[field.id] || field.defaultLabel;
+                    const isMandatory = mandatoryFields.includes(field.id) || field.defaultRequired;
+                    const customWidth = larguraCampos[field.id] || field.defaultWidth;
+                    const placeholder = placeholdersCustomizados[field.id] || `Exemplo de preenchimento para ${activeLabel}...`;
+                    const help = ajudaCustomizada[field.id];
+
+                    const widthCol = customWidth === 'full' ? 'sm:col-span-2' : 'sm:col-span-1';
+
+                    return (
+                      <div key={field.id} className={`${widthCol} space-y-1.5`}>
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-slate-200 flex items-center gap-1">
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-indigo-400 font-mono">
+                              {idx + 1}º
+                            </span>
+                            <span>{activeLabel}</span>
+                            {isMandatory && <span className="text-rose-400 font-bold">*</span>}
+                          </label>
+                          {customWidth === 'full' && (
+                            <span className="text-[10px] text-slate-500 font-mono">100% Linha</span>
+                          )}
+                        </div>
+
+                        {field.type === 'textarea' ? (
+                          <textarea
+                            disabled
+                            placeholder={placeholder}
+                            rows={2}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-300 placeholder-slate-600 resize-none opacity-80"
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            disabled
+                            placeholder={placeholder}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-300 placeholder-slate-600 opacity-80"
+                          />
+                        )}
+
+                        {help && <p className="text-[10px] text-indigo-300">{help}</p>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Fields Management List */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+            
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <span>Campos Configurados para: <strong>{selectedModule}</strong></span>
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    {filteredModuleFields.length} campos
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Use os botões de seta para <strong>reorganizar a ordem</strong>, clique no lápis para <strong>renomear rótulos</strong>, alterne a <strong>visibilidade</strong> e ajuste a <strong>largura no grid</strong>.
+                </p>
+              </div>
+            </div>
+
+            {filteredModuleFields.length === 0 ? (
+              <div className="p-8 text-center bg-slate-50 rounded-xl border border-slate-200 text-slate-500">
+                <p className="text-xs font-semibold">Nenhum campo encontrado para os termos da busca.</p>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {filteredModuleFields.map((field, index) => {
+                  const isHidden = hiddenFields.includes(field.id);
+                  const isMandatory = mandatoryFields.includes(field.id) || field.defaultRequired;
+                  const isRenamed = Boolean(labelsCustomizados[field.id]);
+                  const activeLabel = labelsCustomizados[field.id] || field.defaultLabel;
+                  const currentWidth = larguraCampos[field.id] || field.defaultWidth || 'half';
+                  const isEditingThis = editingFieldId === field.id;
+
+                  return (
+                    <div
+                      key={field.id}
+                      className={`p-4 rounded-xl border transition-all ${
+                        isHidden
+                          ? 'bg-slate-100/70 border-slate-300 opacity-60'
+                          : isRenamed
+                            ? 'bg-indigo-50/30 border-indigo-200 shadow-2xs'
+                            : 'bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
+                      }`}
+                    >
+                      {/* View Row */}
+                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        
+                        {/* Left: Order, Info & Badges */}
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          
+                          {/* Position Badge & Reorder Arrows */}
+                          <div className="flex items-center gap-1 shrink-0 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                            <span className="w-7 text-center text-xs font-black text-slate-700">
+                              {index + 1}º
+                            </span>
+                            <div className="flex flex-col gap-0.5">
+                              <button
+                                type="button"
+                                disabled={index === 0}
+                                onClick={() => handleMoveFieldUp(index)}
+                                className="p-1 rounded hover:bg-white text-slate-600 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer transition-colors"
+                                title="Mover para cima no formulário"
+                              >
+                                <ArrowUp className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={index === filteredModuleFields.length - 1}
+                                onClick={() => handleMoveFieldDown(index)}
+                                className="p-1 rounded hover:bg-white text-slate-600 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer transition-colors"
+                                title="Mover para baixo no formulário"
+                              >
+                                <ArrowDown className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Field Names & Description */}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                                {activeLabel}
+                              </h4>
+
+                              {isRenamed && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                  <Edit3 className="w-2.5 h-2.5" />
+                                  Original: {field.defaultLabel}
+                                </span>
+                              )}
+
+                              {field.isCustom && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  Personalizado
+                                </span>
+                              )}
+
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                ID: {field.id}
+                              </span>
+                            </div>
+
+                            <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+                              {field.description}
+                              {ajudaCustomizada[field.id] && (
+                                <span className="text-indigo-600 font-semibold ml-1.5">
+                                  • Ajuda: "{ajudaCustomizada[field.id]}"
+                                </span>
+                              )}
+                              {placeholdersCustomizados[field.id] && (
+                                <span className="text-slate-400 ml-1.5">
+                                  • Placeholder: "{placeholdersCustomizados[field.id]}"
+                                </span>
+                              )}
+                            </p>
+                          </div>
+
+                        </div>
+
+                        {/* Right: Controls & Toggles */}
+                        <div className="flex flex-wrap items-center gap-2 shrink-0">
+                          
+                          {/* Width Selector */}
+                          <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[10px] font-bold">
+                            <button
+                              type="button"
+                              onClick={() => handleChangeFieldWidth(field.id, 'half')}
+                              className={`px-2 py-1 rounded transition-colors cursor-pointer ${
+                                currentWidth === 'half' ? 'bg-white text-indigo-700 shadow-2xs font-black' : 'text-slate-500 hover:text-slate-800'
+                              }`}
+                              title="Largura: 50% (Meia Coluna)"
+                            >
+                              50%
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleChangeFieldWidth(field.id, 'full')}
+                              className={`px-2 py-1 rounded transition-colors cursor-pointer ${
+                                currentWidth === 'full' ? 'bg-white text-indigo-700 shadow-2xs font-black' : 'text-slate-500 hover:text-slate-800'
+                              }`}
+                              title="Largura: 100% (Linha Inteira)"
+                            >
+                              100%
+                            </button>
+                          </div>
+
+                          {/* Rename Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleStartRename(field)}
+                            className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                            title="Renomear rótulo e personalizar textos"
+                          >
+                            <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
+                            <span>Renomear</span>
+                          </button>
+
+                          {/* Toggle Mandatory */}
+                          <button
+                            type="button"
+                            disabled={isHidden}
+                            onClick={() => handleToggleFieldMandatory(field.id)}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                              isMandatory
+                                ? 'bg-amber-50 text-amber-800 border-amber-300 shadow-2xs'
+                                : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                            }`}
+                            title="Tornar campo obrigatório no preenchimento"
+                          >
+                            {isMandatory ? '★ Obrigatório' : 'Opcional'}
+                          </button>
+
+                          {/* Toggle Visibility (Remove / Hide) */}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleFieldHidden(field.id)}
+                            className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                              isHidden
+                                ? 'bg-slate-200 border-slate-300 text-slate-700 shadow-inner'
+                                : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 shadow-2xs'
+                            }`}
+                            title={isHidden ? 'Campo está oculto/removido do layout' : 'Campo está visível no layout'}
+                          >
+                            {isHidden ? <EyeOff className="w-3.5 h-3.5 text-slate-600" /> : <Eye className="w-3.5 h-3.5 text-emerald-600" />}
+                            <span>{isHidden ? 'Oculto' : 'Visível'}</span>
+                          </button>
+
+                          {/* Reset Individual Button */}
+                          {(isRenamed || isHidden || isMandatory !== field.defaultRequired || currentWidth !== field.defaultWidth) && !field.isCustom && (
+                            <button
+                              type="button"
+                              onClick={() => handleResetIndividualField(field.id)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                              title="Redefinir este campo para o padrão original"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
+                          {/* Delete if Custom Field */}
+                          {field.isCustom && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCustomField(field.id)}
+                              className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors cursor-pointer"
+                              title="Excluir este campo personalizado"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
+                        </div>
+
+                      </div>
+
+                      {/* Inline Rename Form if currently editing */}
+                      {isEditingThis && (
+                        <div className="mt-4 pt-3.5 border-t border-indigo-100 bg-indigo-50/50 p-4 rounded-xl space-y-3 animate-in fade-in">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                              <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
+                              Personalizar Rótulo & Textos do Campo
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              Padrão: {field.defaultLabel}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                Rótulo do Campo (Label)
+                              </label>
+                              <input
+                                type="text"
+                                value={editLabelValue}
+                                onChange={(e) => setEditLabelValue(e.target.value)}
+                                placeholder={field.defaultLabel}
+                                className="w-full px-3 py-1.5 bg-white border border-indigo-200 rounded-lg text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                Texto de Placeholder (Exemplo)
+                              </label>
+                              <input
+                                type="text"
+                                value={editPlaceholderValue}
+                                onChange={(e) => setEditPlaceholderValue(e.target.value)}
+                                placeholder="Ex: Digite o valor..."
+                                className="w-full px-3 py-1.5 bg-white border border-indigo-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                Texto de Ajuda / Subtítulo
+                              </label>
+                              <input
+                                type="text"
+                                value={editHelpValue}
+                                onChange={(e) => setEditHelpValue(e.target.value)}
+                                placeholder="Orientações adicionais..."
+                                className="w-full px-3 py-1.5 bg-white border border-indigo-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-end gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setEditingFieldId(null)}
+                              className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-white rounded-lg transition-colors cursor-pointer"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleSaveRename}
+                              className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Aplicar Renomeação</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+          </div>
+
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* TAB 2: MATRIZ DE PERMISSÕES POR USUÁRIO / CARGO */}
+      {/* ======================================================== */}
+      {activeTab === 'permissoes' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          {/* Left Column: User Selection */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Users className="w-4 h-4 text-indigo-600" />
+                Usuários da Clínica ({usuarios.length})
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Selecione um colaborador para inspecionar ou ajustar privilégios
+              </p>
+            </div>
+
+            <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+              {usuarios.map(u => {
+                const isSelected = selectedUser?.id === u.id;
+                const isUserSuperAdmin = isUserAdminTotal(u);
+
+                return (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => setSelectedUser(u)}
+                    className={`w-full text-left p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                      isSelected
+                        ? 'bg-indigo-50/80 border-indigo-300 ring-2 ring-indigo-500/20 shadow-xs'
+                        : 'bg-slate-50/50 border-slate-200 hover:bg-slate-100/80'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
+                        isUserSuperAdmin 
+                          ? 'bg-amber-500 text-slate-950 font-black ring-2 ring-amber-300' 
+                          : 'bg-indigo-100 text-indigo-800'
+                      }`}>
+                        {u.nome ? u.nome.charAt(0).toUpperCase() : u.email.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-slate-900 truncate">
+                          {u.nome || u.email}
+                        </p>
+                        <p className="text-[10px] text-slate-500 truncate">{u.email}</p>
+                      </div>
+                    </div>
+
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ml-2 ${
+                      isUserSuperAdmin
+                        ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                        : u.role === 'admin_local'
+                          ? 'bg-indigo-100 text-indigo-800'
+                          : 'bg-slate-200 text-slate-700'
+                    }`}>
+                      {u.role || 'recepcao'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right Column: Permissions Matrix Editor */}
+          <div className="lg:col-span-2 space-y-4">
             {selectedUser ? (
               <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-6">
                 
-                {/* User Header & Role Setting */}
+                {/* User Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-4">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">
-                      Permissões de {selectedUser.nome}
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      E-mail: {selectedUser.email} • ID: {selectedUser.id}
-                    </p>
-                  </div>
-
                   <div className="flex items-center gap-3">
-                    <label className="text-xs font-semibold text-slate-600">
-                      Nível de Acesso:
-                    </label>
-                    <select
-                      value={selectedRole}
-                      disabled={selectedUser.role === 'admin_total'}
-                      onChange={(e) => setSelectedRole(e.target.value as UserRole)}
-                      className="px-3 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    >
-                      <option value="admin_total">Admin Total (Super Master)</option>
-                      <option value="admin_local">Admin Local (Gestor)</option>
-                      <option value="profissional">Profissional / Especialista</option>
-                      <option value="recepcao">Recepção & Atendimento</option>
-                      <option value="cliente">Cliente / Paciente</option>
-                    </select>
-                  </div>
-                </div>
-
-                {selectedUser.role === 'admin_total' && (
-                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2.5">
-                    <ShieldCheck className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">
+                      {selectedUser.nome ? selectedUser.nome.charAt(0).toUpperCase() : 'U'}
+                    </div>
                     <div>
-                      <p className="font-bold">Usuário com Acesso Admin Total Irrestrito</p>
-                      <p className="text-amber-800 mt-0.5 leading-relaxed">
-                        Este usuário é o Administrador Master do sistema. Todas as permissões de leitura, gravação, exclusão e visualização de custos e auditorias estão permanentemente ativas.
+                      <h3 className="text-base font-bold text-slate-900">
+                        {selectedUser.nome || selectedUser.email}
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Configurando permissões do usuário • Nível Atual: <strong>{activePresetRole}</strong>
                       </p>
                     </div>
-                  </div>
-                )}
-
-                {/* MODULE 1: FICHAS DE CLIENTES */}
-                <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-indigo-600" />
-                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                      Fichas de Clientes & Prontuários
-                    </h4>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1">
-                    <label className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-700 cursor-pointer hover:border-slate-300">
-                      <span>Criar Novo Cliente</span>
-                      <input
-                        type="checkbox"
-                        checked={currentPermissions.clientes?.criar ?? true}
-                        onChange={() => togglePermission('clientes', 'criar')}
-                        className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-700 cursor-pointer hover:border-slate-300">
-                      <span>Editar Dados do Cliente</span>
-                      <input
-                        type="checkbox"
-                        checked={currentPermissions.clientes?.editar ?? true}
-                        onChange={() => togglePermission('clientes', 'editar')}
-                        className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-700 cursor-pointer hover:border-slate-300">
-                      <span>Ver Histórico Completo</span>
-                      <input
-                        type="checkbox"
-                        checked={currentPermissions.clientes?.verHistorico ?? true}
-                        onChange={() => togglePermission('clientes', 'verHistorico')}
-                        className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-700 cursor-pointer hover:border-slate-300">
-                      <span>Preencher Anamnese</span>
-                      <input
-                        type="checkbox"
-                        checked={currentPermissions.clientes?.preencherAnamnese ?? true}
-                        onChange={() => togglePermission('clientes', 'preencherAnamnese')}
-                        className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between p-2.5 bg-rose-50/50 rounded-lg border border-rose-200 text-xs text-rose-800 cursor-pointer hover:border-rose-300">
-                      <span className="font-semibold">Excluir Ficha (pode_excluir)</span>
-                      <input
-                        type="checkbox"
-                        checked={currentPermissions.clientes?.excluir ?? false}
-                        onChange={() => togglePermission('clientes', 'excluir')}
-                        className="rounded text-rose-600 focus:ring-rose-500 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                {/* MODULE 2: AGENDA */}
-                <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-indigo-600" />
-                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                      Agenda de Atendimentos
-                    </h4>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1">
-                    <label className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-700 cursor-pointer hover:border-slate-300">
-                      <span>Ver Todos Agendamentos</span>
-                      <input
-                        type="checkbox"
-                        checked={currentPermissions.agenda?.verTodos ?? true}
-                        onChange={() => togglePermission('agenda', 'verTodos')}
-                        className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-700 cursor-pointer hover:border-slate-300">
-                      <span>Criar Agendamento</span>
-                      <input
-                        type="checkbox"
-                        checked={currentPermissions.agenda?.criar ?? true}
-                        onChange={() => togglePermission('agenda', 'criar')}
-                        className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-700 cursor-pointer hover:border-slate-300">
-                      <span>Finalizar Atendimento</span>
-                      <input
-                        type="checkbox"
-                        checked={currentPermissions.agenda?.finalizar ?? true}
-                        onChange={() => togglePermission('agenda', 'finalizar')}
-                        className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-700 cursor-pointer hover:border-slate-300">
-                      <span>Cancelar Agendamento</span>
-                      <input
-                        type="checkbox"
-                        checked={currentPermissions.agenda?.cancelar ?? true}
-                        onChange={() => togglePermission('agenda', 'cancelar')}
-                        className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                {/* MODULE 3: FINANCEIRO */}
-                <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="w-4 h-4 text-emerald-600" />
-                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                      Módulo Financeiro & Caixa
-                    </h4>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1">
-                    <label className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-700 cursor-pointer hover:border-slate-300">
-                      <span>Visualizar Entradas</span>
-                      <input
-                        type="checkbox"
-                        checked={currentPermissions.financeiro?.verEntradas ?? false}
-                        onChange={() => togglePermission('financeiro', 'verEntradas')}
-                        className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-700 cursor-pointer hover:border-slate-300">
-                      <span>Visualizar Saídas & Despesas</span>
-                      <input
-                        type="checkbox"
-                        checked={currentPermissions.financeiro?.verSaidas ?? false}
-                        onChange={() => togglePermission('financeiro', 'verSaidas')}
-                        className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-700 cursor-pointer hover:border-slate-300">
-                      <span>Despesas Recorrentes</span>
-                      <input
-                        type="checkbox"
-                        checked={currentPermissions.financeiro?.verRecorrentes ?? false}
-                        onChange={() => togglePermission('financeiro', 'verRecorrentes')}
-                        className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-700 cursor-pointer hover:border-slate-300">
-                      <span>Relatórios Consolidados</span>
-                      <input
-                        type="checkbox"
-                        checked={currentPermissions.financeiro?.verRelatorios ?? false}
-                        onChange={() => togglePermission('financeiro', 'verRelatorios')}
-                        className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between p-2.5 bg-rose-50/50 rounded-lg border border-rose-200 text-xs text-rose-800 cursor-pointer hover:border-rose-300">
-                      <span className="font-semibold">Excluir Lançamentos (Auditoria)</span>
-                      <input
-                        type="checkbox"
-                        checked={currentPermissions.financeiro?.excluir ?? false}
-                        onChange={() => togglePermission('financeiro', 'excluir')}
-                        className="rounded text-rose-600 focus:ring-rose-500 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                {/* MODULE 4: PROCEDIMENTOS & INSUMOS */}
-                <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-purple-600" />
-                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                      Procedimentos & Catálogo Clínico
-                    </h4>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1">
-                    <label className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-700 cursor-pointer hover:border-slate-300">
-                      <span>Criar Procedimentos</span>
-                      <input
-                        type="checkbox"
-                        checked={currentPermissions.procedimentos?.criar ?? true}
-                        onChange={() => togglePermission('procedimentos', 'criar')}
-                        className="rounded text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-700 cursor-pointer hover:border-slate-300">
-                      <span>Ver Custos de Insumos</span>
-                      <input
-                        type="checkbox"
-                        checked={currentPermissions.procedimentos?.verCustos ?? false}
-                        onChange={() => togglePermission('procedimentos', 'verCustos')}
-                        className="rounded text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-700 cursor-pointer hover:border-slate-300">
-                      <span>Ver Margem de Lucro</span>
-                      <input
-                        type="checkbox"
-                        checked={currentPermissions.procedimentos?.verMargem ?? false}
-                        onChange={() => togglePermission('procedimentos', 'verMargem')}
-                        className="rounded text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between p-2.5 bg-rose-50/50 rounded-lg border border-rose-200 text-xs text-rose-800 cursor-pointer hover:border-rose-300">
-                      <span className="font-semibold">Excluir Procedimentos</span>
-                      <input
-                        type="checkbox"
-                        checked={currentPermissions.procedimentos?.excluir ?? false}
-                        onChange={() => togglePermission('procedimentos', 'excluir')}
-                        className="rounded text-rose-600 focus:ring-rose-500 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                {/* MODULE 5: BENS & ATIVOS */}
-                <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Building className="w-4 h-4 text-blue-600" />
-                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                      Bens & Patrimônio da Clínica
-                    </h4>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1">
-                    <label className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-700 cursor-pointer hover:border-slate-300">
-                      <span>Gerenciar e Cadastrar Bens</span>
-                      <input
-                        type="checkbox"
-                        checked={currentPermissions.bens?.gerenciar ?? false}
-                        onChange={() => togglePermission('bens', 'gerenciar')}
-                        className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between p-2.5 bg-rose-50/50 rounded-lg border border-rose-200 text-xs text-rose-800 cursor-pointer hover:border-rose-300">
-                      <span className="font-semibold">Excluir Bens e Ativos</span>
-                      <input
-                        type="checkbox"
-                        checked={currentPermissions.bens?.excluir ?? false}
-                        onChange={() => togglePermission('bens', 'excluir')}
-                        className="rounded text-rose-600 focus:ring-rose-500 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                {/* MODULE 6: ORÇAMENTOS & CONTATOS */}
-                <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-amber-600" />
-                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                      Portal & Solicitações de Orçamento
-                    </h4>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1">
-                    <label className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-700 cursor-pointer hover:border-slate-300">
-                      <span>Ver Todas Solicitações</span>
-                      <input
-                        type="checkbox"
-                        checked={currentPermissions.orcamentos?.verTodos ?? true}
-                        onChange={() => togglePermission('orcamentos', 'verTodos')}
-                        className="rounded text-amber-600 focus:ring-amber-500 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-700 cursor-pointer hover:border-slate-300">
-                      <span>Responder Orçamentos</span>
-                      <input
-                        type="checkbox"
-                        checked={currentPermissions.orcamentos?.responder ?? true}
-                        onChange={() => togglePermission('orcamentos', 'responder')}
-                        className="rounded text-amber-600 focus:ring-amber-500 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-700 cursor-pointer hover:border-slate-300">
-                      <span>Ver E-mails de Contato</span>
-                      <input
-                        type="checkbox"
-                        checked={currentPermissions.orcamentos?.verEmails ?? true}
-                        onChange={() => togglePermission('orcamentos', 'verEmails')}
-                        className="rounded text-amber-600 focus:ring-amber-500 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                {/* Save Bar */}
-                <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                  <div>
-                    {savedSuccess && (
-                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 animate-in fade-in">
-                        <CheckCircle2 className="w-4 h-4" />
-                        Permissões salvas no Firestore com sucesso!
-                      </span>
-                    )}
                   </div>
 
                   <button
                     type="button"
-                    onClick={handleSavePermissions}
-                    disabled={isSaving}
-                    className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold rounded-xl text-xs shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                    onClick={handleSaveUserPermissions}
+                    disabled={isSavingUser}
+                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold rounded-xl text-xs shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
                   >
-                    {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    <span>{isSaving ? 'Salvando...' : 'Salvar Alterações de Permissão'}</span>
+                    {isSavingUser ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    <span>{isSavingUser ? 'Gravando...' : 'Salvar Permissões do Usuário'}</span>
                   </button>
+                </div>
+
+                {savedUserSuccess && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>Permissões do usuário gravadas com sucesso no Firestore!</span>
+                  </div>
+                )}
+
+                {/* Role Preset Selector */}
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                  <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    Cargo / Modelo de Permissões Rápido:
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {(['admin_local', 'profissional', 'recepcao', 'cliente'] as UserRole[]).map(role => (
+                      <button
+                        key={role}
+                        type="button"
+                        onClick={() => {
+                          setActivePresetRole(role);
+                          if (DEFAULT_PRESETS[role]) {
+                            setCustomPerms(DEFAULT_PRESETS[role]);
+                          }
+                        }}
+                        className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                          activePresetRole === role
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {role === 'admin_local' && 'Admin Local (Gestor)'}
+                        {role === 'profissional' && 'Profissional Clínico'}
+                        {role === 'recepcao' && 'Recepção / Atendimento'}
+                        {role === 'cliente' && 'Acesso Cliente'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Granular Permissions Table */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    Matriz Detalhada de Ações por Módulo:
+                  </h4>
+
+                  {/* Modules grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    
+                    {/* Financeiro */}
+                    <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2.5">
+                      <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+                        <DollarSign className="w-4 h-4 text-emerald-600" />
+                        <span className="text-xs font-bold text-slate-900">Módulo Financeiro</span>
+                      </div>
+                      <div className="space-y-1.5 text-xs">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(customPerms.financeiro?.verEntradas)}
+                            onChange={(e) => setCustomPerms(prev => ({ ...prev, financeiro: { ...prev.financeiro, verEntradas: e.target.checked } }))}
+                            className="rounded text-indigo-600"
+                          />
+                          <span>Ver Entradas / Faturamento</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(customPerms.financeiro?.verSaidas)}
+                            onChange={(e) => setCustomPerms(prev => ({ ...prev, financeiro: { ...prev.financeiro, verSaidas: e.target.checked } }))}
+                            className="rounded text-indigo-600"
+                          />
+                          <span>Ver Despesas / Saídas</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(customPerms.financeiro?.verRelatorios)}
+                            onChange={(e) => setCustomPerms(prev => ({ ...prev, financeiro: { ...prev.financeiro, verRelatorios: e.target.checked } }))}
+                            className="rounded text-indigo-600"
+                          />
+                          <span>Ver Relatórios e DRE</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer text-rose-700 font-semibold">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(customPerms.financeiro?.excluir)}
+                            onChange={(e) => setCustomPerms(prev => ({ ...prev, financeiro: { ...prev.financeiro, excluir: e.target.checked } }))}
+                            className="rounded text-rose-600"
+                          />
+                          <span>Permitir Excluir Lançamentos</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Clientes */}
+                    <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2.5">
+                      <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+                        <User className="w-4 h-4 text-indigo-600" />
+                        <span className="text-xs font-bold text-slate-900">Fichas & Clientes</span>
+                      </div>
+                      <div className="space-y-1.5 text-xs">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(customPerms.clientes?.criar)}
+                            onChange={(e) => setCustomPerms(prev => ({ ...prev, clientes: { ...prev.clientes, criar: e.target.checked } }))}
+                            className="rounded text-indigo-600"
+                          />
+                          <span>Cadastrar Novos Clientes</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(customPerms.clientes?.editar)}
+                            onChange={(e) => setCustomPerms(prev => ({ ...prev, clientes: { ...prev.clientes, editar: e.target.checked } }))}
+                            className="rounded text-indigo-600"
+                          />
+                          <span>Editar Fichas e Dados</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(customPerms.clientes?.preencherAnamnese)}
+                            onChange={(e) => setCustomPerms(prev => ({ ...prev, clientes: { ...prev.clientes, preencherAnamnese: e.target.checked } }))}
+                            className="rounded text-indigo-600"
+                          />
+                          <span>Preencher Anamnese & Evoluções</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer text-rose-700 font-semibold">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(customPerms.clientes?.excluir)}
+                            onChange={(e) => setCustomPerms(prev => ({ ...prev, clientes: { ...prev.clientes, excluir: e.target.checked } }))}
+                            className="rounded text-rose-600"
+                          />
+                          <span>Excluir Clientes</span>
+                        </label>
+                      </div>
+                    </div>
+
+                  </div>
                 </div>
 
               </div>
             ) : (
-              <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 text-slate-400">
+              <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 shadow-xs text-slate-400">
                 <Users className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                 <p className="text-sm font-semibold">Selecione um usuário na coluna lateral para gerenciar suas permissões.</p>
               </div>
@@ -726,111 +1358,138 @@ export const PermissionsManagementView: React.FC<PermissionsManagementViewProps>
         </div>
       )}
 
-      {/* TAB 2: CONFIGURAÇÃO DE CAMPOS E VISIBILIDADE */}
-      {activeTab === 'campos' && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-4">
-            <div>
-              <h3 className="text-base font-bold text-slate-900">
-                Controle de Visibilidade & Obrigatoriedade de Campos
-              </h3>
-              <p className="text-xs text-slate-500">
-                Oculte campos dispensáveis para simplificar formulários ou defina campos que devem ser obrigatórios na clínica.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleSaveFieldsConfig}
-              disabled={isSavingFields}
-              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              {isSavingFields ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              <span>{isSavingFields ? 'Salvando...' : 'Salvar Configuração de Telas'}</span>
-            </button>
-          </div>
-
-          {savedFieldsSuccess && (
-            <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>Configurações de campos atualizadas no banco de dados com sucesso!</span>
-            </div>
-          )}
-
-          {/* Group fields by category */}
-          {['Clientes', 'Procedimentos', 'Estoque', 'Agenda'].map(category => {
-            const categoryFields = SYSTEM_FIELDS.filter(f => f.category === category);
-
-            return (
-              <div key={category} className="p-5 rounded-xl bg-slate-50/70 border border-slate-200 space-y-4">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" />
-                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    Formulários de {category}
-                  </h4>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {categoryFields.map(field => {
-                    const isHidden = hiddenFields.includes(field.id);
-                    const isMandatory = mandatoryFields.includes(field.id);
-
-                    return (
-                      <div
-                        key={field.id}
-                        className={`p-3.5 rounded-xl border transition-all flex items-center justify-between ${
-                          isHidden 
-                            ? 'bg-slate-100/80 border-slate-300 opacity-60' 
-                            : 'bg-white border-slate-200 shadow-2xs'
-                        }`}
-                      >
-                        <div>
-                          <p className="text-xs font-bold text-slate-900">
-                            {field.label}
-                          </p>
-                          <p className="text-[10px] text-slate-400 font-mono mt-0.5">
-                            ID: {field.id}
-                          </p>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          {/* Toggle Mandatory */}
-                          <button
-                            type="button"
-                            disabled={isHidden}
-                            onClick={() => handleToggleFieldMandatory(field.id)}
-                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors cursor-pointer ${
-                              isMandatory
-                                ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
-                            title="Tornar campo obrigatório com asterisco"
-                          >
-                            {isMandatory ? '★ Obrigatório' : 'Opcional'}
-                          </button>
-
-                          {/* Toggle Visibility */}
-                          <button
-                            type="button"
-                            onClick={() => handleToggleFieldHidden(field.id)}
-                            className={`p-1.5 rounded-lg border text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                              isHidden
-                                ? 'bg-slate-200 border-slate-300 text-slate-600'
-                                : 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                            }`}
-                            title={isHidden ? 'Campo está oculto na interface' : 'Campo está visível'}
-                          >
-                            {isHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                            <span className="text-[11px]">{isHidden ? 'Oculto' : 'Visível'}</span>
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
+      {/* ======================================================== */}
+      {/* MODAL: CRIAR CAMPO PERSONALIZADO */}
+      {/* ======================================================== */}
+      {isAddingCustomField && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95">
+            <div className="p-5 border-b border-slate-100 bg-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <Plus className="w-5 h-5 text-emerald-400" />
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold">Criar Novo Campo Personalizado</h3>
+                  <p className="text-xs text-slate-400">Adicionar à tela de {selectedModule}</p>
                 </div>
               </div>
-            );
-          })}
+              <button
+                type="button"
+                onClick={() => setIsAddingCustomField(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCustomField} className="p-6 space-y-4 text-xs sm:text-sm">
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  Nome / Rótulo do Campo *
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  placeholder="Ex: Indicação / Como conheceu, Redes Sociais, Altura, etc."
+                  value={newFieldName}
+                  onChange={(e) => setNewFieldName(e.target.value)}
+                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    Tipo de Dado
+                  </label>
+                  <select
+                    value={newFieldType}
+                    onChange={(e) => setNewFieldType(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold cursor-pointer"
+                  >
+                    <option value="text">Texto Curto</option>
+                    <option value="textarea">Texto Longo (Área de Texto)</option>
+                    <option value="number">Número</option>
+                    <option value="date">Data</option>
+                    <option value="select">Seleção de Opções (Dropdown)</option>
+                    <option value="boolean">Sim / Não (Caixa de Seleção)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    Largura no Grid
+                  </label>
+                  <select
+                    value={newFieldWidth}
+                    onChange={(e) => setNewFieldWidth(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold cursor-pointer"
+                  >
+                    <option value="half">50% (Meia Coluna)</option>
+                    <option value="full">100% (Linha Inteira)</option>
+                  </select>
+                </div>
+              </div>
+
+              {newFieldType === 'select' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    Opções da Lista (separadas por vírgula)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Opção 1, Opção 2, Opção 3"
+                    value={newFieldOptions}
+                    onChange={(e) => setNewFieldOptions(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  Exemplo de Preenchimento (Placeholder)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: Digite aqui..."
+                  value={newFieldPlaceholder}
+                  onChange={(e) => setNewFieldPlaceholder(e.target.value)}
+                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
+                />
+              </div>
+
+              <div className="pt-2">
+                <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-800 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={newFieldRequired}
+                    onChange={(e) => setNewFieldRequired(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span>Tornar este campo obrigatório no preenchimento</span>
+                </label>
+              </div>
+
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddingCustomField(false)}
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold transition-colors cursor-pointer text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer text-xs"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Criar Campo na Tela</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 

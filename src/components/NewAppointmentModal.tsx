@@ -66,17 +66,11 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
   useEffect(() => {
     if (currentProc) {
       setDuracao(currentProc.duracao_minutos || 45);
-      if (currentProc.variacoes && currentProc.variacoes.length > 0) {
-        const firstVar = currentProc.variacoes[0];
-        setSelectedVariationId(firstVar.id);
-        setValor(String(firstVar.valor));
-      } else {
-        setSelectedVariationId('');
-        const defaultVal = currentProc.valor_promocional || currentProc.valor_tabela || 0;
-        setValor(String(defaultVal));
-      }
+      setSelectedVariationId('');
+      const defaultVal = currentProc.valor_promocional || currentProc.valor_tabela || currentProc.preco_sugerido || 0;
+      setValor(String(defaultVal));
     }
-  }, [selectedProcId]);
+  }, [selectedProcId, currentProc]);
 
   const handleVariationChange = (varId: string) => {
     setSelectedVariationId(varId);
@@ -235,42 +229,10 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
               >
                 {adminProcedures.map((proc) => (
                   <option key={proc.id} value={proc.id}>
-                    {proc.nome} — R$ {proc.valor_promocional || proc.valor_tabela} ({proc.categoria})
+                    {proc.nome} — R$ {proc.valor_promocional || proc.valor_tabela || proc.preco_sugerido || 0} ({proc.categoria})
                   </option>
                 ))}
               </select>
-            )}
-
-            {/* 3-Tier Variations Option if procedure has variations */}
-            {currentProc?.variacoes && currentProc.variacoes.length > 0 && (
-              <div className="p-3 bg-indigo-50/70 border border-indigo-100 rounded-xl space-y-1.5 mt-2">
-                <label className="text-[11px] font-bold text-indigo-900 flex items-center gap-1">
-                  <Layers className="w-3.5 h-3.5 text-indigo-600" />
-                  Variação / Nível de Aplicação:
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  {currentProc.variacoes.map((v) => {
-                    const isSelected = selectedVariationId === v.id;
-                    return (
-                      <button
-                        type="button"
-                        key={v.id}
-                        onClick={() => handleVariationChange(v.id)}
-                        className={`p-2 rounded-lg border text-left transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                            : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-300'
-                        }`}
-                      >
-                        <div className="text-[11px] font-bold truncate">{v.nome}</div>
-                        <div className={`text-xs font-mono font-semibold ${isSelected ? 'text-indigo-100' : 'text-emerald-700'}`}>
-                          R$ {v.valor}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
             )}
           </div>
 

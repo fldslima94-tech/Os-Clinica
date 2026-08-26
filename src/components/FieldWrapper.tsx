@@ -14,8 +14,60 @@ interface FieldWrapperProps {
 }
 
 /**
- * FieldWrapper: Componente dinâmico de controle de visibilidade e obrigatoriedade de campos
- * Permite ao `admin_total` ocultar ou tornar obrigatórios campos específicos no sistema.
+ * Helper para obter o rótulo (label) ativo de um campo, considerando renomeações do Admin Master
+ */
+export function getFieldLabel(
+  campoId: string, 
+  configuracaoCampos?: ConfiguracaoCampos, 
+  fallbackLabel: string = ''
+): string {
+  if (configuracaoCampos?.labelsCustomizados?.[campoId]) {
+    return configuracaoCampos.labelsCustomizados[campoId];
+  }
+  return fallbackLabel;
+}
+
+/**
+ * Helper para obter o placeholder ativo de um campo, considerando customizações do Admin Master
+ */
+export function getFieldPlaceholder(
+  campoId: string, 
+  configuracaoCampos?: ConfiguracaoCampos, 
+  fallbackPlaceholder: string = ''
+): string {
+  if (configuracaoCampos?.placeholdersCustomizados?.[campoId]) {
+    return configuracaoCampos.placeholdersCustomizados[campoId];
+  }
+  return fallbackPlaceholder;
+}
+
+/**
+ * Helper para checar se um campo está oculto/removido pelo Admin Master
+ */
+export function isFieldHidden(
+  campoId: string, 
+  configuracaoCampos?: ConfiguracaoCampos
+): boolean {
+  return configuracaoCampos?.camposOcultos?.includes(campoId) ?? false;
+}
+
+/**
+ * Helper para checar se um campo é obrigatório pelo Admin Master
+ */
+export function isFieldMandatory(
+  campoId: string, 
+  configuracaoCampos?: ConfiguracaoCampos, 
+  defaultRequired: boolean = false
+): boolean {
+  if (configuracaoCampos?.camposObrigatorios?.includes(campoId)) {
+    return true;
+  }
+  return defaultRequired;
+}
+
+/**
+ * FieldWrapper: Componente dinâmico de controle de visibilidade, renomeação,
+ * obrigatoriedade e layout de campos pelo Admin Master.
  */
 export const FieldWrapper: React.FC<FieldWrapperProps> = ({
   campoId,
@@ -36,20 +88,35 @@ export const FieldWrapper: React.FC<FieldWrapperProps> = ({
     return null;
   }
 
+  // Obter label customizado se o Admin Master tiver renomeado
+  const activeLabel = configuracaoCampos?.labelsCustomizados?.[campoId] || label;
+  
+  // Obter texto de ajuda customizado se configurado
+  const activeHelp = configuracaoCampos?.ajudaCustomizada?.[campoId] || helpText;
+
   const isMandatory = required || mandatoryList.includes(campoId);
 
+  // Largura customizada definida pelo Admin
+  const customWidth = configuracaoCampos?.larguraCampos?.[campoId];
+  const widthClass = customWidth === 'full' 
+    ? 'col-span-full' 
+    : customWidth === 'third' 
+      ? 'sm:col-span-1' 
+      : '';
+
   return (
-    <div className={`w-full ${className}`}>
-      {label && (
+    <div className={`w-full ${widthClass} ${className}`}>
+      {activeLabel && (
         <label className="block text-xs font-semibold text-slate-700 mb-1">
-          {label}
+          {activeLabel}
           {isMandatory && <span className="text-rose-500 ml-1 font-bold">*</span>}
         </label>
       )}
       {children}
-      {helpText && (
-        <p className="text-[11px] text-slate-400 mt-1">{helpText}</p>
+      {activeHelp && (
+        <p className="text-[11px] text-slate-400 mt-1">{activeHelp}</p>
       )}
     </div>
   );
 };
+

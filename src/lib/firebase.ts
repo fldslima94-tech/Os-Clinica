@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import config from '../../firebase-applet-config.json';
 
@@ -17,10 +17,21 @@ const firebaseConfig = {
 // Initialize Firebase App instance
 export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Cloud Firestore with specified database ID
-export const db = config.firestoreDatabaseId && config.firestoreDatabaseId !== '(default)'
-  ? getFirestore(app, config.firestoreDatabaseId)
-  : getFirestore(app);
+// Initialize Cloud Firestore with specified database ID, auto-detect long polling and persistent offline cache
+const databaseId = config.firestoreDatabaseId && config.firestoreDatabaseId !== '(default)'
+  ? config.firestoreDatabaseId
+  : '(default)';
+
+export const db = initializeFirestore(
+  app,
+  {
+    experimentalAutoDetectLongPolling: true,
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
+  },
+  databaseId
+);
 
 // Initialize Firebase Auth
 export const auth = getAuth(app);

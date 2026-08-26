@@ -279,26 +279,45 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                               </span>
                             </div>
 
-                            <div>
-                              <div className="text-xs font-bold text-slate-900 flex items-center justify-between">
-                                <span>{patient?.nome || 'Paciente'}</span>
-                                {patient && (
-                                  <button
-                                    onClick={() => onViewPatient(patient)}
-                                    className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer"
-                                  >
-                                    Prontuário
-                                  </button>
+                            <div className="space-y-2">
+                              {/* Nome do Cliente */}
+                              <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                  Cliente / Paciente
+                                </div>
+                                <div className="text-xs sm:text-sm font-extrabold text-slate-900 flex items-center justify-between mt-0.5">
+                                  <span className="truncate">{patient?.nome || ag.paciente?.nome || 'Cliente'}</span>
+                                  {patient && (
+                                    <button
+                                      onClick={() => onViewPatient(patient)}
+                                      className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer shrink-0 ml-1"
+                                    >
+                                      Prontuário
+                                    </button>
+                                  )}
+                                </div>
+                                {patient?.telefone && (
+                                  <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                                    {patient.telefone}
+                                  </div>
                                 )}
                               </div>
-                              <p className="text-[11px] text-slate-600 mt-0.5">
-                                {ag.procedimento}
-                              </p>
-                              {ag.valor_estimado && (
-                                <p className="text-[11px] font-bold text-emerald-700 mt-0.5">
-                                  R$ {ag.valor_estimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+
+                              {/* Procedimento */}
+                              <div className="bg-indigo-50/60 p-2 rounded-lg border border-indigo-100">
+                                <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 flex items-center gap-1">
+                                  <Sparkles className="w-3 h-3 text-indigo-600" />
+                                  <span>Procedimento Agendado</span>
+                                </div>
+                                <p className="text-xs font-bold text-indigo-950 mt-0.5 leading-snug">
+                                  {ag.procedimento}
                                 </p>
-                              )}
+                                {ag.valor_estimado ? (
+                                  <p className="text-[11px] font-bold text-emerald-700 mt-1 font-mono">
+                                    R$ {ag.valor_estimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </p>
+                                ) : null}
+                              </div>
                             </div>
 
                             {/* Action Buttons */}

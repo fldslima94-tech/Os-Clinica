@@ -15,19 +15,23 @@ import {
   Sparkles,
   Camera,
   HeartPulse,
-  Building
+  Building,
+  CheckCircle2,
+  MapPin,
+  Clock
 } from 'lucide-react';
 import { Paciente, UsuarioEquipe } from '../types';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 import { checkUserCustomPermission } from '../services/firebaseService';
+import { calcularIdade } from '../utils/anamneseValidation';
 
 interface PatientsViewProps {
   pacientes: Paciente[];
   onOpenNewPatient: () => void;
+  onOpenNewAnamnese?: () => void;
   onViewPatient: (paciente: Paciente) => void;
   onOpenPackages?: (paciente: Paciente) => void;
   onDeletePatient?: (id: string, motivo?: string) => void;
-  onOpenNewSupplier?: () => void;
   onGoToSuppliers?: () => void;
   currentUser?: UsuarioEquipe;
 }
@@ -35,10 +39,10 @@ interface PatientsViewProps {
 export const PatientsView: React.FC<PatientsViewProps> = ({
   pacientes,
   onOpenNewPatient,
+  onOpenNewAnamnese,
   onViewPatient,
   onOpenPackages,
   onDeletePatient,
-  onOpenNewSupplier,
   onGoToSuppliers,
   currentUser,
 }) => {
@@ -53,25 +57,10 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
       p.nome.toLowerCase().includes(q) ||
       p.telefone.includes(q) ||
       (p.email && p.email.toLowerCase().includes(q)) ||
+      (p.cpf && p.cpf.includes(q)) ||
       (p.historico_clinico && p.historico_clinico.toLowerCase().includes(q))
     );
   });
-
-  const calculateAge = (birthDateString?: string) => {
-    if (!birthDateString) return null;
-    try {
-      const birth = new Date(birthDateString);
-      const today = new Date();
-      let age = today.getFullYear() - birth.getFullYear();
-      const m = today.getMonth() - birth.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
-        age--;
-      }
-      return age;
-    } catch {
-      return null;
-    }
-  };
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return '-';
@@ -91,34 +80,34 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-              Prontuários & Anamnese
+              Prontuários & Anamnese Completa
             </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight mt-1">
-            Fichas de Clientes & Histórico Clínico
+            Fichas de Clientes & Anamneses Clínicas
           </h2>
           <p className="text-xs text-slate-500 font-medium mt-0.5">
-            Anamneses personalizáveis, evoluções de retorno clínico e galeria fotográfica privada antes/depois.
+            Anamnese estruturada com validação estrita, assinatura digital em canvas, evoluções de retorno e galeria de fotos.
           </p>
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
-          {onOpenNewSupplier && (
+          {onOpenNewAnamnese && (
             <button
-              onClick={onOpenNewSupplier}
-              className="inline-flex items-center gap-2 px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold transition-all cursor-pointer shadow-2xs"
+              onClick={onOpenNewAnamnese}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 text-indigo-700 rounded-xl text-xs sm:text-sm font-bold border border-indigo-200 transition-all cursor-pointer shadow-xs"
             >
-              <Building className="w-4 h-4 text-amber-600" />
-              <span>+ Novo Fornecedor</span>
+              <Sparkles className="w-4 h-4 text-indigo-600" />
+              <span>Nova Anamnese Completa</span>
             </button>
           )}
 
           <button
             onClick={onOpenNewPatient}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-sm font-semibold transition-all cursor-pointer shadow-sm"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-xs"
           >
             <Plus className="w-4 h-4" />
-            <span>Cadastrar Nova Ficha</span>
+            <span>Cadastrar Cliente</span>
           </button>
         </div>
       </div>
@@ -129,7 +118,7 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Buscar ficha por nome do cliente, telefone, e-mail ou histórico..."
+            placeholder="Buscar ficha por nome do cliente, telefone, CPF, e-mail..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
@@ -160,9 +149,10 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredPacientes.map((paciente) => {
-            const age = calculateAge(paciente.data_nascimento);
+            const age = calcularIdade(paciente.data_nascimento);
             const totalFotos = (paciente.fotos_antes_depois?.length || 0) + (paciente.galeria_clinica?.length || 0);
             const totalEvolucoes = paciente.evolucoes_retornos?.length || 0;
+            const totalAnamneses = paciente.anamneses_completas?.length || 0;
 
             return (
               <div
@@ -175,7 +165,13 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
                       {paciente.nome.charAt(0).toUpperCase()}
                     </div>
 
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                      {totalAnamneses > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <CheckCircle2 className="w-3 h-3" />
+                          {totalAnamneses} Anamnese{totalAnamneses > 1 ? 's' : ''}
+                        </span>
+                      )}
                       {totalFotos > 0 && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
                           <Camera className="w-3 h-3" />
@@ -197,14 +193,21 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
 
                   <div className="mt-2 space-y-1.5 text-xs text-slate-600">
                     <div className="flex items-center gap-2">
-                      <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span>{paciente.telefone}</span>
+                      <Phone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span className="font-semibold text-slate-800">{paciente.telefone}</span>
                     </div>
 
                     {paciente.data_nascimento && (
                       <div className="flex items-center gap-2">
                         <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span>{formatDate(paciente.data_nascimento)} {age ? `(${age} anos)` : ''}</span>
+                        <span>{formatDate(paciente.data_nascimento)} {age !== '' ? `(${age} anos)` : ''}</span>
+                      </div>
+                    )}
+
+                    {paciente.endereco && (
+                      <div className="flex items-center gap-2 text-slate-500 text-[11px] truncate">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate">{paciente.endereco}</span>
                       </div>
                     )}
 
@@ -229,7 +232,7 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
                     onClick={() => onViewPatient(paciente)}
                     className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer"
                   >
-                    <span>Abrir Ficha Completa</span>
+                    <span>Abrir Prontuário & Ficha</span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </button>
 

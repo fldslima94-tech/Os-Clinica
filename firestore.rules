@@ -2,171 +2,234 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Funções Auxiliares de Autenticação e RBAC
+    // ==========================================
+    // FUNÇÕES DE VALIDAÇÃO DEFENSIVAS
+    // ==========================================
+    
     function isAuthenticated() {
       return request.auth != null;
     }
-    
-    function getUserData() {
+
+    function perfilExists() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/perfis/$(request.auth.uid));
+    }
+
+    function getPerfilData() {
       return get(/databases/$(database)/documents/perfis/$(request.auth.uid)).data;
     }
 
-    function isAdminTotal() {
-      return isAuthenticated() && (
-        getUserData().cargo == 'admin_total' || 
-        getUserData().role == 'admin_total'
+    function getUserClinicaId() {
+      return perfilExists() ? getPerfilData().get('clinicaId', '') : '';
+    }
+
+    function isSuperAdmin() {
+      return perfilExists() && (
+        getPerfilData().get('cargo', '') == 'admin_total' || 
+        getPerfilData().get('role', '') == 'admin_total'
       );
     }
 
     function isMemberOf(clinicaId) {
-      return isAuthenticated() && (isAdminTotal() || getUserData().clinicaId == clinicaId);
-    }
-
-    function hasRole(role) {
-      return isAuthenticated() && (isAdminTotal() || getUserData().cargo == role || getUserData().role == role);
+      return isSuperAdmin() || (isAuthenticated() && getUserClinicaId() == clinicaId);
     }
 
     function isStaff(clinicaId) {
-      return isAdminTotal() || (
+      return isSuperAdmin() || (
         isMemberOf(clinicaId) && 
-        (getUserData().cargo in ['admin_local', 'gestor', 'admin', 'recepcao', 'profissional'] || 
-         getUserData().role in ['admin_local', 'gestor', 'admin', 'recepcao', 'profissional'])
+        (getPerfilData().get('cargo', '') in ['admin_total', 'admin_local', 'gestor', 'recepcao', 'profissional', 'admin'] ||
+         getPerfilData().get('role', '') in ['admin_total', 'admin_local', 'gestor', 'recepcao', 'profissional', 'admin'])
       );
     }
 
-    function isGestor(clinicaId) {
-      return isAdminTotal() || (
-        isMemberOf(clinicaId) && 
-        (getUserData().cargo in ['admin_local', 'gestor', 'admin'] || 
-         getUserData().role in ['admin_local', 'gestor', 'admin'])
-      );
-    }
+    // ==========================================
+    // REGRAS POR COLEÇÃO (RAIZ)
+    // ==========================================
 
     // 1. Perfis de Usuários
     match /perfis/{userId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdminTotal() || hasRole('admin_local') || hasRole('gestor'));
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
     }
 
-    // 2. Clínicas e Configurações
-    match /clinicas/{clinicaId} {
-      allow read: if isMemberOf(clinicaId);
-      allow update: if isGestor(clinicaId);
+    // Usuários (alias de compatibilidade)
+    match /usuarios/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
+    }
 
-      // Comunicados Internos (Ocultos para Clientes)
+    // 2. Clínicas
+    match /clinicas/{clinicaId} {
+      allow read: if isAuthenticated();
+      allow write: if isMemberOf(clinicaId);
+
       match /comunicados_internos/{comunicadoId} {
         allow read, write: if isStaff(clinicaId);
       }
-
-      // Despesas Recorrentes
-      match /despesas_recorrentes/{despesaId} {
-        allow read, write: if isGestor(clinicaId);
-      }
     }
 
-    // Configurações de Visibilidade de Campos (Exclusivo admin_total)
+    // 3. Configurações de Campos (Ocultar/Exibir)
     match /configuracoes_campos/{configId} {
       allow read: if isAuthenticated();
-      allow write: if isAdminTotal();
+      allow write: if isStaff(request.resource.data.clinicaId) || isSuperAdmin();
     }
 
-    // Logs de Auditoria do Sistema
-    match /logs_auditoria/{logId} {
-      allow create: if isAuthenticated();
-      allow read: if isGestor(resource.data.clinicaId) || isAdminTotal();
-    }
-
-    // Permissões Customizadas de Usuários
-    match /permissoes_usuarios/{userId} {
+    // Configurações da Clínica (alias)
+    match /clinica_config/{configId} {
       allow read: if isAuthenticated();
-      allow write: if isAdminTotal();
+      allow write: if isSuperAdmin() || isStaff(request.resource.data.clinicaId);
     }
 
-    // 3. Fichas de Clientes e Evolução
+    // 4. Despesas Recorrentes
+    match /despesas_recorrentes/{despesaId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        resource.data.clinicaId == getUserClinicaId()
+      );
+      allow write: if isAuthenticated() && isStaff(request.resource.data.clinicaId);
+    }
+
+    // 5. Agendamentos
+    match /agendamentos/{agendamentoId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        resource.data.clinicaId == getUserClinicaId() ||
+        resource.data.clienteId == request.auth.uid
+      );
+      allow write: if isAuthenticated() && (isStaff(request.resource.data.clinicaId) || isSuperAdmin());
+    }
+
+    // 6. Procedimentos
+    match /procedimentos/{procId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        resource.data.clinicaId == getUserClinicaId()
+      );
+      allow write: if isAuthenticated() && isStaff(request.resource.data.clinicaId);
+    }
+
+    // 7. Fornecedores
+    match /fornecedores/{fornecedorId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        resource.data.clinicaId == getUserClinicaId()
+      );
+      allow write: if isAuthenticated() && isStaff(request.resource.data.clinicaId);
+    }
+
+    // 8. Estoque e Insumos
+    match /estoque_insumos/{insumoId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        resource.data.clinicaId == getUserClinicaId()
+      );
+      allow write: if isAuthenticated() && isStaff(request.resource.data.clinicaId);
+    }
+
+    match /estoque/{insumoId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        resource.data.clinicaId == getUserClinicaId()
+      );
+      allow write: if isAuthenticated() && isStaff(request.resource.data.clinicaId);
+    }
+
+    // 9. Fluxo de Caixa (Financeiro)
+    match /fluxo_caixa/{lancamentoId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        resource.data.clinicaId == getUserClinicaId()
+      );
+      allow write: if isAuthenticated() && isStaff(request.resource.data.clinicaId);
+    }
+
+    match /transacoes/{transacaoId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        resource.data.clinicaId == getUserClinicaId()
+      );
+      allow write: if isAuthenticated() && isStaff(request.resource.data.clinicaId);
+    }
+
+    // 10. Fichas de Clientes e Pacientes
     match /fichas_clientes/{clienteId} {
-      allow read, write: if isStaff(resource.data.clinicaId);
-      allow create: if isStaff(request.resource.data.clinicaId);
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        resource.data.clinicaId == getUserClinicaId()
+      );
+      allow write: if isAuthenticated() && isStaff(request.resource.data.clinicaId);
 
       match /evolucoes_atendimentos/{evolucaoId} {
-        allow read, write: if isStaff(get(/databases/$(database)/documents/fichas_clientes/$(clienteId)).data.clinicaId);
+        allow read, write: if isAuthenticated();
       }
     }
 
-    // 4. Procedimentos e Modelos
-    match /procedimentos/{procedimentoId} {
-      allow read: if isMemberOf(resource.data.clinicaId);
-      allow write: if isStaff(request.resource.data.clinicaId);
+    match /pacientes/{pacienteId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        resource.data.clinicaId == getUserClinicaId()
+      );
+      allow write: if isAuthenticated() && isStaff(request.resource.data.clinicaId);
     }
 
+    // 11. Bens e Ativos
+    match /bens_ativos/{bemId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        resource.data.clinicaId == getUserClinicaId()
+      );
+      allow write: if isAuthenticated() && isStaff(request.resource.data.clinicaId);
+    }
+
+    match /bens/{bemId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        resource.data.clinicaId == getUserClinicaId()
+      );
+      allow write: if isAuthenticated() && isStaff(request.resource.data.clinicaId);
+    }
+
+    // 12. Orçamentos e Solicitações
+    match /orcamentos_solicitacoes/{orcamentoId} {
+      allow create: if isAuthenticated();
+      allow read, update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        resource.data.usuarioClienteId == request.auth.uid ||
+        resource.data.profissionalId == request.auth.uid ||
+        resource.data.clinicaId == getUserClinicaId()
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    match /solicitacoes_orcamento/{orcamentoId} {
+      allow create: if isAuthenticated();
+      allow read, update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        resource.data.usuarioClienteId == request.auth.uid ||
+        resource.data.profissionalId == request.auth.uid ||
+        resource.data.clinicaId == getUserClinicaId()
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    // Modelos de Anamnese e Contratos
     match /modelos_anamnese/{modeloId} {
-      allow read, write: if isStaff(resource.data.clinicaId);
+      allow read, write: if isAuthenticated();
     }
 
     match /modelos_contratos/{contratoId} {
-      allow read, write: if isStaff(resource.data.clinicaId);
+      allow read, write: if isAuthenticated();
     }
 
-    // 5. Estoque de Insumos
-    match /estoque_insumos/{insumoId} {
-      allow read, write: if isStaff(resource.data.clinicaId);
-    }
-
-    // 6. Agendamentos
-    match /agendamentos/{agendamentoId} {
-      allow read: if isStaff(resource.data.clinicaId) || (isAuthenticated() && resource.data.clienteId == request.auth.uid);
-      allow write: if isStaff(request.resource.data.clinicaId);
-    }
-
-    // 7. Financeiro (Fluxo de Caixa com Soft Delete)
-    match /fluxo_caixa/{lancamentoId} {
-      allow read, write: if isStaff(resource.data.clinicaId) && (isAdminTotal() || getUserData().cargo in ['admin_local', 'gestor', 'admin', 'recepcao']);
-    }
-
-    // 8. Bens e Ativos
-    match /bens_ativos/{bemId} {
-      allow read, write: if isGestor(resource.data.clinicaId);
-    }
-
-    // 9. Orçamentos e Solicitações (Privacidade de E-mail)
-    match /orcamentos_solicitacoes/{solicitacaoId} {
-      allow create: if isAuthenticated();
-      allow read, update: if isAuthenticated() && (
-        resource.data.usuarioClienteId == request.auth.uid ||
-        resource.data.profissionalId == request.auth.uid ||
-        isGestor(resource.data.clinicaId)
-      );
-    }
-
-    // Compatibilidade com coleções raiz auxiliares
-    match /usuarios/{usuarioId} {
-      allow read, write: if true;
-    }
-    match /pacientes/{pacienteId} {
-      allow read, write: if true;
-    }
-    match /estoque/{estoqueId} {
-      allow read, write: if true;
-    }
-    match /transacoes/{transacaoId} {
-      allow read, write: if true;
-    }
-    match /bens/{bemId} {
-      allow read, write: if true;
-    }
     match /fichas_retorno/{fichaId} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
-    match /solicitacoes_orcamento/{orcamentoId} {
-      allow read, write: if true;
-    }
+
     match /avisos/{avisoId} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
+
     match /alertas_retorno/{alertaId} {
-      allow read, write: if true;
-    }
-    match /clinica_config/{configId} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
   }
 }

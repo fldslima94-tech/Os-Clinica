@@ -36,7 +36,8 @@ import {
   BemAtivo,
   ConfiguracaoCampos,
   PermissoesCustomizadas,
-  Fornecedor
+  Fornecedor,
+  AnamneseCompleta
 } from './types';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -61,6 +62,7 @@ import { UrgentAlertPopupModal } from './components/UrgentAlertPopupModal';
 import { SwitchUserPasswordModal } from './components/SwitchUserPasswordModal';
 import { NewAppointmentModal } from './components/NewAppointmentModal';
 import { NewPatientModal } from './components/NewPatientModal';
+import { AnamneseCompletaModal } from './components/AnamneseCompletaModal';
 import { NewSupplierModal } from './components/NewSupplierModal';
 import { NewInventoryModal } from './components/NewInventoryModal';
 import { ProcedureModal } from './components/ProcedureModal';
@@ -106,7 +108,7 @@ export default function App() {
     camposObrigatorios: [],
   });
   const [currentUser, setCurrentUser] = useState<UsuarioEquipe>(MOCK_USUARIOS[0]);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
 
   // Quadro de Avisos / Pop-up Alerts State
   const [activePopupAviso, setActivePopupAviso] = useState<AvisoQuadro | null>(null);
@@ -140,6 +142,8 @@ export default function App() {
   const [isNewAssetOpen, setIsNewAssetOpen] = useState(false);
   const [assetToEdit, setAssetToEdit] = useState<BemAtivo | null>(null);
   const [isSqlModalOpen, setIsSqlModalOpen] = useState(false);
+  const [isAnamneseModalOpen, setIsAnamneseModalOpen] = useState(false);
+  const [selectedPatientForAnamnese, setSelectedPatientForAnamnese] = useState<Paciente | null>(null);
   const [selectedPatientForDetails, setSelectedPatientForDetails] = useState<Paciente | null>(null);
   const [appointmentToComplete, setAppointmentToComplete] = useState<Agendamento | null>(null);
 
@@ -479,6 +483,9 @@ export default function App() {
       nome: novo.nome.trim(),
       telefone: novo.telefone.trim(),
       data_nascimento: novo.data_nascimento || '',
+      endereco: novo.endereco?.trim() || undefined,
+      profissao: novo.profissao?.trim() || undefined,
+      contato_emergencia: novo.contato_emergencia,
       historico_clinico: novo.historico_clinico || 'Ficha clínica inicial cadastrada.',
       criado_em: new Date().toISOString(),
       email: novo.email?.trim() || undefined,
@@ -488,12 +495,72 @@ export default function App() {
       fototipo: novo.fototipo || 'Fototipo III',
       fotos_antes_depois: [],
       evolucoes_retornos: [],
+      anamneses_completas: novo.anamneses_completas || [],
       termo_consentimento: { assinado: false },
     };
 
     setPacientes(prev => [createdPatient, ...prev]);
     saveDocument(COLLECTIONS.PACIENTES, createdPatient);
     showToast(`Ficha do cliente "${createdPatient.nome}" cadastrada com sucesso!`);
+  };
+
+  const handleSaveNovaAnamneseCompletaGlobal = (novaAnamnese: AnamneseCompleta) => {
+    let target = pacientes.find(p => p.id === novaAnamnese.clienteId);
+
+    if (!target) {
+      // Cria novo paciente se não existir
+      const newPac: Paciente = {
+        id: novaAnamnese.clienteId,
+        nome: novaAnamnese.dadosPessoais.nomeCompleto,
+        telefone: novaAnamnese.dadosPessoais.telefone,
+        data_nascimento: novaAnamnese.dadosPessoais.dataNascimento,
+        email: novaAnamnese.dadosPessoais.email,
+        endereco: novaAnamnese.dadosPessoais.endereco,
+        profissao: novaAnamnese.dadosPessoais.profissao,
+        contato_emergencia: novaAnamnese.dadosPessoais.contatoEmergencia,
+        cpf: novaAnamnese.dadosPessoais.cpf,
+        alergias: novaAnamnese.saudeGeral.possuiAlergias ? novaAnamnese.saudeGeral.detalhesAlergias : undefined,
+        medicacoes: novaAnamnese.saudeGeral.usoAcidos ? novaAnamnese.saudeGeral.detalhesAcidos : undefined,
+        historico_clinico: `[Anamnese Completa Inicial: ${novaAnamnese.procedimentoNome} realizada em ${new Date(novaAnamnese.criadoEm).toLocaleDateString('pt-BR')}]`,
+        criado_em: new Date().toISOString(),
+        anamneses_completas: [novaAnamnese],
+        fotos_antes_depois: [],
+        evolucoes_retornos: [],
+        termo_consentimento: {
+          assinado: true,
+          data_assinatura: novaAnamnese.assinadoEm,
+          assinatura_base64: novaAnamnese.assinaturaUrl,
+          nome_paciente_declarado: novaAnamnese.dadosPessoais.nomeCompleto,
+          cpf_declarado: novaAnamnese.dadosPessoais.cpf,
+        },
+      };
+
+      setPacientes(prev => [newPac, ...prev]);
+      saveDocument(COLLECTIONS.PACIENTES, newPac);
+      showToast(`Nova ficha e anamnese de "${newPac.nome}" registradas com sucesso!`);
+    } else {
+      const existing = target.anamneses_completas || [];
+      const updated: Paciente = {
+        ...target,
+        anamneses_completas: [novaAnamnese, ...existing],
+        alergias: novaAnamnese.saudeGeral.possuiAlergias ? novaAnamnese.saudeGeral.detalhesAlergias : target.alergias,
+        medicacoes: novaAnamnese.saudeGeral.usoAcidos ? novaAnamnese.saudeGeral.detalhesAcidos : target.medicacoes,
+        profissao: novaAnamnese.dadosPessoais.profissao || target.profissao,
+        endereco: novaAnamnese.dadosPessoais.endereco || target.endereco,
+        contato_emergencia: novaAnamnese.dadosPessoais.contatoEmergencia || target.contato_emergencia,
+        historico_clinico: `${target.historico_clinico || ''}\n[Anamnese Completa: ${novaAnamnese.procedimentoNome} realizada em ${new Date(novaAnamnese.criadoEm).toLocaleDateString('pt-BR')}]`,
+      };
+
+      setPacientes(prev => prev.map(p => p.id === target.id ? updated : p));
+      saveDocument(COLLECTIONS.PACIENTES, updated);
+      if (selectedPatientForDetails?.id === target.id) {
+        setSelectedPatientForDetails(updated);
+      }
+      showToast(`Anamnese completa de "${target.nome}" gravada com sucesso!`);
+    }
+
+    setIsAnamneseModalOpen(false);
+    setSelectedPatientForAnamnese(null);
   };
 
   const handleSaveSupplier = (novo: Partial<Fornecedor>) => {
@@ -814,23 +881,49 @@ export default function App() {
   };
 
   // Procedures Catalog Handlers
-  const handleSaveProcedure = (novo: Partial<ProcedimentoClinico>) => {
-    if (procedureToEdit) {
-      const updated: ProcedimentoClinico = { ...procedureToEdit, ...novo } as ProcedimentoClinico;
-      setProcedimentos(prev => prev.map(p => (p.id === procedureToEdit.id ? updated : p)));
+  const handleSaveProcedure = (novo: Partial<ProcedimentoClinico>, idToEdit?: string) => {
+    const targetId = idToEdit || procedureToEdit?.id;
+    if (targetId) {
+      const existing = procedimentos.find(p => p.id === targetId) || procedureToEdit;
+      const val = novo.valor_tabela ?? novo.preco_sugerido ?? existing?.valor_tabela ?? existing?.preco_sugerido ?? 0;
+      const updated: ProcedimentoClinico = {
+        ...existing,
+        ...novo,
+        id: targetId,
+        nome: novo.nome || existing?.nome || 'Procedimento',
+        categoria: novo.categoria || existing?.categoria || 'Injetáveis & Harmonização',
+        descricao: novo.descricao ?? existing?.descricao ?? '',
+        preco_sugerido: val,
+        valor_tabela: val,
+        duracao_minutos: novo.duracao_minutos ?? existing?.duracao_minutos ?? 45,
+        dias_retorno_padrao: novo.dias_retorno_padrao ?? existing?.dias_retorno_padrao ?? 15,
+      } as ProcedimentoClinico;
+      setProcedimentos(prev => prev.map(p => (p.id === targetId ? updated : p)));
       saveDocument(COLLECTIONS.PROCEDIMENTOS, updated);
-      showToast(`Procedimento "${updated.nome}" atualizado!`);
+      showToast(`Procedimento "${updated.nome}" atualizado com sucesso!`);
     } else {
+      const val = novo.valor_tabela ?? novo.preco_sugerido ?? 0;
       const created: ProcedimentoClinico = {
         id: `proc-${Date.now()}`,
-        nome: novo.nome!,
-        categoria: novo.categoria || 'Facial',
+        nome: novo.nome || 'Novo Procedimento',
+        categoria: novo.categoria || 'Injetáveis & Harmonização',
         descricao: novo.descricao || '',
-        preco_sugerido: novo.preco_sugerido || 0,
-        duracao_minutos: novo.duracao_minutos || 60,
+        preco_sugerido: val,
+        valor_tabela: val,
+        valor_promocional: novo.valor_promocional,
+        duracao_minutos: novo.duracao_minutos || 45,
         dias_retorno_padrao: novo.dias_retorno_padrao || 15,
-        instrucoes_cuidados: novo.instrucoes_cuidados || '',
+        instrucoes_cuidados: novo.instrucoes_cuidados || novo.cuidados_pos || '',
+        cuidados_pos: novo.cuidados_pos || novo.instrucoes_cuidados || '',
         contraindicacoes: novo.contraindicacoes,
+        areas_aplicacao: novo.areas_aplicacao,
+        indicacoes: novo.indicacoes,
+        imagem_url: novo.imagem_url,
+        destaque_portal: novo.destaque_portal ?? true,
+        ativo: novo.ativo ?? true,
+        insumos_vinculados: novo.insumos_vinculados,
+        exige_contrato: novo.exige_contrato ?? true,
+        contrato_padrao: novo.contrato_padrao,
       };
       setProcedimentos(prev => [created, ...prev]);
       saveDocument(COLLECTIONS.PROCEDIMENTOS, created);
@@ -1143,13 +1236,13 @@ export default function App() {
             <PatientsView
               pacientes={pacientes}
               onOpenNewPatient={() => setIsNewPatientOpen(true)}
+              onOpenNewAnamnese={() => {
+                setSelectedPatientForAnamnese(null);
+                setIsAnamneseModalOpen(true);
+              }}
               onViewPatient={(p) => setSelectedPatientForDetails(p)}
               onOpenPackages={(p) => setPatientForPackages(p)}
               onDeletePatient={handleDeletePatient}
-              onOpenNewSupplier={() => {
-                setSupplierToEdit(null);
-                setIsNewSupplierOpen(true);
-              }}
               onGoToSuppliers={() => setActiveTab('fornecedores')}
               currentUser={currentUser}
             />
@@ -1241,10 +1334,6 @@ export default function App() {
               onSoftDeleteTransaction={handleSoftDeleteTransaction}
               onAddDespesaRecorrente={handleAddDespesaRecorrente}
               onToggleDespesaRecorrenteStatus={handleToggleDespesaRecorrenteStatus}
-              onOpenNewSupplier={() => {
-                setSupplierToEdit(null);
-                setIsNewSupplierOpen(true);
-              }}
               currentUser={currentUser}
             />
           )}
@@ -1398,8 +1487,24 @@ export default function App() {
         onClose={() => setIsNewPatientOpen(false)}
         onSave={handleSavePatient}
         onSavePatient={handleSavePatient}
+        onOpenAnamneseCompleta={() => {
+          setIsNewPatientOpen(false);
+          setSelectedPatientForAnamnese(null);
+          setIsAnamneseModalOpen(true);
+        }}
         configuracaoCampos={configuracaoCampos}
         currentUser={currentUser}
+      />
+
+      <AnamneseCompletaModal
+        isOpen={isAnamneseModalOpen}
+        onClose={() => {
+          setIsAnamneseModalOpen(false);
+          setSelectedPatientForAnamnese(null);
+        }}
+        paciente={selectedPatientForAnamnese}
+        currentUser={currentUser}
+        onSave={handleSaveNovaAnamneseCompletaGlobal}
       />
 
       <NewSupplierModal
@@ -1428,7 +1533,8 @@ export default function App() {
           setProcedureToEdit(null);
         }}
         onSave={handleSaveProcedure}
-        procedureToEdit={procedureToEdit}
+        procedimentoToEdit={procedureToEdit}
+        estoqueDisponivel={estoque}
       />
 
       <NewUserModal
@@ -1453,6 +1559,7 @@ export default function App() {
         paciente={selectedPatientForDetails}
         agendamentos={agendamentos}
         profissionais={usuarios}
+        clinicaConfig={clinicaConfig}
         onUpdatePatientHistory={handleUpdatePatientHistory}
         onDeletePatient={handleDeletePatient}
         currentUser={currentUser}
