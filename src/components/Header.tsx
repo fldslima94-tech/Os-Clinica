@@ -15,6 +15,7 @@ import {
   Wrench
 } from 'lucide-react';
 import { TabType, UsuarioEquipe, UserRole } from '../types';
+import { ConnectionSyncStatusWidget } from './ConnectionSyncStatusWidget';
 
 interface HeaderProps {
   activeTab: TabType;
@@ -152,6 +153,9 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Right Side: Role Switcher Pill & Actions */}
         <div className="flex items-center gap-2.5 w-full md:w-auto justify-end">
           
+          {/* Status de Conexão & Sincronização Nuvem / IndexedDB */}
+          <ConnectionSyncStatusWidget />
+
           {/* Quadro de Avisos Notification Bell */}
           <button
             type="button"

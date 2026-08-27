@@ -125,6 +125,12 @@ export interface ClinicaConfig {
   email_contato?: string;
   slogan?: string;
   tema_cor_primaria?: string;
+  // Dados de Recebimento PIX & Bancário
+  chave_pix?: string;
+  tipo_chave_pix?: 'cnpj' | 'email' | 'telefone' | 'aleatoria' | 'cpf';
+  titular_pix?: string;
+  banco_pix?: string;
+  cidade_pix?: string;
 }
 
 export interface AvisoQuadro {
@@ -386,6 +392,8 @@ export interface AnamneseCompleta {
   // 4. Consentimento
   termoAceito: boolean;
   assinaturaUrl: string; // Imagem em base64 ou URL no Storage
+  fotoPacienteUrl?: string; // Foto do paciente capturada via câmera na anamnese
+  fotosAtendimento?: string[]; // Fotos adicionais do atendimento / antes do procedimento
   assinadoEm: string;
   criadoEm: string;
 }

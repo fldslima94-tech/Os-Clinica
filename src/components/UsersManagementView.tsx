@@ -424,9 +424,28 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-slate-600 font-medium mt-0.5">
-                          {user.cargo || user.profissao || 'Colaborador'}
+                        <p className="text-xs text-slate-600 font-medium mt-0.5 flex flex-wrap items-center gap-1.5">
+                          <span>{user.cargo || user.profissao || 'Colaborador'}</span>
+                          {user.registro_profissional && (
+                            <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-mono border border-slate-200">
+                              {user.registro_profissional}
+                            </span>
+                          )}
                         </p>
+                        {(user.especialidade || user.porcentagem_comissao !== undefined) && (
+                          <div className="flex items-center gap-2 mt-1">
+                            {user.especialidade && (
+                              <span className="text-[11px] text-indigo-600 font-medium">
+                                {user.especialidade}
+                              </span>
+                            )}
+                            {user.porcentagem_comissao !== undefined && user.porcentagem_comissao > 0 && (
+                              <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded">
+                                {user.porcentagem_comissao}% comissão
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 

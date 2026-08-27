@@ -15,6 +15,8 @@ import {
   FileText
 } from 'lucide-react';
 import { ProcedimentoClinico, EstoqueInsumo, UnidadeMedida } from '../types';
+import { useConnectionStatus } from '../hooks/useConnectionStatus';
+import { Wifi, WifiOff, Database, CloudCheck } from 'lucide-react';
 
 interface ProcedureModalProps {
   isOpen: boolean;
@@ -34,6 +36,94 @@ const CATEGORIAS_PADRAO = [
   'Outros Procedimentos',
 ];
 
+interface ModeloProcedimento {
+  nome: string;
+  categoria: string;
+  duracao_minutos: number;
+  dias_retorno: number;
+  valor_tabela: number;
+  descricao: string;
+  areas: string;
+  indicacoes: string;
+  contraindicacoes: string;
+  cuidados_pos: string;
+}
+
+const MODELOS_PROCEDIMENTOS: ModeloProcedimento[] = [
+  {
+    nome: 'Toxina Botulínica (Botox Completo)',
+    categoria: 'Injetáveis & Harmonização',
+    duracao_minutos: 45,
+    dias_retorno: 15,
+    valor_tabela: 1350,
+    descricao: 'Aplicação de toxina botulínica tipo A para atenuação de rugas de expressão, linhas na testa, glabela (entre as sobrancelhas) e pés de galinha.',
+    areas: 'Testa, Glabela, Pés de Galinha, Código de Barras',
+    indicacoes: 'Rugas dinâmicas, Linhas de expressão, Hiperidrose',
+    contraindicacoes: 'Gestantes, Lactantes, Doenças neuromusculares (ex: Miastenia Gravis), Infecção ativa no local',
+    cuidados_pos: 'Não deitar ou abaixar a cabeça por 4 horas. Não praticar exercícios intensos nas primeiras 24h. Não massagear as regiões tratadas.',
+  },
+  {
+    nome: 'Preenchimento Labial com Ácido Hialurônico (1ml)',
+    categoria: 'Injetáveis & Harmonização',
+    duracao_minutos: 60,
+    dias_retorno: 15,
+    valor_tabela: 1500,
+    descricao: 'Escultura e hidratação labial com ácido hialurônico de alta pureza, definindo contorno, arco do cupido e volume harmônico.',
+    areas: 'Lábio Superior, Lábio Inferior, Arco do Cupido',
+    indicacoes: 'Assimetria labial, Perda de volume, Contorno indefinido, Hidratação profunda',
+    contraindicacoes: 'Gestantes, Infecção labial ativa (Herpes ativa), Doenças autoimunes descompensadas',
+    cuidados_pos: 'Aplicar compressas frias se houver edema leve. Evitar exposição solar direta e bebidas excessivamente quentes nas primeiras 48h.',
+  },
+  {
+    nome: 'Bioestimulador de Colágeno Facial (Sculptra / Elleva)',
+    categoria: 'Bioestimuladores & Fios',
+    duracao_minutos: 60,
+    dias_retorno: 30,
+    valor_tabela: 2800,
+    descricao: 'Aplicação subdérmica de ácido poli-L-lático (PLLA) para estímulo biológico progressivo de colágeno novo, restauração da firmeza e combate à flacidez.',
+    areas: 'Terço Médio Facial, Terço Inferior, Linha Mandibular',
+    indicacoes: 'Flacidez tissular, Perda de sustentação, Afinamento cutâneo',
+    contraindicacoes: 'Gestantes, Lactantes, Lesões ativas de pele, Alergia conhecida aos componentes',
+    cuidados_pos: 'Realizar a massagem da regra do 5 (5 vezes ao dia por 5 minutos durante 5 dias). Usar protetor solar diariamente.',
+  },
+  {
+    nome: 'Fios de Sustentação de PDO (Tração e Espiculados)',
+    categoria: 'Bioestimuladores & Fios',
+    duracao_minutos: 75,
+    dias_retorno: 21,
+    valor_tabela: 3200,
+    descricao: 'Inserção de fios de polidioxanona espiculados para efeito lifting não cirúrgico imediato e sustentação tecidual de longo prazo.',
+    areas: 'Malar, Mandíbula, Terço Médio, Papada',
+    indicacoes: 'Queda do contorno facial, Jowls, Sulco nasogeniano marcado, Flacidez facial moderada',
+    contraindicacoes: 'Infecções cutâneas ativas, Doenças autoimunes ativas, Gestação',
+    cuidados_pos: 'Evitar movimentos mastigatórios bruscos ou excessivos por 7 dias. Dormir preferencialmente de barriga para cima. Não massagear o rosto.',
+  },
+  {
+    nome: 'Limpeza de Pele Profunda + Peeling Ultrassônico',
+    categoria: 'Tratamentos Faciais & Peelings',
+    duracao_minutos: 60,
+    dias_retorno: 30,
+    valor_tabela: 250,
+    descricao: 'Higienização profunda, emoliência com vapor de ozônio, extração de comedões por sucção e espátula ultrassônica, finalizando com máscara calmante e LEDterapia.',
+    areas: 'Face Completa, Pescoço',
+    indicacoes: 'Acne grau I e II, Cravos e miliuns, Poros dilatados, Excesso de oleosidade',
+    contraindicacoes: 'Dermatites agudas ativas, Queimaduras de sol recentes, Rosácea em crise inflamatória aguda',
+    cuidados_pos: 'Não aplicar maquiagem pesada por 12h. Usar protetor solar com FPS 50+ reaplicando a cada 3h.',
+  },
+  {
+    nome: 'Microagulhamento Robótico / Dermaroller + Drug Delivery',
+    categoria: 'Tratamentos Faciais & Peelings',
+    duracao_minutos: 50,
+    dias_retorno: 30,
+    valor_tabela: 850,
+    descricao: 'Indução percutânea de colágeno com microagulhas estéreis associada à infusão de fatores de crescimento e clareadores dermatológicos.',
+    areas: 'Face, Colo, Pescoço',
+    indicacoes: 'Cicatrizes de acne, Melasma refratário, Poros abertos, Rejuvenescimento',
+    contraindicacoes: 'Uso recente de isotretinoína, Herpes ativa, Tendência a queloide',
+    cuidados_pos: 'Não lavar o rosto nas primeiras 4 horas. Aplicar apenas o sérum regenerador indicado. Evitar calor e sol por 7 dias.',
+  }
+];
+
 export const ProcedureModal: React.FC<ProcedureModalProps> = ({
   isOpen,
   onClose,
@@ -41,6 +131,7 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
   procedimentoToEdit,
   estoqueDisponivel = [],
 }) => {
+  const { isOnline, pendingCount, isSyncing } = useConnectionStatus();
   const [nome, setNome] = useState('');
   const [categoria, setCategoria] = useState(CATEGORIAS_PADRAO[0]);
   const [duracaoMinutos, setDuracaoMinutos] = useState(45);
@@ -107,6 +198,19 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
   }, [procedimentoToEdit, isOpen]);
 
   if (!isOpen) return null;
+
+  const handleApplyModelo = (modelo: ModeloProcedimento) => {
+    setNome(modelo.nome);
+    setCategoria(modelo.categoria);
+    setDuracaoMinutos(modelo.duracao_minutos);
+    setDiasRetorno(modelo.dias_retorno);
+    setValorTabela(modelo.valor_tabela);
+    setDescricao(modelo.descricao);
+    setAreasInput(modelo.areas);
+    setIndicacoesInput(modelo.indicacoes);
+    setContraindicacoesInput(modelo.contraindicacoes);
+    setCuidadosPos(modelo.cuidados_pos);
+  };
 
   const handleAddInsumo = (insumoId: string) => {
     const item = estoqueDisponivel.find(i => i.id === insumoId);
@@ -195,17 +299,71 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Status de Sincronização & Rede */}
+            <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border ${
+              !isOnline 
+                ? 'bg-amber-500/10 text-amber-700 border-amber-300' 
+                : 'bg-emerald-500/10 text-emerald-700 border-emerald-300'
+            }`}>
+              {!isOnline ? <WifiOff className="w-3.5 h-3.5 text-amber-600" /> : <CloudCheck className="w-3.5 h-3.5 text-emerald-600" />}
+              <span>{!isOnline ? 'Offline (IndexedDB)' : 'Nuvem Conectada'}</span>
+              {pendingCount > 0 && (
+                <span className="ml-1 px-1.5 py-0.2 bg-amber-200 text-amber-900 rounded-full text-[10px]">
+                  {pendingCount} pendente{pendingCount > 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+
+            <button
+              onClick={onClose}
+              className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
+
+        {/* Banner de Aviso de Fila Local quando Offline */}
+        {!isOnline && (
+          <div className="mx-6 mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between gap-2.5 text-amber-800 text-xs shrink-0">
+            <div className="flex items-center gap-2">
+              <Database className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                <strong>Modo Offline Ativo:</strong> As alterações neste procedimento / protocolo clínico serão guardadas localmente no IndexedDB e sincronizadas com a nuvem automaticamente quando a internet for restabelecida.
+              </span>
+            </div>
+            <span className="px-2 py-0.5 bg-amber-200/70 text-amber-900 rounded-md font-bold text-[10px] uppercase shrink-0">
+              Fila Local
+            </span>
+          </div>
+        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[78vh] overflow-y-auto">
           
+          {/* Sugestões de Modelos Prontos */}
+          {!procedimentoToEdit && (
+            <div className="bg-indigo-50/70 p-3 rounded-xl border border-indigo-100">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-900 mb-2">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Preenchimento Rápido com Modelos Clínicos Prontos:</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {MODELOS_PROCEDIMENTOS.map((mod, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleApplyModelo(mod)}
+                    className="px-2.5 py-1 text-[11px] font-medium bg-white hover:bg-indigo-600 hover:text-white text-indigo-900 rounded-lg border border-indigo-200 transition-colors cursor-pointer shadow-2xs"
+                  >
+                    + {mod.nome.split(' (')[0]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Nome e Categoria */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="sm:col-span-2 space-y-1">

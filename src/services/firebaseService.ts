@@ -699,7 +699,7 @@ export function isUserAdminTotal(user?: UsuarioEquipe | null): boolean {
     user.role === 'admin_master' || 
     user.role === 'admin_total' || 
     user.role === 'admin' || 
-    user.email === 'fldslima94@gmail.com' ||
+    user.email === 'fabio@teste.com' ||
     Boolean(user.cargo && (user.cargo.toLowerCase().includes('master') || user.cargo.toLowerCase().includes('super admin')))
   );
 }
@@ -964,7 +964,7 @@ export async function registrarNovaManutencao(
 // Script de Migração: Promoção de Fabio Lima e Rebaixamento de Admins
 // ==========================================
 
-export async function migrarHierarquiaUsuarios(emailSuperAdmin: string = 'fldslima94@gmail.com') {
+export async function migrarHierarquiaUsuarios(emailSuperAdmin: string = 'fabio@teste.com') {
   try {
     const perfisRef = collection(db, COLLECTIONS.PERFIS);
     const usuariosRef = collection(db, COLLECTIONS.USUARIOS);

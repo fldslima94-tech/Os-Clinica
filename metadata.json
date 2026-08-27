@@ -1,6 +1,8 @@
 {
   "name": "AuraEstética - SaaS Clínica & Studio",
   "description": "SaaS Multi-tenant completo para Clínicas de Estética e Studios de Beleza com Firebase Firestore, RBAC avançado (Admin Total / Super Admin, Admin Local, Recepção, Profissional, Cliente), controle dinâmico de visibilidade de campos, Balcão do Dia, Fichas de Clientes com Anamnese e Evolução Clínica, Gestão de Bens Patrimoniais, Insumos e Pigmentos, Fluxo de Caixa com Soft Delete auditado e Despesas Recorrentes.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": [
+    "camera"
+  ],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

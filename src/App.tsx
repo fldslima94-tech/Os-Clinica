@@ -71,11 +71,14 @@ import { EditUserModal } from './components/EditUserModal';
 import { PatientDetailsModal } from './components/PatientDetailsModal';
 import { SqlAndArchitectureModal } from './components/SqlAndArchitectureModal';
 import { CompleteProcedureModal } from './components/CompleteProcedureModal';
+import { CheckInPaymentAndReturnModal } from './components/CheckInPaymentAndReturnModal';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { TreatmentPackagesModal } from './components/TreatmentPackagesModal';
 import { ClinicSettingsModal } from './components/ClinicSettingsModal';
 import { UserProfileAvatarModal } from './components/UserProfileAvatarModal';
 import { NewAssetModal } from './components/NewAssetModal';
+import { ConflictResolutionModal } from './components/ConflictResolutionModal';
+import { useConnectionStatus } from './contexts/ConnectionStatusContext';
 import { CheckCircle2, AlertCircle, Cloud } from 'lucide-react';
 import { 
   seedInitialFirestoreData, 
@@ -91,6 +94,16 @@ import {
 } from './services/firebaseService';
 
 export default function App() {
+  // Global Offline Sync & Connection Status Hook
+  const {
+    isOnline,
+    isSyncing,
+    queueOfflineMutation,
+    syncSingleUser,
+    selectedConflict,
+    setSelectedConflict
+  } = useConnectionStatus();
+
   // Application State synchronized in Real-Time via Cloud Firestore
   const [clinicaConfig, setClinicaConfig] = useState<ClinicaConfig>(MOCK_CLINICA_CONFIG);
   const [pacientes, setPacientes] = useState<Paciente[]>(MOCK_PACIENTES);
@@ -149,6 +162,8 @@ export default function App() {
   const [selectedPatientForAnamnese, setSelectedPatientForAnamnese] = useState<Paciente | null>(null);
   const [selectedPatientForDetails, setSelectedPatientForDetails] = useState<Paciente | null>(null);
   const [appointmentToComplete, setAppointmentToComplete] = useState<Agendamento | null>(null);
+  const [appointmentToCheckIn, setAppointmentToCheckIn] = useState<Agendamento | null>(null);
+  const [appointmentInitialData, setAppointmentInitialData] = useState<Partial<Agendamento> | null>(null);
 
   // Toast notifications
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
@@ -440,6 +455,85 @@ export default function App() {
     setAppointmentToComplete(null);
   };
 
+  const handleConfirmCheckIn = async (data: {
+    agendamentoId: string;
+    pagamento: {
+      valor: number;
+      forma: FormaPagamento;
+      status: StatusPagamento;
+      observacao?: string;
+    };
+    agendarRetorno: boolean;
+    dadosRetorno?: {
+      data_hora: string;
+      procedimento: string;
+      duracao_minutos: number;
+      profissional_id?: string;
+      profissional_nome?: string;
+      observacoes?: string;
+    };
+  }) => {
+    const ag = agendamentos.find(a => a.id === data.agendamentoId);
+    if (!ag) return;
+    const patientObj = ag.paciente || pacientes.find(p => p.id === ag.paciente_id);
+
+    // 1. Atualizar agendamento para 'em_espera' na recepção com status de pagamento
+    const updatedAg: Agendamento = {
+      ...ag,
+      status: 'em_espera',
+      forma_pagamento: data.pagamento.forma,
+      status_pagamento: data.pagamento.status,
+      valor_estimado: data.pagamento.valor || ag.valor_estimado,
+    };
+    setAgendamentos(prev => prev.map(a => a.id === ag.id ? updatedAg : a));
+    saveDocument(COLLECTIONS.AGENDAMENTOS, updatedAg);
+
+    // 2. Registrar transação financeira caso valor positivo
+    if (data.pagamento.valor > 0) {
+      const novaTx: TransacaoFinanceira = {
+        id: `tx-checkin-${Date.now()}`,
+        paciente_id: ag.paciente_id,
+        paciente_nome: patientObj?.nome || 'Cliente',
+        procedimento: ag.procedimento,
+        valor: data.pagamento.valor,
+        tipo: 'receita',
+        forma_pagamento: data.pagamento.forma,
+        status: data.pagamento.status,
+        data: new Date().toISOString(),
+        profissional_nome: ag.profissional_nome || currentUser.nome,
+        observacao: data.pagamento.observacao || 'Pagamento confirmado no check-in da recepção.',
+        excluido: false,
+      };
+      setTransacoes(prev => [novaTx, ...prev]);
+      saveDocument(COLLECTIONS.TRANSACOES, novaTx);
+    }
+
+    // 3. Agendar retorno caso solicitado
+    if (data.agendarRetorno && data.dadosRetorno) {
+      const returnAg: Agendamento = {
+        id: `ag-retorno-${Date.now()}`,
+        paciente_id: ag.paciente_id,
+        data_hora: data.dadosRetorno.data_hora,
+        procedimento: data.dadosRetorno.procedimento,
+        status: 'confirmado',
+        criado_em: new Date().toISOString(),
+        duracao_minutos: data.dadosRetorno.duracao_minutos || 30,
+        valor_estimado: 0,
+        profissional_id: data.dadosRetorno.profissional_id || ag.profissional_id,
+        profissional_nome: data.dadosRetorno.profissional_nome || ag.profissional_nome,
+        observacoes: data.dadosRetorno.observacoes || 'Retorno agendado durante o check-in na recepção.',
+        paciente: patientObj,
+      };
+      setAgendamentos(prev => [returnAg, ...prev]);
+      saveDocument(COLLECTIONS.AGENDAMENTOS, returnAg);
+      showToast(`Check-in de ${patientObj?.nome || 'paciente'} confirmado e retorno agendado com sucesso!`);
+    } else {
+      showToast(`Check-in de ${patientObj?.nome || 'paciente'} confirmado com sucesso!`);
+    }
+
+    setAppointmentToCheckIn(null);
+  };
+
   const handleSaveAppointment = (novo: Partial<Agendamento>) => {
     const patientObj = pacientes.find(p => p.id === novo.paciente_id);
     const createdAgendamento: Agendamento = {
@@ -489,8 +583,19 @@ export default function App() {
     };
 
     setPacientes(prev => [createdPatient, ...prev]);
-    saveDocument(COLLECTIONS.PACIENTES, createdPatient);
-    showToast(`Ficha do cliente "${createdPatient.nome}" cadastrada com sucesso!`);
+    queueOfflineMutation({
+      entityType: 'paciente',
+      entityId: createdPatient.id,
+      entityTitle: `Cadastro de Cliente: ${createdPatient.nome}`,
+      action: 'create',
+      payload: createdPatient,
+    });
+    if (isOnline) {
+      saveDocument(COLLECTIONS.PACIENTES, createdPatient);
+      showToast(`Ficha do cliente "${createdPatient.nome}" cadastrada e sincronizada com a nuvem!`);
+    } else {
+      showToast(`Ficha do cliente "${createdPatient.nome}" salva offline no dispositivo. Sincronizará quando houver rede.`, 'info');
+    }
   };
 
   const handleSaveNovaAnamneseCompletaGlobal = (novaAnamnese: AnamneseCompleta) => {
@@ -525,8 +630,20 @@ export default function App() {
       };
 
       setPacientes(prev => [newPac, ...prev]);
-      saveDocument(COLLECTIONS.PACIENTES, newPac);
-      showToast(`Nova ficha e anamnese de "${newPac.nome}" registradas com sucesso!`);
+      queueOfflineMutation({
+        entityType: 'paciente',
+        entityId: newPac.id,
+        entityTitle: `Nova Ficha & Anamnese: ${newPac.nome}`,
+        action: 'create',
+        payload: newPac,
+      });
+
+      if (isOnline) {
+        saveDocument(COLLECTIONS.PACIENTES, newPac);
+        showToast(`Nova ficha e anamnese de "${newPac.nome}" gravadas e sincronizadas com a nuvem!`);
+      } else {
+        showToast(`Nova ficha e anamnese de "${newPac.nome}" salvas offline no IndexedDB.`, 'info');
+      }
     } else {
       const existing = target.anamneses_completas || [];
       const updated: Paciente = {
@@ -541,11 +658,24 @@ export default function App() {
       };
 
       setPacientes(prev => prev.map(p => p.id === target.id ? updated : p));
-      saveDocument(COLLECTIONS.PACIENTES, updated);
+      queueOfflineMutation({
+        entityType: 'paciente',
+        entityId: target.id,
+        entityTitle: `Anamnese Atualizada: ${target.nome}`,
+        action: 'update',
+        payload: updated,
+      });
+
+      if (isOnline) {
+        saveDocument(COLLECTIONS.PACIENTES, updated);
+        showToast(`Anamnese completa de "${target.nome}" gravada e sincronizada com a nuvem!`);
+      } else {
+        showToast(`Anamnese de "${target.nome}" salva offline. Sincronizará quando houver rede.`, 'info');
+      }
+
       if (selectedPatientForDetails?.id === target.id) {
         setSelectedPatientForDetails(updated);
       }
-      showToast(`Anamnese completa de "${target.nome}" gravada com sucesso!`);
     }
 
     setIsAnamneseModalOpen(false);
@@ -623,7 +753,25 @@ export default function App() {
     if (target) {
       const updated: Paciente = { ...target, historico_clinico: novoHistorico, ...(dadosExtras || {}) };
       setPacientes(prev => prev.map(p => p.id === pacienteId ? updated : p));
-      saveDocument(COLLECTIONS.PACIENTES, updated);
+      
+      queueOfflineMutation({
+        entityType: 'paciente',
+        entityId: pacienteId,
+        entityTitle: `Prontuário & Evolução: ${target.nome}`,
+        action: 'update',
+        payload: updated,
+      });
+
+      if (isOnline) {
+        saveDocument(COLLECTIONS.PACIENTES, updated);
+        showToast('Ficha clínica e evoluções salvas e sincronizadas com a nuvem!');
+      } else {
+        showToast('Ficha clínica salva localmente no dispositivo (IndexedDB). Sincronizará quando houver conexão.', 'info');
+      }
+
+      if (selectedPatientForDetails?.id === pacienteId) {
+        setSelectedPatientForDetails(updated);
+      }
     }
     setAgendamentos(prev =>
       prev.map(ag =>
@@ -632,7 +780,6 @@ export default function App() {
           : ag
       )
     );
-    showToast('Ficha clínica atualizada com sucesso!');
   };
 
   const handleUpdatePacienteObj = (updatedPaciente: Paciente) => {
@@ -1245,14 +1392,21 @@ export default function App() {
               pacientes={pacientes}
               bens={bensPatrimoniais}
               profissionais={usuarios}
-              onOpenNewAppointment={() => setIsNewAppointmentOpen(true)}
+              transacoes={transacoes}
+              despesasRecorrentes={despesasRecorrentes}
+              onOpenNewAppointment={() => {
+                setAppointmentInitialData(null);
+                setIsNewAppointmentOpen(true);
+              }}
               onOpenNewPatient={() => setIsNewPatientOpen(true)}
               onOpenNewInventory={() => setIsNewInventoryOpen(true)}
               onUpdateStatus={handleUpdateStatus}
               onViewPatient={(p) => setSelectedPatientForDetails(p)}
               onGoToEstoque={() => setActiveTab('estoque')}
               onGoToBens={() => setActiveTab('bens')}
+              onGoToFinancial={() => setActiveTab('financeiro')}
               onOpenCompleteModal={(ag) => setAppointmentToComplete(ag)}
+              onOpenCheckInModal={(ag) => setAppointmentToCheckIn(ag)}
               searchQuery={searchQuery}
             />
           )}
@@ -1262,10 +1416,14 @@ export default function App() {
               agendamentos={agendamentos}
               pacientes={pacientes}
               profissionais={usuarios}
-              onOpenNewAppointment={() => setIsNewAppointmentOpen(true)}
+              onOpenNewAppointment={(initialData) => {
+                setAppointmentInitialData(initialData || null);
+                setIsNewAppointmentOpen(true);
+              }}
               onUpdateStatus={handleUpdateStatus}
               onViewPatient={(p) => setSelectedPatientForDetails(p)}
               onOpenCompleteModal={(ag) => setAppointmentToComplete(ag)}
+              onOpenCheckInModal={(ag) => setAppointmentToCheckIn(ag)}
               onDeleteAppointment={handleDeleteAppointment}
               currentUser={currentUser}
             />
@@ -1517,10 +1675,14 @@ export default function App() {
 
       <NewAppointmentModal
         isOpen={isNewAppointmentOpen}
-        onClose={() => setIsNewAppointmentOpen(false)}
+        onClose={() => {
+          setIsNewAppointmentOpen(false);
+          setAppointmentInitialData(null);
+        }}
         pacientes={pacientes}
         procedimentos={procedimentos}
         profissionais={usuarios}
+        initialData={appointmentInitialData}
         onSave={handleSaveAppointment}
         onSaveAppointment={handleSaveAppointment}
         onOpenNewPatient={() => setIsNewPatientOpen(true)}
@@ -1617,8 +1779,15 @@ export default function App() {
         onUpdatePaciente={handleUpdatePacienteObj}
         onScheduleSession={(sessaoInfo) => {
           setPatientForPackages(null);
+          setAppointmentInitialData({
+            paciente_id: sessaoInfo.pacienteId,
+            procedimento: sessaoInfo.procedimento,
+            observacoes: sessaoInfo.observacoes,
+            valor_estimado: sessaoInfo.valor,
+          });
           setIsNewAppointmentOpen(true);
         }}
+        currentUser={currentUser}
       />
 
       <CompleteProcedureModal
@@ -1629,6 +1798,14 @@ export default function App() {
         onConfirmComplete={handleSaveProcedureCompletion}
         onComplete={handleSaveProcedureCompletion}
         onSaveAlertaRetorno={handleSaveAlertaRetorno}
+      />
+
+      <CheckInPaymentAndReturnModal
+        isOpen={!!appointmentToCheckIn}
+        onClose={() => setAppointmentToCheckIn(null)}
+        agendamento={appointmentToCheckIn}
+        profissionais={usuarios}
+        onConfirmCheckIn={handleConfirmCheckIn}
       />
 
       <NewAssetModal
@@ -1645,6 +1822,12 @@ export default function App() {
       <SqlAndArchitectureModal
         isOpen={isSqlModalOpen}
         onClose={() => setIsSqlModalOpen(false)}
+      />
+
+      {/* Modal Global de Resolução de Conflitos de Sincronização */}
+      <ConflictResolutionModal
+        conflict={selectedConflict}
+        onClose={() => setSelectedConflict(null)}
       />
     </div>
   );

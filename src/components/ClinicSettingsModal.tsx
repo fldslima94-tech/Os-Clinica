@@ -10,7 +10,11 @@ import {
   MapPin,
   FileText,
   Mail,
-  ShieldCheck
+  ShieldCheck,
+  QrCode,
+  CreditCard,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import { ClinicaConfig } from '../types';
 import { compressImageFile } from '../lib/image-utils';
@@ -35,6 +39,13 @@ export const ClinicSettingsModal: React.FC<ClinicSettingsModalProps> = ({
   const [cnpj, setCnpj] = useState(config.cnpj || '');
   const [emailContato, setEmailContato] = useState(config.email_contato || '');
   const [slogan, setSlogan] = useState(config.slogan || '');
+  
+  // PIX Settings
+  const [chavePix, setChavePix] = useState(config.chave_pix || '38.941.205/0001-94');
+  const [tipoChavePix, setTipoChavePix] = useState<'cnpj' | 'email' | 'telefone' | 'aleatoria' | 'cpf'>(config.tipo_chave_pix || 'cnpj');
+  const [titularPix, setTitularPix] = useState(config.titular_pix || 'AuraEstética Ltda');
+  const [bancoPix, setBancoPix] = useState(config.banco_pix || 'Nubank / Inter');
+  const [cidadePix, setCidadePix] = useState(config.cidade_pix || 'São Paulo');
 
   if (!isOpen) return null;
 
@@ -73,13 +84,18 @@ export const ClinicSettingsModal: React.FC<ClinicSettingsModalProps> = ({
       cnpj: cnpj.trim() || undefined,
       email_contato: emailContato.trim() || undefined,
       slogan: slogan.trim() || undefined,
+      chave_pix: chavePix.trim() || undefined,
+      tipo_chave_pix: tipoChavePix,
+      titular_pix: titularPix.trim() || undefined,
+      banco_pix: bancoPix.trim() || undefined,
+      cidade_pix: cidadePix.trim() || undefined,
     });
     onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden my-6 animate-in fade-in zoom-in-95">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-xl overflow-hidden my-6 animate-in fade-in zoom-in-95">
         
         {/* Header */}
         <div className="p-5 border-b border-slate-100 bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 text-white flex items-center justify-between">
@@ -88,8 +104,8 @@ export const ClinicSettingsModal: React.FC<ClinicSettingsModalProps> = ({
               <Building2 className="w-5 h-5 text-indigo-300" />
             </div>
             <div>
-              <h3 className="text-base font-bold">Identidade Visual & Dados da Clínica</h3>
-              <p className="text-xs text-indigo-200">Personalize a logomarca, cabeçalho de recibos e contratos</p>
+              <h3 className="text-base font-bold">Identidade Visual & Configurações da Clínica</h3>
+              <p className="text-xs text-indigo-200">Logomarca, cabeçalhos oficiais e dados de recebimento PIX</p>
             </div>
           </div>
           <button
@@ -160,7 +176,7 @@ export const ClinicSettingsModal: React.FC<ClinicSettingsModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Telefone / WhatsApp *
+                Telefone / WhatsApp Oficial *
               </label>
               <input
                 type="text"
@@ -211,6 +227,74 @@ export const ClinicSettingsModal: React.FC<ClinicSettingsModalProps> = ({
             />
           </div>
 
+          {/* Dados de Pagamento PIX */}
+          <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-200 space-y-3">
+            <div className="flex items-center gap-2 text-emerald-950 font-bold text-xs uppercase tracking-wider">
+              <QrCode className="w-4 h-4 text-emerald-600" />
+              <span>Dados para Recebimento PIX (Balcão & Portal)</span>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-emerald-900 mb-1">
+                  Tipo de Chave
+                </label>
+                <select
+                  value={tipoChavePix}
+                  onChange={(e) => setTipoChavePix(e.target.value as any)}
+                  className="w-full px-3 py-2 text-xs bg-white border border-emerald-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="cnpj">CNPJ</option>
+                  <option value="cpf">CPF</option>
+                  <option value="email">E-mail</option>
+                  <option value="telefone">Telefone</option>
+                  <option value="aleatoria">Chave Aleatória (EVP)</option>
+                </select>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-[11px] font-semibold text-emerald-900 mb-1">
+                  Chave PIX da Clínica
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: 38.941.205/0001-94 ou financeiro@clinica.com.br"
+                  value={chavePix}
+                  onChange={(e) => setChavePix(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-white border border-emerald-300 rounded-lg text-emerald-950 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-emerald-900 mb-1">
+                  Titular da Conta / Razão Social
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: Aura Estética Ltda"
+                  value={titularPix}
+                  onChange={(e) => setTitularPix(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-white border border-emerald-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-emerald-900 mb-1">
+                  Banco / Instituição
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: Nubank, Inter, Itaú, Bradesco"
+                  value={bancoPix}
+                  onChange={(e) => setBancoPix(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-white border border-emerald-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Actions */}
           <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2.5">
             <button
@@ -233,3 +317,4 @@ export const ClinicSettingsModal: React.FC<ClinicSettingsModalProps> = ({
     </div>
   );
 };
+

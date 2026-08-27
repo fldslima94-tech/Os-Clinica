@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   User, 
@@ -22,11 +22,19 @@ import {
   CheckCircle2,
   Lock,
   Eye,
-  Info
+  Info,
+  Camera,
+  Upload,
+  Trash2,
+  Image as ImageIcon,
+  RotateCcw
 } from 'lucide-react';
 import { AnamneseCompleta, Paciente, UsuarioEquipe, ClinicaConfig } from '../types';
 import { CanvasAssinatura } from './CanvasAssinatura';
+import { CameraCaptureModal } from './CameraCaptureModal';
 import { calcularIdade, formatarTelefone, formatarCPF, anamneseCompletaSchema } from '../utils/anamneseValidation';
+import { useConnectionStatus } from '../contexts/ConnectionStatusContext';
+import { Wifi, WifiOff, Database, CloudCheck } from 'lucide-react';
 
 interface AnamneseCompletaModalProps {
   isOpen: boolean;
@@ -47,9 +55,15 @@ export const AnamneseCompletaModal: React.FC<AnamneseCompletaModalProps> = ({
   currentUser,
   clinicaConfig,
 }) => {
+  const { isOnline, isSyncing } = useConnectionStatus();
   const isVisualizacao = !!anamneseParaVisualizar;
   const [etapaAtual, setEtapaAtual] = useState<number>(1);
   const [errosValidacao, setErrosValidacao] = useState<{ [campo: string]: string }>({});
+
+  // 0. Foto do Paciente / Câmera
+  const [fotoPacienteUrl, setFotoPacienteUrl] = useState('');
+  const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // 1. Dados Pessoais
   const [nomeCompleto, setNomeCompleto] = useState('');
@@ -157,6 +171,7 @@ export const AnamneseCompletaModal: React.FC<AnamneseCompletaModalProps> = ({
 
       setTermoAceito(anamneseParaVisualizar.termoAceito ?? true);
       setAssinaturaUrl(anamneseParaVisualizar.assinaturaUrl || '');
+      setFotoPacienteUrl(anamneseParaVisualizar.fotoPacienteUrl || '');
       setEtapaAtual(1);
     } else if (pacienteExistente) {
       // Preenche com os dados do paciente existente
@@ -169,6 +184,7 @@ export const AnamneseCompletaModal: React.FC<AnamneseCompletaModalProps> = ({
       setProfissao(pacienteExistente.profissao || '');
       setContatoEmergenciaNome(pacienteExistente.contato_emergencia?.nome || '');
       setContatoEmergenciaTel(pacienteExistente.contato_emergencia?.telefone || '');
+      setFotoPacienteUrl(pacienteExistente.foto_url || '');
       
       if (pacienteExistente.alergias) {
         setPossuiAlergias(true);
@@ -188,6 +204,7 @@ export const AnamneseCompletaModal: React.FC<AnamneseCompletaModalProps> = ({
       setCpf('');
       setContatoEmergenciaNome('');
       setContatoEmergenciaTel('');
+      setFotoPacienteUrl('');
 
       setGestanteOuAmamentando(false);
       setPossuiAlergias(false);
@@ -364,6 +381,8 @@ export const AnamneseCompletaModal: React.FC<AnamneseCompletaModalProps> = ({
       },
       termoAceito: true,
       assinaturaUrl,
+      fotoPacienteUrl: fotoPacienteUrl || undefined,
+      fotosAtendimento: fotoPacienteUrl ? [fotoPacienteUrl] : undefined,
       assinadoEm: new Date().toISOString(),
       criadoEm: anamneseParaVisualizar?.criadoEm || new Date().toISOString(),
     };
@@ -393,6 +412,7 @@ export const AnamneseCompletaModal: React.FC<AnamneseCompletaModalProps> = ({
       cpf: cpf.trim() || undefined,
       endereco: endereco.trim() || undefined,
       profissao: profissao.trim() || undefined,
+      foto_url: fotoPacienteUrl || undefined,
       contato_emergencia: {
         nome: contatoEmergenciaNome.trim(),
         telefone: contatoEmergenciaTel.trim(),
@@ -439,6 +459,37 @@ export const AnamneseCompletaModal: React.FC<AnamneseCompletaModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Botão Rápido de Câmera */}
+            <button
+              type="button"
+              disabled={isVisualizacao}
+              onClick={() => setIsCameraModalOpen(true)}
+              title={fotoPacienteUrl ? 'Foto registrada (Clique para alterar)' : 'Capturar foto do paciente via câmera'}
+              className={`p-2 rounded-xl transition-all flex items-center gap-1.5 text-xs font-bold cursor-pointer disabled:opacity-50 ${
+                fotoPacienteUrl 
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30' 
+                  : 'bg-indigo-600/50 hover:bg-indigo-600 text-white border border-indigo-400/40'
+              }`}
+            >
+              <Camera className="w-4 h-4" />
+              <span className="hidden md:inline">
+                {fotoPacienteUrl ? 'Foto Anexada' : 'Capturar Foto'}
+              </span>
+              {fotoPacienteUrl && (
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              )}
+            </button>
+
+            {/* Status de Sincronização Local */}
+            <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border ${
+              !isOnline 
+                ? 'bg-amber-500/20 text-amber-200 border-amber-400/40' 
+                : 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30'
+            }`}>
+              {!isOnline ? <WifiOff className="w-3.5 h-3.5" /> : <CloudCheck className="w-3.5 h-3.5" />}
+              <span>{!isOnline ? 'Salvamento Offline (IndexedDB)' : 'Nuvem Conectada'}</span>
+            </div>
+
             <button
               type="button"
               onClick={handlePrint}
@@ -519,6 +570,21 @@ export const AnamneseCompletaModal: React.FC<AnamneseCompletaModalProps> = ({
           </button>
         </div>
 
+        {/* Offline Status Warning Banner */}
+        {!isOnline && (
+          <div className="mx-6 mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between gap-2.5 text-amber-800 text-xs shrink-0">
+            <div className="flex items-center gap-2">
+              <Database className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                <strong>Modo Offline Ativo:</strong> Esta anamnese e assinatura digital serão armazenadas com segurança no dispositivo (IndexedDB) e enviadas automaticamente para a nuvem assim que houver conexão.
+              </span>
+            </div>
+            <span className="px-2 py-0.5 bg-amber-200/60 text-amber-900 rounded-md font-bold text-[10px] uppercase shrink-0">
+              Fila Local
+            </span>
+          </div>
+        )}
+
         {/* Global Error Banner */}
         {Object.keys(errosValidacao).length > 0 && (
           <div className="mx-6 mt-4 p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2.5 text-rose-700 text-xs font-semibold animate-in fade-in shrink-0">
@@ -538,9 +604,89 @@ export const AnamneseCompletaModal: React.FC<AnamneseCompletaModalProps> = ({
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2">
                   <User className="w-4 h-4 text-indigo-600" />
-                  <h4 className="text-sm font-bold text-slate-800">Bloco 1: Dados Pessoais do Cliente</h4>
+                  <h4 className="text-sm font-bold text-slate-800">Bloco 1: Dados Pessoais & Foto do Cliente</h4>
                 </div>
                 <span className="text-xs text-slate-400 font-medium">Campos com * são obrigatórios</span>
+              </div>
+
+              {/* Card de Foto Clínica & Captura de Câmera */}
+              <div className="p-4 bg-gradient-to-br from-indigo-50/70 via-slate-50 to-purple-50/40 rounded-2xl border border-indigo-100/80 shadow-xs">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  
+                  <div className="flex items-center gap-3.5">
+                    {fotoPacienteUrl ? (
+                      <div className="relative group shrink-0">
+                        <img
+                          src={fotoPacienteUrl}
+                          alt="Foto do Paciente"
+                          className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-indigo-500 shadow-md ring-2 ring-indigo-200"
+                        />
+                        <span className="absolute -bottom-1 -right-1 p-1 bg-emerald-600 text-white rounded-full shadow-xs" title="Foto Registrada">
+                          <Check className="w-3 h-3" />
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-indigo-100/70 border-2 border-dashed border-indigo-300 flex flex-col items-center justify-center text-indigo-500 shrink-0">
+                        <Camera className="w-7 h-7" />
+                      </div>
+                    )}
+
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <h5 className="text-xs sm:text-sm font-bold text-slate-900">
+                          Foto Clínica do Paciente
+                        </h5>
+                        {fotoPacienteUrl ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            Foto Registrada
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-200/80 text-slate-600">
+                            Câmera em Tempo Real
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] sm:text-xs text-slate-500 max-w-md leading-relaxed">
+                        Capture uma foto facial ou corporal durante o atendimento para comprovação clínica e acompanhamento na ficha.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Botões de Ação de Foto */}
+                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+                    <button
+                      type="button"
+                      disabled={isVisualizacao}
+                      onClick={() => setIsCameraModalOpen(true)}
+                      className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>{fotoPacienteUrl ? 'Tirar Nova Foto' : 'Capturar Foto'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isVisualizacao}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200 transition-all cursor-pointer disabled:opacity-50"
+                      title="Carregar foto da galeria ou arquivo local"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Galeria</span>
+                    </button>
+
+                    {fotoPacienteUrl && !isVisualizacao && (
+                      <button
+                        type="button"
+                        onClick={() => setFotoPacienteUrl('')}
+                        className="p-2 text-rose-600 hover:bg-rose-50 rounded-xl border border-rose-200 transition-all cursor-pointer"
+                        title="Remover Foto"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1494,6 +1640,37 @@ export const AnamneseCompletaModal: React.FC<AnamneseCompletaModalProps> = ({
                 )}
               </div>
 
+              {/* Foto do Paciente Anexada (Verificação Visual) */}
+              {fotoPacienteUrl && (
+                <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-100 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={fotoPacienteUrl}
+                      alt="Foto do Paciente"
+                      className="w-12 h-12 rounded-xl object-cover border border-indigo-300 shadow-xs ring-2 ring-indigo-100"
+                    />
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <Camera className="w-3.5 h-3.5 text-indigo-600" />
+                        <span className="text-xs font-bold text-indigo-950">Foto Clínica Vinculada</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Identificação visual anexada à assinatura digital do atendimento.
+                      </p>
+                    </div>
+                  </div>
+                  {!isVisualizacao && (
+                    <button
+                      type="button"
+                      onClick={() => setIsCameraModalOpen(true)}
+                      className="px-2.5 py-1 text-[11px] font-bold text-indigo-600 hover:bg-indigo-100 rounded-lg transition-all cursor-pointer"
+                    >
+                      Alterar Foto
+                    </button>
+                  )}
+                </div>
+              )}
+
               {/* Resumo da Anamnese para Conferência */}
               <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1.5">
                 <div className="flex items-center justify-between font-bold text-slate-800">
@@ -1568,6 +1745,38 @@ export const AnamneseCompletaModal: React.FC<AnamneseCompletaModalProps> = ({
             )}
           </div>
         </div>
+
+        {/* Hidden File Input for Image Upload Fallback */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="user"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              if (event.target?.result) {
+                setFotoPacienteUrl(event.target.result as string);
+              }
+            };
+            reader.readAsDataURL(file);
+          }}
+          className="hidden"
+        />
+
+        {/* Modal de Captura de Foto via Câmera */}
+        {isCameraModalOpen && (
+          <CameraCaptureModal
+            isOpen={isCameraModalOpen}
+            onClose={() => setIsCameraModalOpen(false)}
+            onCapture={(photoDataUrl) => setFotoPacienteUrl(photoDataUrl)}
+            patientName={nomeCompleto || pacienteExistente?.nome}
+            title={`Foto de ${nomeCompleto || 'Paciente'}`}
+            subtitle="Registro fotográfico em tempo real durante a anamnese"
+          />
+        )}
 
       </div>
     </div>

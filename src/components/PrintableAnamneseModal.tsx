@@ -95,34 +95,48 @@ export const PrintableAnamneseModal: React.FC<PrintableAnamneseModalProps> = ({
           <h2 className="text-xs font-black uppercase tracking-wider text-indigo-900 bg-slate-100 px-3 py-1.5 rounded-lg">
             1. Dados Pessoais do Cliente
           </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-xs">
-            <div>
-              <span className="text-slate-500 font-semibold block text-[11px]">Nome Completo:</span>
-              <strong className="text-slate-900">{dp.nomeCompleto}</strong>
-            </div>
-            <div>
-              <span className="text-slate-500 font-semibold block text-[11px]">Data de Nascimento / Idade:</span>
-              <strong>{dp.dataNascimento ? new Date(dp.dataNascimento).toLocaleDateString('pt-BR') : '-'} ({dp.idade} anos)</strong>
-            </div>
-            <div>
-              <span className="text-slate-500 font-semibold block text-[11px]">Telefone / WhatsApp:</span>
-              <strong>{dp.telefone}</strong>
-            </div>
-            <div>
-              <span className="text-slate-500 font-semibold block text-[11px]">E-mail:</span>
-              <span>{dp.email || '-'}</span>
-            </div>
-            <div>
-              <span className="text-slate-500 font-semibold block text-[11px]">Profissão:</span>
-              <span>{dp.profissao || '-'}</span>
-            </div>
-            <div>
-              <span className="text-slate-500 font-semibold block text-[11px]">Contato de Emergência:</span>
-              <span>{dp.contatoEmergencia?.nome || '-'} ({dp.contatoEmergencia?.telefone || '-'})</span>
-            </div>
-            <div className="sm:col-span-3">
-              <span className="text-slate-500 font-semibold block text-[11px]">Endereço Completo:</span>
-              <span>{dp.endereco || 'Não informado'}</span>
+          <div className="flex flex-col sm:flex-row items-start gap-4">
+            {anamnese.fotoPacienteUrl && (
+              <div className="shrink-0 text-center space-y-1">
+                <img
+                  src={anamnese.fotoPacienteUrl}
+                  alt="Foto Clínica do Paciente"
+                  className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl object-cover border-2 border-slate-300 shadow-xs"
+                />
+                <span className="text-[9px] uppercase font-bold text-slate-500 block">
+                  Foto do Atendimento
+                </span>
+              </div>
+            )}
+            <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-xs w-full">
+              <div>
+                <span className="text-slate-500 font-semibold block text-[11px]">Nome Completo:</span>
+                <strong className="text-slate-900">{dp.nomeCompleto}</strong>
+              </div>
+              <div>
+                <span className="text-slate-500 font-semibold block text-[11px]">Data de Nascimento / Idade:</span>
+                <strong>{dp.dataNascimento ? new Date(dp.dataNascimento).toLocaleDateString('pt-BR') : '-'} ({dp.idade} anos)</strong>
+              </div>
+              <div>
+                <span className="text-slate-500 font-semibold block text-[11px]">Telefone / WhatsApp:</span>
+                <strong>{dp.telefone}</strong>
+              </div>
+              <div>
+                <span className="text-slate-500 font-semibold block text-[11px]">E-mail:</span>
+                <span>{dp.email || '-'}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 font-semibold block text-[11px]">Profissão:</span>
+                <span>{dp.profissao || '-'}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 font-semibold block text-[11px]">Contato de Emergência:</span>
+                <span>{dp.contatoEmergencia?.nome || '-'} ({dp.contatoEmergencia?.telefone || '-'})</span>
+              </div>
+              <div className="sm:col-span-3">
+                <span className="text-slate-500 font-semibold block text-[11px]">Endereço Completo:</span>
+                <span>{dp.endereco || 'Não informado'}</span>
+              </div>
             </div>
           </div>
         </div>

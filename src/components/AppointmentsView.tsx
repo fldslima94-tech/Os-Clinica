@@ -27,7 +27,7 @@ interface AppointmentsViewProps {
   agendamentos: Agendamento[];
   pacientes: Paciente[];
   profissionais?: UsuarioEquipe[];
-  onOpenNewAppointment: () => void;
+  onOpenNewAppointment: (initialData?: Partial<Agendamento>) => void;
   onUpdateStatus: (id: string, status: StatusAgendamento) => void;
   onViewPatient: (paciente: Paciente) => void;
   onOpenCompleteModal?: (agendamento: Agendamento) => void;
@@ -74,8 +74,8 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
   };
 
   const balcaoAgendamentos = agendamentos
-    .filter(ag => isToday(ag.data_horario))
-    .sort((a, b) => new Date(a.data_horario).getTime() - new Date(b.data_horario).getTime());
+    .filter(ag => isToday(ag.data_hora))
+    .sort((a, b) => new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime());
 
   // Filter appointments for standard views
   const filtered = agendamentos.filter(ag => {

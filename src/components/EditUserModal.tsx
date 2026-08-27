@@ -16,7 +16,9 @@ import {
   Crown,
   Building2,
   UserCheck,
-  UserCircle
+  UserCircle,
+  Percent,
+  Stethoscope
 } from 'lucide-react';
 import { UsuarioEquipe, UserRole, PermissoesUsuario } from '../types';
 
@@ -45,6 +47,9 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
   const [role, setRole] = useState<UserRole>('usuario');
   const [telefone, setTelefone] = useState('');
   const [senha, setSenha] = useState('');
+  const [registroProfissional, setRegistroProfissional] = useState('');
+  const [especialidade, setEspecialidade] = useState('');
+  const [comissaoPercent, setComissaoPercent] = useState<number | string>(30);
   const [showPassword, setShowPassword] = useState(false);
 
   const [permissoes, setPermissoes] = useState<PermissoesUsuario>({
@@ -67,6 +72,9 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
       setRole(usuario.role);
       setTelefone(usuario.telefone || '');
       setSenha(usuario.senha || '123456');
+      setRegistroProfissional(usuario.registro_profissional || '');
+      setEspecialidade(usuario.especialidade || '');
+      setComissaoPercent(usuario.porcentagem_comissao ?? 30);
       if (usuario.permissoes) {
         setPermissoes(usuario.permissoes);
       }
@@ -124,6 +132,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
       saveHandler({
         ...usuario,
         nome: nome.trim(),
+        nomeCompleto: nome.trim(),
         email: email.trim(),
         senha: senha.trim(),
         cargo: cargo.trim() || (
@@ -133,6 +142,9 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
         ),
         role,
         telefone: telefone.trim(),
+        registro_profissional: registroProfissional.trim() || undefined,
+        especialidade: especialidade.trim() || undefined,
+        porcentagem_comissao: Number(comissaoPercent) || 0,
         permissoes,
       });
     }
@@ -293,6 +305,47 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
                 onChange={(e) => setCargo(e.target.value)}
                 placeholder="Ex: Biomédica Esteta, Recepcionista, Gerente..."
                 className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600"
+              />
+            </div>
+          </div>
+
+          {/* Registro Profissional e Especialidade */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Conselho / Registro (CRM, CRBM...)</label>
+              <input
+                type="text"
+                value={registroProfissional}
+                onChange={(e) => setRegistroProfissional(e.target.value)}
+                placeholder="Ex: CRBM 42.190 / CRM 189.200"
+                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Especialidade Clínica</label>
+              <input
+                type="text"
+                value={especialidade}
+                onChange={(e) => setEspecialidade(e.target.value)}
+                placeholder="Ex: Harmonização Facial, Laser..."
+                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+                <Percent className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Comissão (%)</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={comissaoPercent}
+                onChange={(e) => setComissaoPercent(e.target.value)}
+                placeholder="Ex: 30"
+                className="w-full px-3 py-2 text-xs bg-white border border-emerald-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 font-bold text-emerald-800"
               />
             </div>
           </div>

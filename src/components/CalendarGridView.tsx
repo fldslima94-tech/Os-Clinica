@@ -14,7 +14,7 @@ import { Agendamento, Paciente, StatusAgendamento } from '../types';
 interface CalendarGridViewProps {
   agendamentos: Agendamento[];
   pacientes: Paciente[];
-  onOpenNewAppointment: () => void;
+  onOpenNewAppointment: (initialData?: Partial<Agendamento>) => void;
   onSelectAgendamento: (agendamento: Agendamento) => void;
   onViewPatient: (paciente: Paciente) => void;
   onUpdateStatus: (id: string, status: StatusAgendamento) => void;
@@ -263,7 +263,10 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
                           </div>
                         ) : (
                           <button
-                            onClick={onOpenNewAppointment}
+                            onClick={() => {
+                              const dStr = day.toISOString().split('T')[0];
+                              onOpenNewAppointment({ data_hora: `${dStr}T${hour}:00` });
+                            }}
                             className="w-full h-full opacity-0 group-hover:opacity-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 rounded text-[11px] font-medium transition-opacity cursor-pointer"
                           >
                             + Agendar
@@ -307,7 +310,10 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
                       <div className="flex items-center justify-between text-xs text-slate-400 py-1">
                         <span>Horário livre</span>
                         <button
-                          onClick={onOpenNewAppointment}
+                          onClick={() => {
+                            const dStr = selectedDate.toISOString().split('T')[0];
+                            onOpenNewAppointment({ data_hora: `${dStr}T${hour}:00` });
+                          }}
                           className="text-indigo-600 hover:text-indigo-700 font-semibold cursor-pointer"
                         >
                           + Agendar

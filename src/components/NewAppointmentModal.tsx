@@ -20,6 +20,7 @@ interface NewAppointmentModalProps {
   pacientes: Paciente[];
   procedimentos?: ProcedimentoClinico[];
   profissionais?: UsuarioEquipe[];
+  initialData?: Partial<Agendamento> | null;
   onSave?: (novoAgendamento: Partial<Agendamento>) => void;
   onSaveAppointment?: (novoAgendamento: Partial<Agendamento>) => void;
   onOpenNewPatient?: () => void;
@@ -31,6 +32,7 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
   pacientes,
   procedimentos = [],
   profissionais = [],
+  initialData,
   onSave,
   onSaveAppointment,
   onOpenNewPatient,
@@ -48,6 +50,48 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
   const [status, setStatus] = useState<StatusAgendamento>('confirmado');
   const [valor, setValor] = useState<string>('1200');
   const [observacoes, setObservacoes] = useState<string>('');
+
+  // Synchronize when opening or initialData changes
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (initialData) {
+      if (initialData.paciente_id) {
+        setPacienteId(initialData.paciente_id);
+      }
+      if (initialData.profissional_id) {
+        setProfissionalId(initialData.profissional_id);
+      }
+      if (initialData.data_hora) {
+        try {
+          const d = new Date(initialData.data_hora);
+          if (!isNaN(d.getTime())) {
+            setData(d.toISOString().split('T')[0]);
+            const hours = String(d.getHours()).padStart(2, '0');
+            const minutes = String(d.getMinutes()).padStart(2, '0');
+            setHora(`${hours}:${minutes}`);
+          }
+        } catch {
+          // ignore
+        }
+      }
+      if (initialData.procedimento) {
+        const foundProc = adminProcedures.find(p => p.nome.toLowerCase() === initialData.procedimento?.toLowerCase());
+        if (foundProc) {
+          setSelectedProcId(foundProc.id);
+        }
+      }
+      if (initialData.duracao_minutos) {
+        setDuracao(initialData.duracao_minutos);
+      }
+      if (initialData.valor_estimado !== undefined) {
+        setValor(String(initialData.valor_estimado));
+      }
+      if (initialData.observacoes) {
+        setObservacoes(initialData.observacoes);
+      }
+    }
+  }, [isOpen, initialData, adminProcedures]);
 
   const currentProc = adminProcedures.find(p => p.id === selectedProcId) || adminProcedures[0];
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, User, Shield, Mail, Phone, Award, CheckCircle2, Lock, UserCheck, Crown, Building2, UserCircle, Sparkles } from 'lucide-react';
+import { X, User, Shield, Mail, Phone, Award, CheckCircle2, Lock, UserCheck, Crown, Building2, UserCircle, Sparkles, Stethoscope, Percent } from 'lucide-react';
 import { UsuarioEquipe, UserRole, PermissoesUsuario } from '../types';
 
 interface NewUserModalProps {
@@ -24,6 +24,9 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
   const [role, setRole] = useState<UserRole>('usuario');
   const [telefone, setTelefone] = useState('');
   const [senha, setSenha] = useState('');
+  const [registroProfissional, setRegistroProfissional] = useState('');
+  const [especialidade, setEspecialidade] = useState('');
+  const [comissaoPercent, setComissaoPercent] = useState<number | string>(30);
 
   // Default permissions based on role
   const [permissoes, setPermissoes] = useState<PermissoesUsuario>({
@@ -89,6 +92,7 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
     if (saveHandler) {
       saveHandler({
         nome: nome.trim(),
+        nomeCompleto: nome.trim(),
         email: email.trim(),
         senha: senha.trim() || defaultPass,
         cargo: cargo.trim() || (
@@ -98,6 +102,9 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
         ),
         role,
         telefone: telefone.trim(),
+        registro_profissional: registroProfissional.trim() || undefined,
+        especialidade: especialidade.trim() || undefined,
+        porcentagem_comissao: Number(comissaoPercent) || 0,
         status: 'ativo',
         permissoes,
       });
@@ -109,6 +116,8 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
     setSenha('');
     setCargo('Usuário da Equipe');
     setTelefone('');
+    setRegistroProfissional('');
+    setEspecialidade('');
     onClose();
   };
 
@@ -123,8 +132,8 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
               <User className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">Novo Cadastro de Usuário</h2>
-              <p className="text-xs text-slate-500">Estruture o acesso nos 4 níveis da hierarquia do sistema</p>
+              <h2 className="text-base font-bold text-slate-900">Novo Cadastro de Usuário / Profissional</h2>
+              <p className="text-xs text-slate-500">Cadastre profissionais reais, recepcionistas e gestores com comissões</p>
             </div>
           </div>
           <button
@@ -201,12 +210,12 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-emerald-800">
                     <UserCheck className="w-4 h-4 text-emerald-600" />
-                    <span>3. Usuário</span>
+                    <span>3. Profissional / Equipe</span>
                   </span>
                   {(role === 'usuario' || role === 'profissional' || role === 'recepcao' || role === 'operador') && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
                 </div>
                 <p className="text-[11px] text-slate-600 leading-tight">
-                  Acesso baseado no que o Admin Master ou Admin Local liberar (profissionais, recepção, operadores).
+                  Acesso aos atendimentos, agenda por profissional, anamneses e evolução de clientes.
                 </p>
               </button>
 
@@ -245,19 +254,60 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
                 placeholder="Ex: Dra. Mariana Silva"
-                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600"
+                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 font-semibold"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Cargo / Descrição da Função *</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Cargo / Função *</label>
               <input
                 type="text"
                 required
                 value={cargo}
                 onChange={(e) => setCargo(e.target.value)}
-                placeholder="Ex: Biomédica Esteta, Recepcionista, Gerente..."
+                placeholder="Ex: Biomédica Esteta, Dermatologista, Esteticista..."
                 className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600"
+              />
+            </div>
+          </div>
+
+          {/* Registro Profissional e Especialidade */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Conselho / Registro (CRM, CRBM...)</label>
+              <input
+                type="text"
+                value={registroProfissional}
+                onChange={(e) => setRegistroProfissional(e.target.value)}
+                placeholder="Ex: CRBM 42.190 / CRM 189.200"
+                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Especialidade Clínica</label>
+              <input
+                type="text"
+                value={especialidade}
+                onChange={(e) => setEspecialidade(e.target.value)}
+                placeholder="Ex: Harmonização Facial, Laser..."
+                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+                <Percent className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Comissão (%)</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={comissaoPercent}
+                onChange={(e) => setComissaoPercent(e.target.value)}
+                placeholder="Ex: 30"
+                className="w-full px-3 py-2 text-xs bg-white border border-emerald-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 font-bold text-emerald-800"
               />
             </div>
           </div>
@@ -271,7 +321,7 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="email@clinica.com.br"
+                placeholder="mariana@clinica.com.br"
                 className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600"
               />
             </div>
@@ -283,7 +333,7 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
                 required
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
-                placeholder="Defina a senha"
+                placeholder="Ex: 123456"
                 className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 font-mono"
               />
             </div>
@@ -360,9 +410,10 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
+              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
             >
-              Cadastrar Usuário
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Salvar Cadastro de Profissional</span>
             </button>
           </div>
 

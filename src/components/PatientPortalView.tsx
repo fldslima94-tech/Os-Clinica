@@ -141,7 +141,7 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
       profile = {
         id: `goog-${Date.now()}`,
         nome: 'Fernanda Lima da Silva',
-        email: 'fldslima94@gmail.com',
+        email: 'paciente.fernanda@exemplo.com',
         avatar_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&auto=format&fit=crop&q=80',
         telefone: '(11) 99888-7766',
       };
@@ -861,7 +861,7 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
                   alt="Avatar"
                   className="w-6 h-6 rounded-full object-cover"
                 />
-                <span>Continuar como Fernanda (fldslima94@gmail.com)</span>
+                <span>Continuar como Fernanda (paciente.fernanda@exemplo.com)</span>
               </button>
 
               <div className="flex items-center gap-3 text-xs text-slate-400">

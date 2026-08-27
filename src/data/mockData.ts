@@ -34,7 +34,7 @@ export const MOCK_USUARIOS: UsuarioEquipe[] = [
     id: 'user-super-admin',
     nome: 'Fabio Lima',
     nomeCompleto: 'Fabio Lima',
-    email: 'fldslima94@gmail.com',
+    email: 'fabio@teste.com',
     senha: 'admin123',
     cargo: 'Super Admin (Master)',
     profissao: 'Proprietário & Administrador Geral',
@@ -571,6 +571,20 @@ export const MOCK_PACIENTES: Paciente[] = [
     criado_em: '2025-01-15T11:00:00Z',
     email: 'mariana.duarte@email.com',
     habilitar_login_portal: true,
+    fotos_antes_depois: [
+      {
+        id: 'foto-02',
+        titulo: 'Micropigmentação Labial Efeito Velvet',
+        data: '2025-02-10',
+        procedimento: 'Micropigmentação Labial',
+        procedimento_nome: 'Micropigmentação Labial',
+        foto_antes: 'https://images.unsplash.com/photo-1512290900672-1f02a0a026e6?w=600&auto=format&fit=crop&q=80',
+        foto_depois: 'https://images.unsplash.com/photo-1588510970672-f2f94e022b7b?w=600&auto=format&fit=crop&q=80',
+        foto_antes_url: 'https://images.unsplash.com/photo-1512290900672-1f02a0a026e6?w=600&auto=format&fit=crop&q=80',
+        foto_depois_url: 'https://images.unsplash.com/photo-1588510970672-f2f94e022b7b?w=600&auto=format&fit=crop&q=80',
+        observacoes: 'Revitalização labial com pigmento Coral Rose. Cicatrização uniforme e definição do arco do cupido.',
+      }
+    ],
   }
 ];
 
@@ -846,7 +860,7 @@ export const MOCK_ORCAMENTOS: SolicitacaoOrcamento[] = [
   {
     id: 'orc-01',
     paciente_nome: 'Fernanda Lima',
-    paciente_email: 'fldslima94@gmail.com',
+    paciente_email: 'paciente.fernanda@exemplo.com',
     paciente_telefone: '(11) 98765-4321',
     conta_google_vinculada: true,
     profissional_id: 'user-01',
