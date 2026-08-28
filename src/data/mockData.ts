@@ -65,6 +65,40 @@ export const MOCK_USUARIOS: UsuarioEquipe[] = [
     }
   },
   {
+    id: 'user-super-admin-alt',
+    nome: 'Fabio Lima (Master)',
+    nomeCompleto: 'Fabio Lima (Master)',
+    email: 'fabio@teste.com',
+    senha: 'admin123',
+    cargo: 'Super Admin (Master)',
+    profissao: 'Proprietário & Administrador Geral',
+    role: 'admin_total',
+    telefone: '(11) 99999-8877',
+    status: 'ativo',
+    ultimo_acesso: 'Online agora',
+    avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
+    registro_profissional: 'ADM/SP 99.112',
+    especialidade: 'Governança & Gestão de Clínicas',
+    porcentagem_comissao: 100,
+    permissoes: {
+      ver_financeiro_completo: true,
+      emitir_recibo: true,
+      editar_prontuario_clinico: true,
+      gerenciar_estoque_custos: true,
+      configuracoes_sistema: true,
+      visualizar_bens_ativos: true,
+    },
+    permissoesCustomizadas: {
+      financeiro: { verEntradas: true, verSaidas: true, verRecorrentes: true, excluir: true, verRelatorios: true },
+      clientes: { criar: true, editar: true, excluir: true, verHistorico: true, preencherAnamnese: true },
+      agenda: { verTodos: true, verPropria: true, criar: true, cancelar: true, finalizar: true },
+      procedimentos: { verCustos: true, verMargem: true, criar: true, excluir: true, ajustarEstoque: true },
+      bens: { visualizar: true, cadastrar: true, editar: true, gerenciar: true, excluir: true, manutencao: true },
+      estoque: { ajustar: true, excluir: true },
+      orcamentos: { verTodos: true, responder: true, verEmails: true }
+    }
+  },
+  {
     id: 'user-01',
     nome: 'Dra. Camila Vasconcelos',
     nomeCompleto: 'Dra. Camila Vasconcelos',

@@ -744,6 +744,7 @@ export function isUserAdminTotal(user?: UsuarioEquipe | null): boolean {
   const userName = (user.nome || user.nomeCompleto || '').toLowerCase().trim();
   const userRole = (user.role || '').toLowerCase().trim();
   const userCargo = (user.cargo || '').toLowerCase().trim();
+  
   return (
     userRole === 'admin_master' || 
     userRole === 'admin_total' || 
@@ -751,12 +752,14 @@ export function isUserAdminTotal(user?: UsuarioEquipe | null): boolean {
     userRole === 'master' ||
     userRole === 'super_admin' ||
     user.id === 'user-super-admin' ||
+    user.id === 'user-super-admin-alt' ||
     userEmail === 'fldslima94@gmail.com' ||
     userEmail === 'fabio@teste.com' ||
     userName === 'fabio lima' ||
+    userName.includes('fabio lima') ||
     userCargo.includes('master') ||
     userCargo.includes('super admin') ||
-    userCargo.includes('administrador') ||
+    userCargo.includes('administrador geral') ||
     userCargo.includes('admin total')
   );
 }
@@ -777,6 +780,56 @@ export function isUserAdminLocalOrTotal(user?: UsuarioEquipe | null): boolean {
     userCargo.includes('gerente') ||
     userCargo.includes('gestor')
   );
+}
+
+/**
+ * Auto-cura e garantia de existência do Super Admin no Firestore
+ */
+export async function ensureSuperAdminInFirestore(): Promise<void> {
+  try {
+    const superAdminData: UsuarioEquipe = {
+      id: 'user-super-admin',
+      nome: 'Fabio Lima',
+      nomeCompleto: 'Fabio Lima',
+      email: 'fldslima94@gmail.com',
+      senha: 'admin123',
+      cargo: 'Super Admin (Master)',
+      profissao: 'Proprietário & Administrador Geral',
+      role: 'admin_total',
+      telefone: '(11) 99999-8877',
+      status: 'ativo',
+      ultimo_acesso: 'Online agora',
+      avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
+      registro_profissional: 'ADM/SP 99.112',
+      especialidade: 'Governança & Gestão de Clínicas',
+      porcentagem_comissao: 100,
+      permissoes: {
+        ver_financeiro_completo: true,
+        emitir_recibo: true,
+        editar_prontuario_clinico: true,
+        gerenciar_estoque_custos: true,
+        configuracoes_sistema: true,
+        visualizar_bens_ativos: true,
+      },
+      permissoesCustomizadas: {
+        financeiro: { verEntradas: true, verSaidas: true, verRecorrentes: true, excluir: true, verRelatorios: true },
+        clientes: { criar: true, editar: true, excluir: true, verHistorico: true, preencherAnamnese: true },
+        agenda: { verTodos: true, verPropria: true, criar: true, cancelar: true, finalizar: true },
+        procedimentos: { verCustos: true, verMargem: true, criar: true, excluir: true, ajustarEstoque: true },
+        bens: { visualizar: true, cadastrar: true, editar: true, gerenciar: true, excluir: true, manutencao: true },
+        estoque: { ajustar: true, excluir: true },
+        orcamentos: { verTodos: true, responder: true, verEmails: true }
+      }
+    };
+
+    const userRef = doc(db, COLLECTIONS.USUARIOS, 'user-super-admin');
+    const perfilRef = doc(db, COLLECTIONS.PERFIS, 'user-super-admin');
+
+    await setDoc(userRef, superAdminData, { merge: true });
+    await setDoc(perfilRef, superAdminData, { merge: true });
+  } catch (err) {
+    console.warn('[ensureSuperAdminInFirestore] Aviso ao sincronizar Super Admin:', err);
+  }
 }
 
 export function checkUserCustomPermission(

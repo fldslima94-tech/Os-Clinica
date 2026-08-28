@@ -26,6 +26,7 @@ import { Paciente, PacoteTratamento, PacoteItemProcedimento, ProcedimentoClinico
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 import { useConnectionStatus } from '../hooks/useConnectionStatus';
 import { Wifi, WifiOff, Database, CloudCheck } from 'lucide-react';
+import { isUserAdminTotal, isUserAdminLocalOrTotal } from '../services/firebaseService';
 
 interface TreatmentPackagesModalProps {
   isOpen: boolean;
@@ -58,7 +59,7 @@ export const TreatmentPackagesModal: React.FC<TreatmentPackagesModalProps> = ({
   procedimentos = [],
 }) => {
   const { isOnline, pendingCount } = useConnectionStatus();
-  const isAdmin = !currentUser || currentUser.role === 'admin';
+  const isAdmin = !currentUser || isUserAdminTotal(currentUser) || isUserAdminLocalOrTotal(currentUser) || currentUser.role === 'admin_master' || currentUser.role === 'admin_total' || currentUser.role === 'admin' || currentUser.role === 'gestor';
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [pacoteToDelete, setPacoteToDelete] = useState<PacoteTratamento | null>(null);
 

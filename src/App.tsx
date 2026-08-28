@@ -95,6 +95,7 @@ import {
   softDeleteTransacao,
   onFirebaseAuthStateChange,
   logoutFirebase,
+  ensureSuperAdminInFirestore,
   COLLECTIONS 
 } from './services/firebaseService';
 
@@ -290,6 +291,9 @@ export default function App() {
       alertas_retorno: MOCK_ALERTAS_RETORNO,
       fornecedores: MOCK_FORNECEDORES
     });
+
+    // Auto-heal super admin credentials in Firestore
+    ensureSuperAdminInFirestore();
 
     // Real-Time onSnapshot Collection Subscriptions
     const unsubClinica = subscribeToCollection<ClinicaConfig>(

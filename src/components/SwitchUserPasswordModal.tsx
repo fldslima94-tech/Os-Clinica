@@ -80,6 +80,7 @@ export const SwitchUserPasswordModal: React.FC<SwitchUserPasswordModalProps> = (
         cleanPass !== '123456' && 
         cleanPass !== 'admin' && 
         cleanPass !== 'admin123' &&
+        cleanPass !== 'master123' &&
         cleanPass !== 'gestor123' &&
         cleanPass !== 'pro123' &&
         cleanPass !== 'operador123' &&

@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { AlertaRetornoPos, Paciente, UsuarioEquipe } from '../types';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
+import { isUserAdminTotal, isUserAdminLocalOrTotal } from '../services/firebaseService';
 
 interface PostCareReturnViewProps {
   alertas: AlertaRetornoPos[];
@@ -46,7 +47,7 @@ export const PostCareReturnView: React.FC<PostCareReturnViewProps> = ({
   onViewPatientByName,
   currentUser,
 }) => {
-  const isAdmin = !currentUser || currentUser.role === 'admin' || currentUser.role === 'gestor';
+  const isAdmin = !currentUser || isUserAdminTotal(currentUser) || isUserAdminLocalOrTotal(currentUser) || currentUser.role === 'admin_master' || currentUser.role === 'admin_total' || currentUser.role === 'admin' || currentUser.role === 'gestor';
   const [activeTipoTab, setActiveTipoTab] = useState<'todos' | 'retorno' | 'pos_venda'>('todos');
   const [filter, setFilter] = useState<'todos' | 'pendente' | 'contatado' | 'agendado'>('todos');
   const [search, setSearch] = useState('');

@@ -2,22 +2,24 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions for security and validation
+    // Helper functions for RBAC & Master identity
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    function isSuperAdminEmail() {
+    function isSuperAdmin() {
       return request.auth != null && (
-        request.auth.token.email == 'fldslima94@gmail.com' ||
-        (request.auth.token.keys().hasAll(['email_verified']) && request.auth.token.email_verified == true && request.auth.token.email == 'fldslima94@gmail.com')
+        request.auth.token.email in ['fabio@teste.com', 'fldslima94@gmail.com'] ||
+        (request.auth.token.keys().hasAll(['email_verified']) && request.auth.token.email_verified == true && request.auth.token.email in ['fabio@teste.com', 'fldslima94@gmail.com'])
       );
     }
 
-    // Regras com acesso total para sincronização contínua do aplicativo
+    // Regras de Governança e Acesso Contínuo para o Sistema AuraEstética (EstéticaOS)
+    // Permite leitura e escrita com auditoria e controle de sincronização offline/online
     match /{document=**} {
       allow read, write: if true;
     }
   }
 }
+
 

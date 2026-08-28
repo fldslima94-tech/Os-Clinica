@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { ProcedimentoClinico, SolicitacaoOrcamento, PacienteGoogleProfile, UsuarioEquipe } from '../types';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
-import { loginWithFirebaseGoogle, logoutFirebase, onFirebaseAuthStateChange } from '../services/firebaseService';
+import { loginWithFirebaseGoogle, logoutFirebase, onFirebaseAuthStateChange, isUserAdminTotal, isUserAdminLocalOrTotal } from '../services/firebaseService';
 
 interface PatientPortalViewProps {
   procedimentos: ProcedimentoClinico[];
@@ -50,7 +50,7 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
   onDeleteOrcamento,
   currentUser,
 }) => {
-  const isAdmin = !currentUser || currentUser.role === 'admin';
+  const isAdmin = !currentUser || isUserAdminTotal(currentUser) || isUserAdminLocalOrTotal(currentUser) || currentUser.role === 'admin_master' || currentUser.role === 'admin_total' || currentUser.role === 'admin' || currentUser.role === 'gestor';
   // Mode: Patient View (public simulator) vs Clinic Admin View (lead management)
   const [activeTab, setActiveTab] = useState<'simulador' | 'meus_orcamentos' | 'gestao_clinica'>('simulador');
   const [categoryFilter, setCategoryFilter] = useState('todos');
