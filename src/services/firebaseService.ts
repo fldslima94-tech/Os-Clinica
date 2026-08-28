@@ -827,6 +827,20 @@ export async function ensureSuperAdminInFirestore(): Promise<void> {
 
     await setDoc(userRef, superAdminData, { merge: true });
     await setDoc(perfilRef, superAdminData, { merge: true });
+
+    // Also auto-heal alternate super admin login (fabio@teste.com)
+    const superAdminAltData: UsuarioEquipe = {
+      ...superAdminData,
+      id: 'user-super-admin-alt',
+      nome: 'Fabio Lima (Master)',
+      nomeCompleto: 'Fabio Lima (Master)',
+      email: 'fabio@teste.com',
+      senha: 'admin123',
+    };
+    const userAltRef = doc(db, COLLECTIONS.USUARIOS, 'user-super-admin-alt');
+    const perfilAltRef = doc(db, COLLECTIONS.PERFIS, 'user-super-admin-alt');
+    await setDoc(userAltRef, superAdminAltData, { merge: true });
+    await setDoc(perfilAltRef, superAdminAltData, { merge: true });
   } catch (err) {
     console.warn('[ensureSuperAdminInFirestore] Aviso ao sincronizar Super Admin:', err);
   }

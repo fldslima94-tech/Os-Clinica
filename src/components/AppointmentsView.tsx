@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { Agendamento, Paciente, StatusAgendamento, UsuarioEquipe } from '../types';
 import { CalendarGridView } from './CalendarGridView';
-import { isUserAdminTotal } from '../services/firebaseService';
+import { isUserAdminTotal, isUserAdminLocalOrTotal } from '../services/firebaseService';
 
 interface AppointmentsViewProps {
   agendamentos: Agendamento[];
@@ -57,7 +57,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
   currentUser,
   initialBalcaoMode = false,
 }) => {
-  const isAdmin = !currentUser || isUserAdminTotal(currentUser) || currentUser.role === 'admin_total' || currentUser.role === 'admin';
+  const isAdmin = !currentUser || isUserAdminTotal(currentUser) || isUserAdminLocalOrTotal(currentUser) || currentUser.role === 'admin_master' || currentUser.role === 'admin_total' || currentUser.role === 'admin' || currentUser.role === 'gestor';
   const [viewFormat, setViewFormat] = useState<'cards' | 'profissionais' | 'calendario' | 'balcao'>(initialBalcaoMode ? 'balcao' : 'cards');
   const [filterStatus, setFilterStatus] = useState<string>('todos');
   const [balcaoFilterStatus, setBalcaoFilterStatus] = useState<string>('todos');
@@ -765,7 +765,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                               {ag.status !== 'concluido' && (
                                 <button
                                   onClick={() => handleCheckInClick(ag)}
-                                  className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                  className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                                   title="Confirmar Chegada, Pagamento e Retorno"
                                 >
                                   <UserCheck className="w-3 h-3" />
@@ -773,17 +773,29 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                                 </button>
                               )}
 
-                              {ag.status !== 'concluido' ? (
-                                <button
-                                  onClick={() => handleConcludeClick(ag)}
-                                  className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
-                                >
-                                  <CheckCircle2 className="w-3 h-3" />
-                                  <span>Concluir</span>
-                                </button>
-                              ) : (
-                                <span className="text-[11px] text-slate-400 font-medium italic">Atendimento Finalizado</span>
-                              )}
+                              <div className="flex items-center gap-1 ml-auto">
+                                {ag.status !== 'concluido' ? (
+                                  <button
+                                    onClick={() => handleConcludeClick(ag)}
+                                    className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                  >
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    <span>Concluir</span>
+                                  </button>
+                                ) : (
+                                  <span className="text-[11px] text-slate-400 font-medium italic">Atendimento Finalizado</span>
+                                )}
+
+                                {isAdmin && onDeleteAppointment && (
+                                  <button
+                                    onClick={() => setAppointmentToDelete(ag)}
+                                    className="p-1 text-slate-300 hover:bg-rose-50 hover:text-rose-600 rounded transition-colors cursor-pointer"
+                                    title="Excluir Agendamento Permanentemente"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
                         );
