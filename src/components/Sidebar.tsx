@@ -16,7 +16,8 @@ import {
   Building,
   Landmark,
   Settings,
-  Sparkles
+  Sparkles,
+  Database
 } from 'lucide-react';
 import { TabType, UsuarioEquipe, ClinicaConfig } from '../types';
 import { isUserAdminTotal } from '../services/firebaseService';
@@ -192,13 +193,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {
         title: 'Gestão & Segurança',
         items: [
-          ...(isAdminTotal ? [{
-            id: 'permissoes' as TabType,
-            label: 'Permissões & Matriz',
-            icon: Lock,
-            badge: 'Super Admin',
-            badgeColor: 'bg-amber-100 text-amber-800 border-amber-200 font-bold',
-          }] : []),
+          ...(isAdminTotal ? [
+            {
+              id: 'banco_dados' as TabType,
+              label: 'Edição & Banco Master',
+              icon: Database,
+              badge: 'Master Total',
+              badgeColor: 'bg-rose-100 text-rose-800 border-rose-200 font-bold',
+            },
+            {
+              id: 'permissoes' as TabType,
+              label: 'Permissões & Matriz',
+              icon: Lock,
+              badge: 'Super Admin',
+              badgeColor: 'bg-amber-100 text-amber-800 border-amber-200 font-bold',
+            }
+          ] : []),
           ...(isGestor ? [{
             id: 'usuarios' as TabType,
             label: 'Equipe & Usuários',

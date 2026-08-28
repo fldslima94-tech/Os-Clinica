@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { Agendamento, Paciente, StatusAgendamento, UsuarioEquipe } from '../types';
 import { CalendarGridView } from './CalendarGridView';
+import { isUserAdminTotal } from '../services/firebaseService';
 
 interface AppointmentsViewProps {
   agendamentos: Agendamento[];
@@ -56,7 +57,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
   currentUser,
   initialBalcaoMode = false,
 }) => {
-  const isAdmin = !currentUser || currentUser.role === 'admin';
+  const isAdmin = !currentUser || isUserAdminTotal(currentUser) || currentUser.role === 'admin_total' || currentUser.role === 'admin';
   const [viewFormat, setViewFormat] = useState<'cards' | 'profissionais' | 'calendario' | 'balcao'>(initialBalcaoMode ? 'balcao' : 'cards');
   const [filterStatus, setFilterStatus] = useState<string>('todos');
   const [balcaoFilterStatus, setBalcaoFilterStatus] = useState<string>('todos');
@@ -467,14 +468,28 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
 
                           {/* Procedimento */}
                           <td className="py-3.5 px-4 text-slate-800 font-medium">
-                            <div className="line-clamp-1 max-w-[200px]" title={ag.procedimento}>
-                              {ag.procedimento}
+                            <div className="flex items-center gap-1.5">
+                              {(ag.procedimento.toLowerCase().includes('retorno') || ag.procedimento.toLowerCase().includes('revisão')) && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[10px] font-extrabold border border-purple-200 shrink-0">
+                                  <RotateCcw className="w-2.5 h-2.5" />
+                                  Retorno
+                                </span>
+                              )}
+                              <div className="line-clamp-1 max-w-[200px]" title={ag.procedimento}>
+                                {ag.procedimento}
+                              </div>
                             </div>
                             {ag.valor_estimado ? (
                               <span className="text-[11px] font-mono text-emerald-700 font-bold block">
                                 R$ {ag.valor_estimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                               </span>
-                            ) : null}
+                            ) : (
+                              <span className="text-[10px] text-slate-400 font-medium block">
+                                {(ag.procedimento.toLowerCase().includes('retorno') || ag.procedimento.toLowerCase().includes('revisão'))
+                                  ? 'Retorno incluso (R$ 0,00)'
+                                  : 'Sem valor lançado'}
+                              </span>
+                            )}
                           </td>
 
                           {/* Status */}
@@ -572,6 +587,17 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                                 >
                                   <RotateCcw className="w-3 h-3" />
                                   <span>Reativar</span>
+                                </button>
+                              )}
+
+                              {/* EXCLUIR AGENDAMENTO (ADMIN / MASTER) */}
+                              {isAdmin && onDeleteAppointment && (
+                                <button
+                                  onClick={() => setAppointmentToDelete(ag)}
+                                  className="p-1.5 text-slate-300 hover:bg-rose-50 hover:text-rose-600 rounded-md transition-colors cursor-pointer"
+                                  title="Excluir Agendamento Permanentemente"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               )}
                             </div>
@@ -711,9 +737,17 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
 
                               {/* Procedimento */}
                               <div className="bg-indigo-50/60 p-2 rounded-lg border border-indigo-100">
-                                <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 flex items-center gap-1">
-                                  <Sparkles className="w-3 h-3 text-indigo-600" />
-                                  <span>Procedimento Agendado</span>
+                                <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 flex items-center justify-between gap-1">
+                                  <div className="flex items-center gap-1">
+                                    <Sparkles className="w-3 h-3 text-indigo-600" />
+                                    <span>Procedimento Agendado</span>
+                                  </div>
+                                  {(ag.procedimento.toLowerCase().includes('retorno') || ag.procedimento.toLowerCase().includes('revisão')) && (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-purple-200/80 text-purple-900 text-[9px] font-black">
+                                      <RotateCcw className="w-2.5 h-2.5" />
+                                      RETORNO
+                                    </span>
+                                  )}
                                 </div>
                                 <p className="text-xs font-bold text-indigo-950 mt-0.5 leading-snug">
                                   {ag.procedimento}
@@ -834,12 +868,26 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                     </div>
 
                     <div className="mb-3">
-                      <h3 className="text-sm font-bold text-slate-900 line-clamp-1">
-                        {ag.procedimento}
-                      </h3>
-                      {ag.valor_estimado && (
+                      <div className="flex items-center gap-1.5 mb-1">
+                        {(ag.procedimento.toLowerCase().includes('retorno') || ag.procedimento.toLowerCase().includes('revisão')) && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-purple-100 text-purple-800 text-[10px] font-extrabold border border-purple-200 shrink-0">
+                            <RotateCcw className="w-2.5 h-2.5" />
+                            Retorno
+                          </span>
+                        )}
+                        <h3 className="text-sm font-bold text-slate-900 line-clamp-1">
+                          {ag.procedimento}
+                        </h3>
+                      </div>
+                      {ag.valor_estimado ? (
                         <p className="text-xs font-semibold text-slate-600 mt-0.5">
                           R$ {ag.valor_estimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      ) : (
+                        <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                          {(ag.procedimento.toLowerCase().includes('retorno') || ag.procedimento.toLowerCase().includes('revisão'))
+                            ? 'Retorno incluso (R$ 0,00)'
+                            : 'Sem valor lançado'}
                         </p>
                       )}
 

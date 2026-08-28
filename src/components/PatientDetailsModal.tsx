@@ -48,6 +48,7 @@ import {
 import { MODELO_TERMO_CONSENTIMENTO } from '../data/mockData';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 import { AnamneseCompletaModal } from './AnamneseCompletaModal';
+import { isUserAdminTotal, isUserAdminLocalOrTotal } from '../services/firebaseService';
 import { PrintableAnamneseModal } from './PrintableAnamneseModal';
 import { PhotoComparisonModal, PhotoItem } from './PhotoComparisonModal';
 import { CameraCaptureModal } from './CameraCaptureModal';
@@ -86,7 +87,7 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
     return queueItems.filter(item => item.entityId === paciente.id || item.entityTitle?.toLowerCase().includes(paciente.nome.toLowerCase()));
   }, [queueItems, paciente]);
 
-  const isGestor = !currentUser || currentUser.role === 'gestor' || currentUser.role === 'admin';
+  const isGestor = !currentUser || isUserAdminTotal(currentUser) || isUserAdminLocalOrTotal(currentUser) || currentUser.role === 'admin_total' || currentUser.role === 'admin' || currentUser.role === 'gestor';
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'anamnese' | 'evolucoes' | 'fotos' | 'procedimentos' | 'termo'>('anamnese');
   

@@ -688,6 +688,7 @@ export type TabType =
   | 'quadro_avisos'
   | 'usuarios'
   | 'permissoes' // Módulo de Gestão de Permissões e Campos do admin_total
+  | 'banco_dados' // Edição & Banco de Dados Master Total
   | 'perfil' // Meu Perfil / Minha Conta
   | 'configuracoes'
   | 'supabase_guide';
@@ -778,3 +779,13 @@ export interface PacienteGoogleProfile {
   telefone?: string;
   data_nascimento?: string;
 }
+
+// Aliases for seamless cross-component compatibility
+export type Procedimento = ProcedimentoClinico;
+export type ItemEstoque = EstoqueInsumo;
+export type LancamentoFinanceiro = TransacaoFinanceira;
+export type AtivoPatrimonial = BemPatrimonial;
+export type AvisoMural = AvisoQuadro;
+export type PlanoTratamento = PacoteTratamento;
+export type EvolucaoRetorno = FichaRetornoEvolucao;
+

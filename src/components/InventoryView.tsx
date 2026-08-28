@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { EstoqueInsumo, ProcedimentoClinico, UsuarioEquipe } from '../types';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
+import { isUserAdminTotal } from '../services/firebaseService';
 
 interface InventoryViewProps {
   estoque: EstoqueInsumo[];
@@ -52,7 +53,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   onUpdateQuantity,
   onToggleProcedureStatus,
 }) => {
-  const isAdmin = currentUser.role === 'admin';
+  const isAdmin = !currentUser || isUserAdminTotal(currentUser) || currentUser.role === 'admin_total' || currentUser.role === 'admin';
   const [currentTab, setCurrentTab] = useState<'procedimentos' | 'insumos'>('procedimentos');
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('todos');
@@ -391,7 +392,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         </>
                       ) : (
                         <span className="text-[11px] text-slate-400 italic">
-                          Apenas Admin altera
+                          Apenas Admin Master / Gestor altera
                         </span>
                       )}
                     </div>

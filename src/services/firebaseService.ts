@@ -68,10 +68,12 @@ export const COLLECTIONS = {
   ORCAMENTOS: 'solicitacoes_orcamento',
   ORCAMENTOS_SOLICITACOES: 'orcamentos_solicitacoes',
   TRANSACOES: 'transacoes',
+  FINANCEIRO: 'transacoes',
   FLUXO_CAIXA: 'fluxo_caixa',
   DESPESAS_RECORRENTES: 'despesas_recorrentes',
   BENS: 'bens',
   BENS_ATIVOS: 'bens_ativos',
+  PATRIMONIO: 'bens_ativos',
   MODELOS_ANAMNESE: 'modelos_anamnese',
   MODELOS_CONTRATOS: 'modelos_contratos',
   FICHAS_RETORNO: 'fichas_retorno',
@@ -740,15 +742,22 @@ export function isUserAdminTotal(user?: UsuarioEquipe | null): boolean {
   if (!user) return false;
   const userEmail = (user.email || '').toLowerCase().trim();
   const userName = (user.nome || user.nomeCompleto || '').toLowerCase().trim();
+  const userRole = (user.role || '').toLowerCase().trim();
+  const userCargo = (user.cargo || '').toLowerCase().trim();
   return (
-    user.role === 'admin_master' || 
-    user.role === 'admin_total' || 
-    user.role === 'admin' || 
+    userRole === 'admin_master' || 
+    userRole === 'admin_total' || 
+    userRole === 'admin' || 
+    userRole === 'master' ||
+    userRole === 'super_admin' ||
     user.id === 'user-super-admin' ||
     userEmail === 'fldslima94@gmail.com' ||
     userEmail === 'fabio@teste.com' ||
     userName === 'fabio lima' ||
-    Boolean(user.cargo && (user.cargo.toLowerCase().includes('master') || user.cargo.toLowerCase().includes('super admin')))
+    userCargo.includes('master') ||
+    userCargo.includes('super admin') ||
+    userCargo.includes('administrador') ||
+    userCargo.includes('admin total')
   );
 }
 
@@ -758,11 +767,15 @@ export function isUserAdminMaster(user?: UsuarioEquipe | null): boolean {
 
 export function isUserAdminLocalOrTotal(user?: UsuarioEquipe | null): boolean {
   if (!user) return false;
+  const userRole = (user.role || '').toLowerCase().trim();
+  const userCargo = (user.cargo || '').toLowerCase().trim();
   return (
     isUserAdminTotal(user) || 
-    user.role === 'admin_local' || 
-    user.role === 'gestor' ||
-    Boolean(user.cargo && user.cargo.toLowerCase().includes('admin local'))
+    userRole === 'admin_local' || 
+    userRole === 'gestor' ||
+    userCargo.includes('admin local') ||
+    userCargo.includes('gerente') ||
+    userCargo.includes('gestor')
   );
 }
 
@@ -1097,5 +1110,178 @@ export function usePermissions(currentUser?: UsuarioEquipe | null) {
     canDelete: (modulo: keyof PermissoesCustomizadas) => checkUserCustomPermission(currentUser, modulo, 'excluir'),
     canManageAssets: () => checkUserCustomPermission(currentUser, 'bens', 'gerenciar'),
   };
+}
+
+// ============================================================================
+// 10. MÓDULO MASTER DATABASE: CRUD, CATEGORIAS, HISTÓRICOS E AUDITORIA GLOBAL
+// ============================================================================
+
+/**
+ * Exclusão física definitiva direta de qualquer documento no Firestore para o Admin Master
+ */
+export async function deleteRecordMaster(collectionName: string, docId: string): Promise<boolean> {
+  try {
+    const docRef = doc(db, collectionName, docId);
+    await deleteDoc(docRef);
+    return true;
+  } catch (error: any) {
+    console.error(`[deleteRecordMaster] Erro ao excluir registro ${docId} de ${collectionName}:`, error);
+    handleFirestoreError(error, OperationType.DELETE, collectionName);
+    return false;
+  }
+}
+
+/**
+ * Atualização/Edição direta de campos de qualquer documento no Firestore para o Admin Master
+ */
+export async function updateRecordMaster(collectionName: string, docId: string, data: any): Promise<boolean> {
+  try {
+    const docRef = doc(db, collectionName, docId);
+    const cleanData = sanitizeForFirestore({
+      ...data,
+      atualizadoEm: serverTimestamp(),
+    });
+    await setDoc(docRef, cleanData, { merge: true });
+    return true;
+  } catch (error: any) {
+    console.error(`[updateRecordMaster] Erro ao atualizar documento ${docId} em ${collectionName}:`, error);
+    handleFirestoreError(error, OperationType.WRITE, collectionName);
+    return false;
+  }
+}
+
+/**
+ * Criação de novo documento com ID gerado ou customizado para o Admin Master
+ */
+export async function createRecordMaster(collectionName: string, data: any, customId?: string): Promise<string | null> {
+  try {
+    const id = customId || (data.id && String(data.id).trim() ? String(data.id).trim() : `${collectionName.slice(0, 4)}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`);
+    const docRef = doc(db, collectionName, id);
+    const cleanData = sanitizeForFirestore({
+      ...data,
+      id,
+      criadoEm: serverTimestamp(),
+      atualizadoEm: serverTimestamp(),
+    });
+    await setDoc(docRef, cleanData, { merge: true });
+    return id;
+  } catch (error: any) {
+    console.error(`[createRecordMaster] Erro ao criar documento em ${collectionName}:`, error);
+    handleFirestoreError(error, OperationType.WRITE, collectionName);
+    return null;
+  }
+}
+
+/**
+ * Atualização em lote de categoria para todos os documentos de uma coleção (renomeação de categoria)
+ */
+export async function batchRenameCategory(
+  collectionName: string,
+  oldCategory: string,
+  newCategory: string,
+  categoryField: string = 'categoria'
+): Promise<{ success: boolean; updatedCount: number }> {
+  try {
+    if (!oldCategory || !newCategory || oldCategory.trim() === newCategory.trim()) {
+      return { success: true, updatedCount: 0 };
+    }
+
+    const colRef = collection(db, collectionName);
+    const snap = await getDocs(colRef);
+    let updatedCount = 0;
+    const batch = writeBatch(db);
+
+    snap.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (data && data[categoryField] === oldCategory) {
+        batch.update(docSnap.ref, {
+          [categoryField]: newCategory.trim(),
+          atualizadoEm: serverTimestamp(),
+        });
+        updatedCount++;
+      }
+    });
+
+    if (updatedCount > 0) {
+      await batch.commit();
+    }
+
+    return { success: true, updatedCount };
+  } catch (error: any) {
+    console.error(`[batchRenameCategory] Erro ao renomear categoria de ${oldCategory} para ${newCategory}:`, error);
+    return { success: false, updatedCount: 0 };
+  }
+}
+
+/**
+ * Remoção ou reclassificação em lote de uma categoria em uma coleção
+ */
+export async function batchDeleteCategory(
+  collectionName: string,
+  categoryToDelete: string,
+  fallbackCategory: string = 'Geral',
+  categoryField: string = 'categoria'
+): Promise<{ success: boolean; updatedCount: number }> {
+  try {
+    const colRef = collection(db, collectionName);
+    const snap = await getDocs(colRef);
+    let updatedCount = 0;
+    const batch = writeBatch(db);
+
+    snap.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (data && data[categoryField] === categoryToDelete) {
+        batch.update(docSnap.ref, {
+          [categoryField]: fallbackCategory,
+          atualizadoEm: serverTimestamp(),
+        });
+        updatedCount++;
+      }
+    });
+
+    if (updatedCount > 0) {
+      await batch.commit();
+    }
+
+    return { success: true, updatedCount };
+  } catch (error: any) {
+    console.error(`[batchDeleteCategory] Erro ao excluir/reclassificar categoria ${categoryToDelete}:`, error);
+    return { success: false, updatedCount: 0 };
+  }
+}
+
+/**
+ * Exclusão de item específico do histórico clínico de um paciente (Evolução, Anamnese, Foto ou Prontuário)
+ */
+export async function deletePatientClinicalHistoryItem(
+  paciente: Paciente,
+  itemType: 'evolucao' | 'anamnese' | 'foto' | 'procedimento_texto',
+  itemId: string
+): Promise<Paciente | null> {
+  try {
+    const updatedPaciente: Paciente = { ...paciente };
+
+    if (itemType === 'evolucao') {
+      const evolucoes = updatedPaciente.evolucoes_retornos || [];
+      updatedPaciente.evolucoes_retornos = evolucoes.filter(ev => ev.id !== itemId);
+    } else if (itemType === 'anamnese') {
+      const anamneses = updatedPaciente.anamneses_completas || [];
+      updatedPaciente.anamneses_completas = anamneses.filter(an => an.id !== itemId);
+      const fichasAnamnese = updatedPaciente.fichas_anamnese || [];
+      updatedPaciente.fichas_anamnese = fichasAnamnese.filter(fa => fa.id !== itemId);
+    } else if (itemType === 'foto') {
+      const fotos = updatedPaciente.fotos_antes_depois || [];
+      updatedPaciente.fotos_antes_depois = fotos.filter(f => f.id !== itemId);
+    } else if (itemType === 'procedimento_texto') {
+      // Limpar ou resetar histórico de texto
+      updatedPaciente.historico_clinico = '';
+    }
+
+    await saveDocument(COLLECTIONS.PACIENTES, updatedPaciente);
+    return updatedPaciente;
+  } catch (error: any) {
+    console.error(`[deletePatientClinicalHistoryItem] Erro ao excluir histórico do paciente ${paciente.id}:`, error);
+    return null;
+  }
 }
 

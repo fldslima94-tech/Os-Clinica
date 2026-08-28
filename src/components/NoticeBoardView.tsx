@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { AvisoQuadro, PrioridadeAviso, UsuarioEquipe } from '../types';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
+import { isUserAdminTotal, isUserAdminLocalOrTotal } from '../services/firebaseService';
 
 interface NoticeBoardViewProps {
   avisos: AvisoQuadro[];
@@ -46,8 +47,8 @@ export const NoticeBoardView: React.FC<NoticeBoardViewProps> = ({
   const [novosDestinatarios, setNovosDestinatarios] = useState<'todos' | 'admin' | 'operador' | 'cliente'>('todos');
   const [novoExibirPopup, setNovoExibirPopup] = useState(false);
 
-  const isAdmin = currentUser.role === 'admin';
-  const isOperador = currentUser.role === 'operador';
+  const isAdmin = isUserAdminTotal(currentUser) || isUserAdminLocalOrTotal(currentUser) || currentUser.role === 'admin_master' || currentUser.role === 'admin_total' || currentUser.role === 'admin' || currentUser.role === 'gestor';
+  const isOperador = currentUser.role === 'operador' || currentUser.role === 'recepcao';
   const canCreate = isAdmin || isOperador;
 
   // Filter notices based on user role and filters

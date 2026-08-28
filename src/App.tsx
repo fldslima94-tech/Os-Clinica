@@ -73,6 +73,7 @@ import { SqlAndArchitectureModal } from './components/SqlAndArchitectureModal';
 import { CompleteProcedureModal } from './components/CompleteProcedureModal';
 import { CheckInPaymentAndReturnModal } from './components/CheckInPaymentAndReturnModal';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
+import { DatabaseMasterView } from './components/DatabaseMasterView';
 import { TreatmentPackagesModal } from './components/TreatmentPackagesModal';
 import { ClinicSettingsModal } from './components/ClinicSettingsModal';
 import { UserProfileAvatarModal } from './components/UserProfileAvatarModal';
@@ -963,9 +964,9 @@ export default function App() {
   };
 
   const handleDeletePatient = (id: string) => {
-    const isGestor = currentUser.role === 'gestor' || currentUser.role === 'admin';
-    if (!isGestor) {
-      showToast('Apenas gestores têm permissão para excluir fichas de clientes.', 'info');
+    const isMasterOrGestor = isUserAdminTotal(currentUser) || isUserAdminLocalOrTotal(currentUser) || currentUser.role === 'admin_master' || currentUser.role === 'admin_total' || currentUser.role === 'admin' || currentUser.role === 'gestor';
+    if (!isMasterOrGestor) {
+      showToast('Apenas o Admin Master ou Gestores têm permissão para excluir fichas de clientes.', 'info');
       return;
     }
     const patientName = pacientes.find(p => p.id === id)?.nome || 'Cliente';
@@ -1062,9 +1063,9 @@ export default function App() {
   };
 
   const handleDeleteInventoryItem = (id: string) => {
-    const isGestor = currentUser.role === 'gestor' || currentUser.role === 'admin';
-    if (!isGestor) {
-      showToast('Apenas gestores têm permissão para excluir insumos.', 'info');
+    const isMasterOrGestor = isUserAdminTotal(currentUser) || isUserAdminLocalOrTotal(currentUser) || currentUser.role === 'admin_master' || currentUser.role === 'admin_total' || currentUser.role === 'admin' || currentUser.role === 'gestor';
+    if (!isMasterOrGestor) {
+      showToast('Apenas o Admin Master ou Gestores têm permissão para excluir insumos.', 'info');
       return;
     }
     const item = estoque.find(i => i.id === id);
@@ -1223,9 +1224,9 @@ export default function App() {
   };
 
   const handleDeleteAppointment = (id: string) => {
-    const isGestor = currentUser.role === 'gestor' || currentUser.role === 'admin';
-    if (!isGestor) {
-      showToast('Apenas gestores têm permissão para excluir agendamentos.', 'info');
+    const isMasterOrGestor = isUserAdminTotal(currentUser) || isUserAdminLocalOrTotal(currentUser) || currentUser.role === 'admin_master' || currentUser.role === 'admin_total' || currentUser.role === 'admin' || currentUser.role === 'gestor';
+    if (!isMasterOrGestor) {
+      showToast('Apenas o Admin Master ou Gestores têm permissão para excluir agendamentos.', 'info');
       return;
     }
     setAgendamentos(prev => prev.filter(a => a.id !== id));
@@ -1291,9 +1292,9 @@ export default function App() {
   };
 
   const handleDeleteAlertaRetorno = (alertaId: string) => {
-    const isGestor = currentUser.role === 'gestor' || currentUser.role === 'admin';
-    if (!isGestor) {
-      showToast('Apenas gestores têm permissão para excluir alertas de retorno.', 'info');
+    const isMasterOrGestor = isUserAdminTotal(currentUser) || isUserAdminLocalOrTotal(currentUser) || currentUser.role === 'admin_master' || currentUser.role === 'admin_total' || currentUser.role === 'admin' || currentUser.role === 'gestor';
+    if (!isMasterOrGestor) {
+      showToast('Apenas o Admin Master ou Gestores têm permissão para excluir alertas de retorno.', 'info');
       return;
     }
     const alerta = alertasRetorno.find(a => a.id === alertaId);
@@ -1356,9 +1357,9 @@ export default function App() {
   };
 
   const handleDeleteProcedure = (id: string) => {
-    const isGestor = currentUser.role === 'gestor' || currentUser.role === 'admin';
-    if (!isGestor) {
-      showToast('Apenas gestores podem remover procedimentos do catálogo.', 'info');
+    const isMasterOrGestor = isUserAdminTotal(currentUser) || isUserAdminLocalOrTotal(currentUser) || currentUser.role === 'admin_master' || currentUser.role === 'admin_total' || currentUser.role === 'admin' || currentUser.role === 'gestor';
+    if (!isMasterOrGestor) {
+      showToast('Apenas o Admin Master ou Gestores podem remover procedimentos do catálogo.', 'info');
       return;
     }
     setProcedimentos(prev => prev.filter(p => p.id !== id));
@@ -1897,6 +1898,28 @@ export default function App() {
               onDeleteUser={handleDeleteUser}
               onToggleUserStatus={handleToggleUserStatus}
               onOpenSqlGuide={() => setIsSqlModalOpen(true)}
+            />
+          )}
+
+          {activeTab === 'banco_dados' && (isUserAdminTotal(currentUser)) && (
+            <DatabaseMasterView
+              currentUser={currentUser}
+              pacientes={pacientes}
+              agendamentos={agendamentos}
+              procedimentos={procedimentos}
+              estoque={estoque}
+              financeiro={transacoes}
+              fornecedores={fornecedores}
+              ativos={bensPatrimoniais}
+              avisos={avisos}
+              usuarios={usuarios}
+              clinicaConfig={clinicaConfig}
+              onRefreshData={() => {
+                showToast('Dados sincronizados com o banco com sucesso!');
+              }}
+              onUpdatePaciente={(updatedP) => {
+                setPacientes(prev => prev.map(p => p.id === updatedP.id ? updatedP : p));
+              }}
             />
           )}
 
