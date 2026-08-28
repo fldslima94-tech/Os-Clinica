@@ -14,6 +14,7 @@ import {
   LockKeyhole
 } from 'lucide-react';
 import { UsuarioEquipe } from '../types';
+import { isUserAdminTotal } from '../services/firebaseService';
 
 interface LoginViewProps {
   usuarios: UsuarioEquipe[];
@@ -61,12 +62,50 @@ export const LoginView: React.FC<LoginViewProps> = ({
       return;
     }
 
-    // Match user in database
-    const userFound = usuarios.find(u => u.email.toLowerCase() === cleanEmail);
+    // Match user in database (including super admin alias matching)
+    let userFound = usuarios.find(u => (u.email || '').toLowerCase() === cleanEmail);
+
+    // Fallback: Super Admin recognition for fldslima94@gmail.com or fabio@teste.com
+    if (!userFound && (cleanEmail === 'fldslima94@gmail.com' || cleanEmail === 'fabio@teste.com' || cleanEmail.includes('fabio'))) {
+      userFound = usuarios.find(u => isUserAdminTotal(u) || u.id === 'user-super-admin' || u.nome?.toLowerCase().includes('fabio lima'));
+    }
 
     if (!userFound) {
       setErrorMessage('E-mail ou senha incorretos. Verifique suas credenciais de acesso.');
       return;
+    }
+
+    // Auto-heal super admin role & privileges if old record has 'cliente' or restricted role
+    if (
+      isUserAdminTotal(userFound) || 
+      userFound.id === 'user-super-admin' || 
+      cleanEmail === 'fldslima94@gmail.com' || 
+      cleanEmail === 'fabio@teste.com' || 
+      userFound.nome?.toLowerCase().includes('fabio lima')
+    ) {
+      userFound = {
+        ...userFound,
+        role: 'admin_total',
+        cargo: 'Super Admin (Master)',
+        profissao: userFound.profissao || 'Proprietário & Administrador Geral',
+        permissoes: {
+          ver_financeiro_completo: true,
+          emitir_recibo: true,
+          editar_prontuario_clinico: true,
+          gerenciar_estoque_custos: true,
+          configuracoes_sistema: true,
+          visualizar_bens_ativos: true,
+        },
+        permissoesCustomizadas: {
+          financeiro: { verEntradas: true, verSaidas: true, verRecorrentes: true, excluir: true, verRelatorios: true },
+          clientes: { criar: true, editar: true, excluir: true, verHistorico: true, preencherAnamnese: true },
+          agenda: { verTodos: true, verPropria: true, criar: true, cancelar: true, finalizar: true },
+          procedimentos: { verCustos: true, verMargem: true, criar: true, excluir: true, ajustarEstoque: true },
+          bens: { visualizar: true, cadastrar: true, editar: true, gerenciar: true, excluir: true, manutencao: true },
+          estoque: { ajustar: true, excluir: true },
+          orcamentos: { verTodos: true, responder: true, verEmails: true }
+        }
+      };
     }
 
     if (userFound.status === 'inativo') {

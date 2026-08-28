@@ -31,7 +31,8 @@ import {
   Maximize2,
   Layers,
   ArrowLeftRight,
-  Filter
+  Filter,
+  ArrowLeft
 } from 'lucide-react';
 import { 
   Paciente, 
@@ -505,6 +506,18 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
     onUpdatePatientHistory(paciente.id, historico, { termo_consentimento: updatedTermo });
   };
 
+  // Escape key listener to close modal smoothly
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isCameraModalOpen && !isDeleteModalOpen && !isComparisonModalOpen && !isAnamneseModalOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isCameraModalOpen, isDeleteModalOpen, isComparisonModalOpen, isAnamneseModalOpen, onClose]);
+
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
@@ -513,6 +526,15 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
           {/* Header */}
           <div className="p-4 sm:p-5 border-b border-slate-100 bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-2 -ml-1 text-slate-300 hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-1 text-xs font-semibold"
+                title="Voltar para a lista de clientes"
+              >
+                <ArrowLeft className="w-5 h-5" />
+                <span className="hidden sm:inline">Voltar</span>
+              </button>
               <div className="p-2.5 rounded-xl bg-indigo-600 text-white shadow-xs">
                 <User className="w-5 h-5" />
               </div>
@@ -583,6 +605,7 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
                 type="button"
                 onClick={onClose}
                 className="p-2 text-slate-300 hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+                title="Fechar (Esc)"
               >
                 <X className="w-5 h-5" />
               </button>

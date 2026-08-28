@@ -36,7 +36,7 @@ import {
   DespesaRecorrente,
   Fornecedor
 } from '../types';
-import { checkUserCustomPermission } from '../services/firebaseService';
+import { checkUserCustomPermission, isUserAdminTotal } from '../services/firebaseService';
 
 interface FinancialViewProps {
   transacoes: TransacaoFinanceira[];
@@ -65,7 +65,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
   onToggleDespesaRecorrenteStatus,
   currentUser,
 }) => {
-  const isGestor = !currentUser || currentUser.role === 'admin_total' || currentUser.role === 'admin_local' || currentUser.role === 'gestor' || currentUser.role === 'admin';
+  const isGestor = !currentUser || isUserAdminTotal(currentUser) || currentUser.role === 'admin_total' || currentUser.role === 'admin_local' || currentUser.role === 'gestor' || currentUser.role === 'admin';
   const canDelete = checkUserCustomPermission(currentUser, 'financeiro', 'excluir');
   const canViewEntradas = checkUserCustomPermission(currentUser, 'financeiro', 'verEntradas');
   const canViewSaidas = checkUserCustomPermission(currentUser, 'financeiro', 'verSaidas');

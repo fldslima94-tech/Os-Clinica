@@ -15,7 +15,9 @@ import {
   Wrench
 } from 'lucide-react';
 import { TabType, UsuarioEquipe, UserRole } from '../types';
+import { isUserAdminTotal } from '../services/firebaseService';
 import { ConnectionSyncStatusWidget } from './ConnectionSyncStatusWidget';
+import { MasterEditToggle } from './MasterEditToggle';
 
 interface HeaderProps {
   activeTab: TabType;
@@ -153,6 +155,9 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Right Side: Role Switcher Pill & Actions */}
         <div className="flex items-center gap-2.5 w-full md:w-auto justify-end">
           
+          {/* Botão de Ativação do Modo Edição Master */}
+          <MasterEditToggle />
+
           {/* Status de Conexão & Sincronização Nuvem / IndexedDB */}
           <ConnectionSyncStatusWidget />
 
@@ -219,7 +224,7 @@ export const Header: React.FC<HeaderProps> = ({
                   {currentUser.nome.split(' ')[0]} {currentUser.nome.split(' ')[1] || ''}
                 </div>
                 <div className="text-[10px] text-slate-500 font-medium">
-                  {currentUser.role === 'admin_total' 
+                  {isUserAdminTotal(currentUser) 
                     ? '👑 Super Admin' 
                     : currentUser.role === 'admin_local' || currentUser.role === 'admin' || currentUser.role === 'gestor'
                     ? '⭐ Admin' 
@@ -266,7 +271,7 @@ export const Header: React.FC<HeaderProps> = ({
                         <div>
                           <p className="font-semibold leading-tight">{u.nome}</p>
                           <p className="text-[10px] text-slate-400">
-                            {u.role === 'admin_total'
+                            {isUserAdminTotal(u)
                               ? 'Super Admin'
                               : u.role === 'admin_local' || u.role === 'admin' || u.role === 'gestor'
                               ? 'Admin Local'
@@ -279,7 +284,7 @@ export const Header: React.FC<HeaderProps> = ({
                         </div>
                       </div>
                       <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                        u.role === 'admin_total' 
+                        isUserAdminTotal(u) 
                           ? 'bg-amber-100 text-amber-800'
                           : u.role === 'admin_local' || u.role === 'admin' || u.role === 'gestor'
                           ? 'bg-indigo-100 text-indigo-700' 
@@ -289,7 +294,7 @@ export const Header: React.FC<HeaderProps> = ({
                           ? 'bg-emerald-100 text-emerald-700'
                           : 'bg-blue-100 text-blue-700'
                       }`}>
-                        {u.role === 'admin_total'
+                        {isUserAdminTotal(u)
                           ? 'Master'
                           : u.role === 'admin_local' || u.role === 'admin' || u.role === 'gestor'
                           ? 'Admin'
@@ -304,7 +309,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
 
                 <div className="px-2 pt-2 mt-1 border-t border-slate-100 space-y-1">
-                  {(currentUser.role === 'admin_total' || currentUser.role === 'admin_local' || currentUser.role === 'admin' || currentUser.role === 'gestor') && (
+                  {(isUserAdminTotal(currentUser) || currentUser.role === 'admin_local' || currentUser.role === 'admin' || currentUser.role === 'gestor') && (
                     <button
                       onClick={() => setActiveTab('usuarios')}
                       className="w-full text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 px-2 py-1.5 rounded-md flex items-center gap-1.5"

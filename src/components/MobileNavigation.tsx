@@ -17,6 +17,7 @@ import {
   KeyRound
 } from 'lucide-react';
 import { TabType, UsuarioEquipe } from '../types';
+import { isUserAdminTotal } from '../services/firebaseService';
 
 interface MobileNavigationProps {
   activeTab: TabType;
@@ -40,8 +41,8 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
   onLogout,
 }) => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const isAdminTotal = currentUser.role === 'admin_total';
-  const isAdminLocal = currentUser.role === 'admin_local' || currentUser.role === 'gestor' || currentUser.role === 'admin';
+  const isAdminTotal = isUserAdminTotal(currentUser);
+  const isAdminLocal = !isAdminTotal && (currentUser.role === 'admin_local' || currentUser.role === 'gestor' || currentUser.role === 'admin');
   const isGestor = isAdminTotal || isAdminLocal;
   const isCliente = currentUser.role === 'cliente';
 

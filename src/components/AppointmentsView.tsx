@@ -18,7 +18,13 @@ import {
   Sparkles, 
   Columns,
   Store,
-  ArrowRight
+  ArrowRight,
+  DoorOpen,
+  Undo2,
+  RotateCcw,
+  Check,
+  Hourglass,
+  AlertTriangle
 } from 'lucide-react';
 import { Agendamento, Paciente, StatusAgendamento, UsuarioEquipe } from '../types';
 import { CalendarGridView } from './CalendarGridView';
@@ -53,15 +59,18 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
   const isAdmin = !currentUser || currentUser.role === 'admin';
   const [viewFormat, setViewFormat] = useState<'cards' | 'profissionais' | 'calendario' | 'balcao'>(initialBalcaoMode ? 'balcao' : 'cards');
   const [filterStatus, setFilterStatus] = useState<string>('todos');
+  const [balcaoFilterStatus, setBalcaoFilterStatus] = useState<string>('todos');
   const [filterProfissional, setFilterProfissional] = useState<string>('todos');
   const [search, setSearch] = useState('');
   const [appointmentToDelete, setAppointmentToDelete] = useState<Agendamento | null>(null);
   const [selectedContratoAgendamento, setSelectedContratoAgendamento] = useState<Agendamento | null>(null);
 
   // Today filter for Balcão (00:00 to 23:59)
-  const isToday = (dateStr: string) => {
+  const isToday = (dateStr?: string) => {
     try {
+      if (!dateStr) return false;
       const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return false;
       const today = new Date();
       return (
         d.getDate() === today.getDate() &&
@@ -73,9 +82,38 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
     }
   };
 
-  const balcaoAgendamentos = agendamentos
-    .filter(ag => isToday(ag.data_hora))
-    .sort((a, b) => new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime());
+  const formatDateTime = (iso?: string) => {
+    try {
+      if (!iso) return { date: '--/--', time: '--:--' };
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return { date: '--/--', time: '--:--' };
+      return {
+        date: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+        time: d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      };
+    } catch {
+      return { date: '--/--', time: '--:--' };
+    }
+  };
+
+  const allBalcaoToday = agendamentos
+    .filter(ag => isToday(ag.data_hora || ag.data_horario))
+    .sort((a, b) => new Date(a.data_hora || a.data_horario || '').getTime() - new Date(b.data_hora || b.data_horario || '').getTime());
+
+  const countTotalToday = allBalcaoToday.length;
+  const countEspera = allBalcaoToday.filter(a => a.status === 'em_espera').length;
+  const countEmAtendimento = allBalcaoToday.filter(a => a.status === 'em_atendimento').length;
+  const countConcluido = allBalcaoToday.filter(a => a.status === 'concluido').length;
+  const countAgendados = allBalcaoToday.filter(a => a.status === 'confirmado' || a.status === 'pendente').length;
+
+  const balcaoAgendamentos = allBalcaoToday.filter(ag => {
+    if (balcaoFilterStatus === 'todos') return true;
+    if (balcaoFilterStatus === 'em_espera') return ag.status === 'em_espera';
+    if (balcaoFilterStatus === 'em_atendimento') return ag.status === 'em_atendimento';
+    if (balcaoFilterStatus === 'concluido') return ag.status === 'concluido';
+    if (balcaoFilterStatus === 'agendados') return ag.status === 'confirmado' || ag.status === 'pendente';
+    return true;
+  });
 
   // Filter appointments for standard views
   const filtered = agendamentos.filter(ag => {
@@ -92,18 +130,6 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
     return matchesStatus && matchesProfissional && (patientName.includes(q) || proc.includes(q) || profName.includes(q));
   });
 
-  const formatDateTime = (iso: string) => {
-    try {
-      const d = new Date(iso);
-      return {
-        date: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-        time: d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-      };
-    } catch {
-      return { date: '--/--', time: '--:--' };
-    }
-  };
-
   const handleConcludeClick = (ag: Agendamento) => {
     if (onOpenCompleteModal) {
       onOpenCompleteModal(ag);
@@ -116,7 +142,56 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
     if (onOpenCheckInModal) {
       onOpenCheckInModal(ag);
     } else {
-      onUpdateStatus(ag.id, 'confirmado');
+      onUpdateStatus(ag.id, 'em_espera');
+    }
+  };
+
+  const renderStatusBadge = (status: StatusAgendamento) => {
+    switch (status) {
+      case 'em_atendimento':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-300 shadow-2xs animate-pulse">
+            <DoorOpen className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Em Sala / Procedimento</span>
+          </span>
+        );
+      case 'em_espera':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping inline-block" />
+            <UserCheck className="w-3.5 h-3.5 text-amber-700" />
+            <span>Na Recepção (Chegou)</span>
+          </span>
+        );
+      case 'concluido':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-300">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Concluído</span>
+          </span>
+        );
+      case 'confirmado':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+            <Check className="w-3.5 h-3.5 text-blue-600" />
+            <span>Agendado</span>
+          </span>
+        );
+      case 'cancelado':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+            <XCircle className="w-3.5 h-3.5 text-rose-600" />
+            <span>Cancelado</span>
+          </span>
+        );
+      case 'pendente':
+      default:
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+            <Clock className="w-3.5 h-3.5 text-slate-500" />
+            <span>Aguardando</span>
+          </span>
+        );
     }
   };
 
@@ -227,31 +302,110 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                   </span>
                 </div>
                 <p className="text-xs text-indigo-200 mt-0.5">
-                  Visualização resumida e segura para recepcionistas: apenas Horário, Cliente, Profissional e Status.
+                  Painel operacional em tempo real para controle de recepção, chamada para sala e checkout de procedimentos.
                 </p>
               </div>
             </div>
 
-            <div className="text-right flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-1">
-              <span className="text-xs text-indigo-200">Total Hoje</span>
-              <span className="text-xl font-black text-white">{balcaoAgendamentos.length} Pacientes</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onOpenNewAppointment}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Novo Agendamento Hoje</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Status Filter Bar for Balcão */}
+          <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                onClick={() => setBalcaoFilterStatus('todos')}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  balcaoFilterStatus === 'todos'
+                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Todos Hoje ({countTotalToday})
+              </button>
+              <button
+                onClick={() => setBalcaoFilterStatus('em_espera')}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                  balcaoFilterStatus === 'em_espera'
+                    ? 'bg-amber-500 text-white shadow-2xs'
+                    : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full ${balcaoFilterStatus === 'em_espera' ? 'bg-white' : 'bg-amber-500'}`} />
+                Na Recepção ({countEspera})
+              </button>
+              <button
+                onClick={() => setBalcaoFilterStatus('em_atendimento')}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                  balcaoFilterStatus === 'em_atendimento'
+                    ? 'bg-indigo-800 text-white shadow-2xs'
+                    : 'bg-indigo-50 text-indigo-800 hover:bg-indigo-100 border border-indigo-200'
+                }`}
+              >
+                <DoorOpen className="w-3.5 h-3.5" />
+                Em Sala ({countEmAtendimento})
+              </button>
+              <button
+                onClick={() => setBalcaoFilterStatus('concluido')}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                  balcaoFilterStatus === 'concluido'
+                    ? 'bg-emerald-600 text-white shadow-2xs'
+                    : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Concluídos ({countConcluido})
+              </button>
+              <button
+                onClick={() => setBalcaoFilterStatus('agendados')}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                  balcaoFilterStatus === 'agendados'
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Aguardando Chegada ({countAgendados})
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-500 font-medium">
+              Mostrando <strong className="text-slate-800">{balcaoAgendamentos.length}</strong> de {countTotalToday} registros
             </div>
           </div>
 
           {balcaoAgendamentos.length === 0 ? (
             <div className="bg-white rounded-2xl p-12 border border-slate-200 text-center shadow-xs">
               <Clock className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-              <h4 className="text-base font-bold text-slate-800">Nenhum atendimento agendado para hoje</h4>
+              <h4 className="text-base font-bold text-slate-800">Nenhum atendimento para hoje neste filtro</h4>
               <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">
-                Todos os horários do dia estão livres ou os agendamentos pertencem a outras datas do calendário.
+                {countTotalToday === 0 
+                  ? 'Todos os horários do dia estão livres ou os agendamentos pertencem a outras datas do calendário.'
+                  : 'Nenhum paciente encontrado com o status selecionado acima.'}
               </p>
-              <button
-                onClick={onOpenNewAppointment}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                Agendar Paciente para Hoje
-              </button>
+              {countTotalToday === 0 ? (
+                <button
+                  onClick={onOpenNewAppointment}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  Agendar Paciente para Hoje
+                </button>
+              ) : (
+                <button
+                  onClick={() => setBalcaoFilterStatus('todos')}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                >
+                  Ver Todos de Hoje
+                </button>
+              )}
             </div>
           ) : (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
@@ -261,38 +415,42 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                     <tr className="border-b border-slate-100 bg-slate-50/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                       <th className="py-3.5 px-4">Horário</th>
                       <th className="py-3.5 px-4">Nome do Cliente</th>
-                      <th className="py-3.5 px-4">Profissional Responsável</th>
-                      <th className="py-3.5 px-4 text-center">Status</th>
-                      <th className="py-3.5 px-4 text-right">Ação Balcão</th>
+                      <th className="py-3.5 px-4">Profissional</th>
+                      <th className="py-3.5 px-4">Procedimento</th>
+                      <th className="py-3.5 px-4 text-center">Status no Balcão</th>
+                      <th className="py-3.5 px-4 text-right">Fluxo / Ações Rápidas</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-xs">
                     {balcaoAgendamentos.map((ag) => {
-                      const dt = formatDateTime(ag.data_horario);
+                      const dt = formatDateTime(ag.data_hora || ag.data_horario);
+                      const patient = pacientes.find(p => p.id === ag.paciente_id) || ag.paciente;
+                      const patientName = patient?.nome || ag.paciente?.nome || 'Cliente';
+
                       return (
-                        <tr key={ag.id} className="hover:bg-slate-50/60 transition-colors">
+                        <tr key={ag.id} className="hover:bg-slate-50/70 transition-colors">
                           {/* Horário */}
                           <td className="py-3.5 px-4 font-bold text-indigo-700 whitespace-nowrap">
                             <div className="flex items-center gap-1.5">
                               <Clock className="w-3.5 h-3.5 text-indigo-500" />
-                              <span>{dt.time}</span>
+                              <span className="text-sm">{dt.time}</span>
                             </div>
                           </td>
 
                           {/* Nome do Cliente */}
                           <td className="py-3.5 px-4 font-semibold text-slate-800">
                             <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 font-bold text-xs shrink-0">
-                                {ag.paciente?.nome.charAt(0) || 'C'}
+                              <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 font-bold text-xs shrink-0">
+                                {patientName.charAt(0)}
                               </div>
                               <div>
-                                <span className="block font-bold text-slate-900">{ag.paciente?.nome || 'Cliente sem nome'}</span>
-                                {ag.paciente && (
+                                <span className="block font-bold text-slate-900">{patientName}</span>
+                                {patient && (
                                   <button
-                                    onClick={() => onViewPatient(ag.paciente!)}
+                                    onClick={() => onViewPatient(patient)}
                                     className="text-[10px] text-indigo-600 hover:text-indigo-800 underline font-medium cursor-pointer"
                                   >
-                                    Ver prontuário rápido
+                                    Ver prontuário
                                   </button>
                                 )}
                               </div>
@@ -303,50 +461,117 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                           <td className="py-3.5 px-4 text-slate-700 font-medium whitespace-nowrap">
                             <div className="flex items-center gap-1.5">
                               <User className="w-3.5 h-3.5 text-slate-400" />
-                              <span>{ag.profissional_nome || 'Profissional da Unidade'}</span>
+                              <span>{ag.profissional_nome || 'Profissional Geral'}</span>
                             </div>
+                          </td>
+
+                          {/* Procedimento */}
+                          <td className="py-3.5 px-4 text-slate-800 font-medium">
+                            <div className="line-clamp-1 max-w-[200px]" title={ag.procedimento}>
+                              {ag.procedimento}
+                            </div>
+                            {ag.valor_estimado ? (
+                              <span className="text-[11px] font-mono text-emerald-700 font-bold block">
+                                R$ {ag.valor_estimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                            ) : null}
                           </td>
 
                           {/* Status */}
                           <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                              ag.status === 'concluido'
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : ag.status === 'confirmado'
-                                ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                                : ag.status === 'cancelado'
-                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                                : 'bg-amber-50 text-amber-700 border border-amber-200'
-                            }`}>
-                              {ag.status === 'concluido' && <CheckCircle2 className="w-3 h-3 text-emerald-600" />}
-                              {ag.status === 'confirmado' && <CheckCircle2 className="w-3 h-3 text-blue-600" />}
-                              {ag.status === 'cancelado' && <XCircle className="w-3 h-3 text-rose-600" />}
-                              {ag.status === 'pendente' && <Clock className="w-3 h-3 text-amber-600" />}
-                              <span className="capitalize">{ag.status}</span>
-                            </span>
+                            {renderStatusBadge(ag.status)}
                           </td>
 
-                          {/* Ações Rápidas */}
+                          {/* Ações Rápidas do Fluxo Operacional */}
                           <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                            <div className="flex items-center justify-end gap-2">
-                              {ag.status !== 'concluido' && (
-                                <button
-                                  onClick={() => handleCheckInClick(ag)}
-                                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
-                                  title="Check-In de Chegada, Registro de Pagamento e Agendamento de Retorno"
-                                >
-                                  <UserCheck className="w-3.5 h-3.5" />
-                                  <span>Check-In & Retorno</span>
-                                </button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* 1. SE AGENDADO OU PENDENTE (Chegada do Paciente) */}
+                              {(ag.status === 'confirmado' || ag.status === 'pendente') && (
+                                <>
+                                  <button
+                                    onClick={() => onUpdateStatus(ag.id, 'em_espera')}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                                    title="Marcar que o cliente chegou na recepção"
+                                  >
+                                    <UserCheck className="w-3.5 h-3.5" />
+                                    <span>Chegou (Recepção)</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleCheckInClick(ag)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                                    title="Check-In & Retorno"
+                                  >
+                                    <span>Check-In</span>
+                                  </button>
+                                </>
                               )}
 
-                              {ag.status !== 'concluido' && (
+                              {/* 2. SE NA ESPERA (Chamar para Sala) */}
+                              {ag.status === 'em_espera' && (
+                                <>
+                                  <button
+                                    onClick={() => onUpdateStatus(ag.id, 'em_atendimento')}
+                                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                                    title="Chamar paciente para a sala de procedimento"
+                                  >
+                                    <DoorOpen className="w-3.5 h-3.5" />
+                                    <span>Chamar Sala</span>
+                                  </button>
+                                  <button
+                                    onClick={() => onUpdateStatus(ag.id, 'confirmado')}
+                                    className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                    title="Desfazer chegada"
+                                  >
+                                    <Undo2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </>
+                              )}
+
+                              {/* 3. SE EM SALA (Finalizar Atendimento / Baixar Insumos) */}
+                              {ag.status === 'em_atendimento' && (
+                                <>
+                                  <button
+                                    onClick={() => handleConcludeClick(ag)}
+                                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                                    title="Concluir procedimento, baixar estoque e registrar receita"
+                                  >
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    <span>Finalizar / Checkout</span>
+                                  </button>
+                                  <button
+                                    onClick={() => onUpdateStatus(ag.id, 'em_espera')}
+                                    className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                    title="Voltar para a recepção/espera"
+                                  >
+                                    <Undo2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </>
+                              )}
+
+                              {/* 4. SE CONCLUÍDO (Atendimento Finalizado) */}
+                              {ag.status === 'concluido' && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
+                                    ✓ Concluído
+                                  </span>
+                                  <button
+                                    onClick={() => onUpdateStatus(ag.id, 'em_atendimento')}
+                                    className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors cursor-pointer"
+                                    title="Reabrir procedimento se necessário"
+                                  >
+                                    <RotateCcw className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* 5. SE CANCELADO */}
+                              {ag.status === 'cancelado' && (
                                 <button
-                                  onClick={() => handleConcludeClick(ag)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition-all cursor-pointer"
-                                  title="Concluir Procedimento e Baixar Insumos"
+                                  onClick={() => onUpdateStatus(ag.id, 'confirmado')}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium cursor-pointer"
                                 >
-                                  <span>Concluir</span>
+                                  <RotateCcw className="w-3 h-3" />
+                                  <span>Reativar</span>
                                 </button>
                               )}
                             </div>
@@ -457,14 +682,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                               <span className="text-xs font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
                                 {dt.date} às {dt.time}
                               </span>
-                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
-                                ag.status === 'confirmado' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                                ag.status === 'pendente' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
-                                ag.status === 'concluido' ? 'bg-slate-100 text-slate-600 border border-slate-200' :
-                                'bg-rose-50 text-rose-600 border border-rose-200'
-                              }`}>
-                                {ag.status}
-                              </span>
+                              {renderStatusBadge(ag.status)}
                             </div>
 
                             <div className="space-y-2">
@@ -612,14 +830,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                         <Clock className="w-3.5 h-3.5 text-slate-400" />
                         <span>{dt.date} às {dt.time}</span>
                       </div>
-                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium capitalize border ${
-                        ag.status === 'confirmado' ? 'bg-green-50 text-green-700 border-green-200/60' :
-                        ag.status === 'pendente' ? 'bg-amber-50 text-amber-700 border-amber-200/60' :
-                        ag.status === 'concluido' ? 'bg-slate-100 text-slate-600 border-slate-200' :
-                        'bg-red-50 text-red-600 border-red-200'
-                      }`}>
-                        {ag.status}
-                      </span>
+                      {renderStatusBadge(ag.status)}
                     </div>
 
                     <div className="mb-3">

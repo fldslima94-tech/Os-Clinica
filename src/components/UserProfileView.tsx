@@ -19,7 +19,8 @@ import {
 import { UsuarioEquipe } from '../types';
 import { 
   atualizarDadosPerfil, 
-  reautenticarEAtualizarSenha 
+  reautenticarEAtualizarSenha,
+  isUserAdminTotal 
 } from '../services/firebaseService';
 import { compressImageFile } from '../lib/image-utils';
 
@@ -190,7 +191,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-500/30 text-indigo-200 border border-indigo-400/40">
-                  {currentUser.role === 'admin_total' ? '👑 Super Admin Master' : currentUser.role}
+                  {isUserAdminTotal(currentUser) ? '👑 Super Admin Master' : currentUser.role}
                 </span>
                 <span className="text-xs text-indigo-300">
                   ID: {currentUser.id}

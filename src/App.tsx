@@ -78,6 +78,8 @@ import { ClinicSettingsModal } from './components/ClinicSettingsModal';
 import { UserProfileAvatarModal } from './components/UserProfileAvatarModal';
 import { NewAssetModal } from './components/NewAssetModal';
 import { ConflictResolutionModal } from './components/ConflictResolutionModal';
+import { MasterEditProvider } from './contexts/MasterEditModeContext';
+import { MasterEditModal } from './components/MasterEditModal';
 import { useConnectionStatus } from './contexts/ConnectionStatusContext';
 import { CheckCircle2, AlertCircle, Cloud } from 'lucide-react';
 import { 
@@ -90,8 +92,58 @@ import {
   isUserAdminLocalOrTotal,
   executeAtomicCheckout,
   softDeleteTransacao,
+  onFirebaseAuthStateChange,
+  logoutFirebase,
   COLLECTIONS 
 } from './services/firebaseService';
+
+// Storage keys for persistent session and navigation state
+const STORAGE_AUTH_KEY = 'aura_auth_session';
+const STORAGE_USER_KEY = 'aura_current_user';
+const STORAGE_TAB_KEY = 'aura_active_tab';
+
+// Helper functions for initial load
+function getInitialTab(userRole?: string): TabType {
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    const tabFromUrl = params.get('tab') as TabType;
+    if (tabFromUrl) return tabFromUrl;
+
+    const tabFromStorage = localStorage.getItem(STORAGE_TAB_KEY) as TabType;
+    if (tabFromStorage) return tabFromStorage;
+  }
+  return userRole === 'cliente' ? 'portal_paciente' : 'dashboard';
+}
+
+function getInitialUser(): UsuarioEquipe {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem(STORAGE_USER_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.id) return parsed;
+      } catch (e) {
+        console.warn('Erro ao carregar usuário salvo:', e);
+      }
+    }
+  }
+  return MOCK_USUARIOS[0];
+}
+
+function getInitialAuthState(): boolean {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem(STORAGE_AUTH_KEY) === 'true';
+  }
+  return false;
+}
+
+function getInitialPatientIdFromUrl(): string | null {
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('pacienteId');
+  }
+  return null;
+}
 
 export default function App() {
   // Global Offline Sync & Connection Status Hook
@@ -123,8 +175,11 @@ export default function App() {
     camposOcultos: [],
     camposObrigatorios: [],
   });
-  const [currentUser, setCurrentUser] = useState<UsuarioEquipe>(MOCK_USUARIOS[0]);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  
+  // Persistent Auth & Navigation State
+  const [currentUser, setCurrentUser] = useState<UsuarioEquipe>(getInitialUser);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(getInitialAuthState);
+  const [activeTab, setActiveTabState] = useState<TabType>(() => getInitialTab(getInitialUser().role));
 
   // Quadro de Avisos / Pop-up Alerts State
   const [activePopupAviso, setActivePopupAviso] = useState<AvisoQuadro | null>(null);
@@ -135,10 +190,38 @@ export default function App() {
   const [isSwitchUserModalOpen, setIsSwitchUserModalOpen] = useState(false);
   const [switchTargetUser, setSwitchTargetUser] = useState<UsuarioEquipe | null>(null);
 
-  // UI Navigation & Search State
-  const [activeTab, setActiveTab] = useState<TabType>(() => {
-    return MOCK_USUARIOS[0].role === 'cliente' ? 'portal_paciente' : 'dashboard';
-  });
+  // Centralized navigation handler with browser history stack (pushState) and storage sync
+  const navigateToTab = (newTab: TabType, pushToHistory = true, extraParams?: Record<string, string | null>) => {
+    setActiveTabState(newTab);
+    try {
+      localStorage.setItem(STORAGE_TAB_KEY, newTab);
+    } catch (e) {
+      // quota or private mode fallback
+    }
+
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', newTab);
+      if (extraParams) {
+        Object.entries(extraParams).forEach(([k, v]) => {
+          if (v === null || v === undefined) {
+            url.searchParams.delete(k);
+          } else {
+            url.searchParams.set(k, v);
+          }
+        });
+      }
+      if (pushToHistory) {
+        window.history.pushState({ tab: newTab, ...extraParams }, '', url.toString());
+      } else {
+        window.history.replaceState({ tab: newTab, ...extraParams }, '', url.toString());
+      }
+    }
+  };
+
+  const setActiveTab = (tab: TabType) => {
+    navigateToTab(tab, true);
+  };
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Modals State
@@ -274,7 +357,74 @@ export default function App() {
 
     const unsubUsuarios = subscribeToCollection<UsuarioEquipe>(
       COLLECTIONS.USUARIOS, 
-      (data) => setUsuarios(data), 
+      (data) => {
+        if (!data || data.length === 0) {
+          setUsuarios(MOCK_USUARIOS);
+          return;
+        }
+
+        // Sanitize and self-heal Super Admin permissions across database versions
+        const sanitized = data.map(u => {
+          const isSuper =
+            isUserAdminTotal(u) ||
+            u.id === 'user-super-admin' ||
+            u.email?.toLowerCase() === 'fldslima94@gmail.com' ||
+            u.email?.toLowerCase() === 'fabio@teste.com' ||
+            u.nome?.toLowerCase().includes('fabio lima');
+
+          if (isSuper && u.role !== 'admin_total') {
+            const fixedSuperAdmin: UsuarioEquipe = {
+              ...u,
+              role: 'admin_total',
+              cargo: 'Super Admin (Master)',
+              profissao: u.profissao || 'Proprietário & Administrador Geral',
+              permissoes: {
+                ver_financeiro_completo: true,
+                emitir_recibo: true,
+                editar_prontuario_clinico: true,
+                gerenciar_estoque_custos: true,
+                configuracoes_sistema: true,
+                visualizar_bens_ativos: true,
+              },
+              permissoesCustomizadas: {
+                financeiro: { verEntradas: true, verSaidas: true, verRecorrentes: true, excluir: true, verRelatorios: true },
+                clientes: { criar: true, editar: true, excluir: true, verHistorico: true, preencherAnamnese: true },
+                agenda: { verTodos: true, verPropria: true, criar: true, cancelar: true, finalizar: true },
+                procedimentos: { verCustos: true, verMargem: true, criar: true, excluir: true, ajustarEstoque: true },
+                bens: { visualizar: true, cadastrar: true, editar: true, gerenciar: true, excluir: true, manutencao: true },
+                estoque: { ajustar: true, excluir: true },
+                orcamentos: { verTodos: true, responder: true, verEmails: true }
+              }
+            };
+            saveDocument(COLLECTIONS.USUARIOS, fixedSuperAdmin);
+            return fixedSuperAdmin;
+          }
+          return u;
+        });
+
+        // Ensure user-super-admin always exists in list
+        const hasSuper = sanitized.some(u => isUserAdminTotal(u) || u.id === 'user-super-admin');
+        const finalList = hasSuper ? sanitized : [MOCK_USUARIOS[0], ...sanitized];
+        setUsuarios(finalList);
+
+        // Keep active currentUser in sync with real-time updates from database
+        setCurrentUser(prevUser => {
+          const activeInDb = finalList.find(u => 
+            u.id === prevUser.id || 
+            (Boolean(u.email) && Boolean(prevUser.email) && u.email.toLowerCase() === prevUser.email.toLowerCase()) ||
+            (isUserAdminTotal(prevUser) && isUserAdminTotal(u))
+          );
+          if (activeInDb) {
+            try {
+              localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(activeInDb));
+            } catch (e) {
+              // ignore
+            }
+            return activeInDb;
+          }
+          return prevUser;
+        });
+      }, 
       MOCK_USUARIOS
     );
 
@@ -318,6 +468,69 @@ export default function App() {
     };
   }, []);
 
+  // Listen to browser popstate (Back/Forward history buttons) and sync active tab & deep links
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = (event.state?.tab || params.get('tab') || 'dashboard') as TabType;
+      const pacienteIdParam = event.state?.pacienteId || params.get('pacienteId');
+
+      setActiveTabState(tabParam);
+      try {
+        localStorage.setItem(STORAGE_TAB_KEY, tabParam);
+      } catch (e) {
+        // ignore
+      }
+
+      if (pacienteIdParam) {
+        const found = pacientes.find(p => p.id === pacienteIdParam);
+        if (found) {
+          setSelectedPatientForDetails(found);
+        }
+      } else {
+        setSelectedPatientForDetails(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    // Ensure the current URL query params reflect the active tab on page load
+    const currentParams = new URLSearchParams(window.location.search);
+    if (!currentParams.get('tab') && activeTab) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', activeTab);
+      window.history.replaceState({ tab: activeTab }, '', url.toString());
+    }
+
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [activeTab, pacientes]);
+
+  // Deep linking: auto-open patient details if pacienteId is in the URL and patients are loaded
+  useEffect(() => {
+    const initialPatientId = getInitialPatientIdFromUrl();
+    if (initialPatientId && pacientes.length > 0 && !selectedPatientForDetails) {
+      const found = pacientes.find(p => p.id === initialPatientId);
+      if (found) {
+        setSelectedPatientForDetails(found);
+      }
+    }
+  }, [pacientes]);
+
+  // Firebase Auth real-time session listener (keeps user logged in across page reloads)
+  useEffect(() => {
+    const unsubscribe = onFirebaseAuthStateChange((fbUser) => {
+      if (fbUser) {
+        setIsAuthenticated(true);
+        try {
+          localStorage.setItem(STORAGE_AUTH_KEY, 'true');
+        } catch (e) {
+          // ignore
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   // Avisos exibidos exclusivamente na aba correspondente (Mural de Avisos), sem pop-up intrusivo ao abrir o app
   // Conforme solicitação do usuário: "Avisos não devem aparecer ao abrir o app apenas na aba correspondente"
 
@@ -358,9 +571,9 @@ export default function App() {
     dataRetornoSugerida?: string,
     termoAssinado?: boolean
   ) => {
-    const targetAgendamento = typeof targetAgendamentoOrId === 'string'
-      ? agendamentos.find(a => a.id === targetAgendamentoOrId) || appointmentToComplete
-      : targetAgendamentoOrId;
+    const targetAgendamento = (typeof targetAgendamentoOrId === 'object' && targetAgendamentoOrId ? targetAgendamentoOrId : null)
+      || (typeof targetAgendamentoOrId === 'string' ? agendamentos.find(a => a.id === targetAgendamentoOrId) : null)
+      || appointmentToComplete;
 
     if (!targetAgendamento) return;
 
@@ -373,30 +586,55 @@ export default function App() {
       quantidade_utilizada: i.quantidade_utilizada || i.quantidade || 1,
     }));
 
-    // Execute atomic checkout
-    await executeAtomicCheckout({
-      agendamentoId: targetAgendamento.id,
-      insumosConsumidos: normalizedSupplies,
-      transacao: {
-        paciente_nome: patient?.nome || 'Cliente',
-        procedimento: targetAgendamento.procedimento,
-        valor: pagamento.valor,
-        tipo: 'receita',
-        forma_pagamento: pagamento.forma,
-        status: pagamento.status,
-        profissional_nome: targetAgendamento.profissional_nome || currentUser.nome,
-        observacao: pagamento.observacao,
-      }
-    });
+    const updatedCompletedAgendamento: Agendamento = {
+      ...targetAgendamento,
+      status: 'concluido' as StatusAgendamento,
+      valor_estimado: pagamento.valor,
+      forma_pagamento: pagamento.forma,
+      status_pagamento: pagamento.status,
+      insumos_utilizados: normalizedSupplies,
+      insumos_consumidos: normalizedSupplies,
+      observacoes: pagamento.observacao 
+        ? `${targetAgendamento.observacoes ? targetAgendamento.observacoes + ' | ' : ''}Checkout: ${pagamento.observacao}`
+        : targetAgendamento.observacoes,
+    };
 
-    // Update Local States
+    // 1. Update Local States immediately to guarantee removal from 'em_espera' queue
     setAgendamentos(prev =>
-      prev.map(a =>
-        a.id === targetAgendamento.id
-          ? { ...a, status: 'concluido' as StatusAgendamento, insumos_utilizados: normalizedSupplies, insumos_consumidos: normalizedSupplies }
-          : a
-      )
+      prev.map(a => (a.id === targetAgendamento.id ? updatedCompletedAgendamento : a))
     );
+
+    // 2. Persist appointment directly in Firestore with status 'concluido'
+    await saveDocument(COLLECTIONS.AGENDAMENTOS, updatedCompletedAgendamento);
+
+    // 3. Execute atomic checkout (Stock debit + Transaction)
+    try {
+      await executeAtomicCheckout({
+        agendamentoId: targetAgendamento.id,
+        pacienteId: targetAgendamento.paciente_id,
+        pacienteNome: patient?.nome || 'Cliente',
+        procedimentoNome: targetAgendamento.procedimento,
+        profissionalId: targetAgendamento.profissional_id,
+        profissionalNome: targetAgendamento.profissional_nome || currentUser.nome,
+        valorPago: pagamento.valor,
+        formaPagamento: pagamento.forma,
+        statusPagamento: pagamento.status,
+        insumosConsumidos: normalizedSupplies,
+        observacoes: pagamento.observacao,
+        transacao: {
+          paciente_nome: patient?.nome || 'Cliente',
+          procedimento: targetAgendamento.procedimento,
+          valor: pagamento.valor,
+          tipo: 'receita',
+          forma_pagamento: pagamento.forma,
+          status: pagamento.status,
+          profissional_nome: targetAgendamento.profissional_nome || currentUser.nome,
+          observacao: pagamento.observacao,
+        }
+      });
+    } catch (err) {
+      console.warn('[executeAtomicCheckout error in handleSaveProcedureCompletion]', err);
+    }
 
     setEstoque(prev =>
       prev.map(item => {
@@ -1243,22 +1481,106 @@ export default function App() {
     setIsSwitchUserModalOpen(true);
   };
 
+  // Patient Details Modal Deep Linking Handlers
+  const handleOpenPatientDetails = (paciente: Paciente, pushHistory = true) => {
+    setSelectedPatientForDetails(paciente);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', 'pacientes');
+      url.searchParams.set('pacienteId', paciente.id);
+      if (pushHistory) {
+        window.history.pushState({ tab: 'pacientes', pacienteId: paciente.id }, '', url.toString());
+      } else {
+        window.history.replaceState({ tab: 'pacientes', pacienteId: paciente.id }, '', url.toString());
+      }
+      try {
+        localStorage.setItem(STORAGE_TAB_KEY, 'pacientes');
+      } catch (e) {
+        // ignore
+      }
+    }
+  };
+
+  const handleClosePatientDetails = (pushHistory = false) => {
+    setSelectedPatientForDetails(null);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('pacienteId');
+      if (pushHistory) {
+        window.history.pushState({ tab: activeTab }, '', url.toString());
+      } else {
+        window.history.replaceState({ tab: activeTab }, '', url.toString());
+      }
+    }
+  };
+
   const handleConfirmSwitchUser = (user: UsuarioEquipe) => {
-    setCurrentUser(user);
-    const roleLabel = user.role === 'gestor' || user.role === 'admin' ? 'Gestor' : user.role === 'profissional' ? 'Profissional' : user.role === 'recepcao' ? 'Recepção' : 'Cliente';
+    const isSuper = isUserAdminTotal(user) || user.id === 'user-super-admin' || user.email?.toLowerCase() === 'fldslima94@gmail.com' || user.email?.toLowerCase() === 'fabio@teste.com' || user.nome?.toLowerCase().includes('fabio lima');
+    const userToSet = isSuper ? { ...user, role: 'admin_total' as UserRole, cargo: 'Super Admin (Master)' } : user;
+    setCurrentUser(userToSet);
+    try {
+      localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(userToSet));
+    } catch (e) {
+      // ignore
+    }
+    const roleLabel = isSuper
+      ? 'Super Admin (Master)'
+      : user.role === 'admin_local' || user.role === 'gestor' || user.role === 'admin'
+      ? 'Gestor'
+      : user.role === 'profissional'
+      ? 'Profissional'
+      : user.role === 'recepcao' || user.role === 'operador'
+      ? 'Recepção'
+      : 'Cliente';
     showToast(`Sessão autenticada para: ${user.nome} (${roleLabel})`, 'info');
   };
 
   const handleLoginSuccess = (user: UsuarioEquipe) => {
-    setCurrentUser(user);
+    const isSuper = isUserAdminTotal(user) || user.id === 'user-super-admin' || user.email?.toLowerCase() === 'fldslima94@gmail.com' || user.email?.toLowerCase() === 'fabio@teste.com' || user.nome?.toLowerCase().includes('fabio lima');
+    const userToSet = isSuper ? { ...user, role: 'admin_total' as UserRole, cargo: 'Super Admin (Master)' } : user;
+    setCurrentUser(userToSet);
     setIsAuthenticated(true);
-    const roleLabel = user.role === 'gestor' || user.role === 'admin' ? 'Gestor' : user.role === 'profissional' ? 'Profissional' : user.role === 'recepcao' ? 'Recepção' : 'Cliente';
+    try {
+      localStorage.setItem(STORAGE_AUTH_KEY, 'true');
+      localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(userToSet));
+    } catch (e) {
+      // ignore
+    }
+    
+    const targetTab: TabType = userToSet.role === 'cliente' ? 'portal_paciente' : 'dashboard';
+    navigateToTab(targetTab, true);
+
+    const roleLabel = isSuper
+      ? 'Super Admin (Master)'
+      : user.role === 'admin_local' || user.role === 'gestor' || user.role === 'admin'
+      ? 'Gestor'
+      : user.role === 'profissional'
+      ? 'Profissional'
+      : user.role === 'recepcao' || user.role === 'operador'
+      ? 'Recepção'
+      : 'Cliente';
     showToast(`Bem-vindo(a), ${user.nome}! Acesso concedido como ${roleLabel}.`);
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
-    showToast('Sessão encerrada. Faça login para continuar.', 'info');
+    try {
+      localStorage.removeItem(STORAGE_AUTH_KEY);
+      localStorage.removeItem(STORAGE_USER_KEY);
+      localStorage.removeItem(STORAGE_TAB_KEY);
+    } catch (e) {
+      // ignore
+    }
+
+    // Sign out from Firebase Auth if logged in
+    logoutFirebase().catch(e => console.warn('[Firebase Auth] Erro ao deslogar:', e));
+
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.search = '';
+      window.history.replaceState({}, '', url.toString());
+    }
+    showToast('Sessão encerrada com sucesso.', 'info');
   };
 
   const handleToggleUserStatus = (userId: string) => {
@@ -1322,7 +1644,8 @@ export default function App() {
   ).length;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col antialiased">
+    <MasterEditProvider currentUser={currentUser}>
+      <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col antialiased">
       
       {/* Toast Notification */}
       {toastMessage && (
@@ -1401,7 +1724,7 @@ export default function App() {
               onOpenNewPatient={() => setIsNewPatientOpen(true)}
               onOpenNewInventory={() => setIsNewInventoryOpen(true)}
               onUpdateStatus={handleUpdateStatus}
-              onViewPatient={(p) => setSelectedPatientForDetails(p)}
+              onViewPatient={(p) => handleOpenPatientDetails(p)}
               onGoToEstoque={() => setActiveTab('estoque')}
               onGoToBens={() => setActiveTab('bens')}
               onGoToFinancial={() => setActiveTab('financeiro')}
@@ -1421,7 +1744,7 @@ export default function App() {
                 setIsNewAppointmentOpen(true);
               }}
               onUpdateStatus={handleUpdateStatus}
-              onViewPatient={(p) => setSelectedPatientForDetails(p)}
+              onViewPatient={(p) => handleOpenPatientDetails(p)}
               onOpenCompleteModal={(ag) => setAppointmentToComplete(ag)}
               onOpenCheckInModal={(ag) => setAppointmentToCheckIn(ag)}
               onDeleteAppointment={handleDeleteAppointment}
@@ -1437,7 +1760,7 @@ export default function App() {
                 setSelectedPatientForAnamnese(null);
                 setIsAnamneseModalOpen(true);
               }}
-              onViewPatient={(p) => setSelectedPatientForDetails(p)}
+              onViewPatient={(p) => handleOpenPatientDetails(p)}
               onOpenPackages={(p) => setPatientForPackages(p)}
               onDeletePatient={handleDeletePatient}
               onGoToSuppliers={() => setActiveTab('fornecedores')}
@@ -1556,7 +1879,7 @@ export default function App() {
               onViewPatientByName={(nome) => {
                 const found = pacientes.find(p => p.nome.toLowerCase() === nome.toLowerCase());
                 if (found) {
-                  setSelectedPatientForDetails(found);
+                  handleOpenPatientDetails(found);
                 } else {
                   setActiveTab('pacientes');
                 }
@@ -1670,7 +1993,7 @@ export default function App() {
         orcamentos={orcamentos}
         transacoes={transacoes}
         onNavigate={(tab) => setActiveTab(tab)}
-        onSelectPatient={(p) => setSelectedPatientForDetails(p)}
+        onSelectPatient={(p) => handleOpenPatientDetails(p)}
       />
 
       <NewAppointmentModal
@@ -1761,7 +2084,7 @@ export default function App() {
 
       <PatientDetailsModal
         isOpen={!!selectedPatientForDetails}
-        onClose={() => setSelectedPatientForDetails(null)}
+        onClose={() => handleClosePatientDetails()}
         paciente={selectedPatientForDetails}
         agendamentos={agendamentos}
         profissionais={usuarios}
@@ -1829,6 +2152,10 @@ export default function App() {
         conflict={selectedConflict}
         onClose={() => setSelectedConflict(null)}
       />
+
+      {/* Modal Dinâmico Universal de Edição Master */}
+      <MasterEditModal />
     </div>
+  </MasterEditProvider>
   );
 }

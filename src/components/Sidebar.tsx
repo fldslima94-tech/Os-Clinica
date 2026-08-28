@@ -19,6 +19,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { TabType, UsuarioEquipe, ClinicaConfig } from '../types';
+import { isUserAdminTotal } from '../services/firebaseService';
 
 interface SidebarProps {
   activeTab: TabType;
@@ -45,8 +46,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenUserAvatarModal,
   onLogout,
 }) => {
-  const isAdminTotal = currentUser.role === 'admin_total';
-  const isAdminLocal = currentUser.role === 'admin_local' || currentUser.role === 'gestor' || currentUser.role === 'admin';
+  const isAdminTotal = isUserAdminTotal(currentUser);
+  const isAdminLocal = !isAdminTotal && (currentUser.role === 'admin_local' || currentUser.role === 'gestor' || currentUser.role === 'admin');
   const isGestor = isAdminTotal || isAdminLocal;
   const isRecepcao = currentUser.role === 'recepcao' || currentUser.role === 'operador';
   const isProfissional = currentUser.role === 'profissional';

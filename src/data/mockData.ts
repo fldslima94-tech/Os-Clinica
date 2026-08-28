@@ -34,7 +34,7 @@ export const MOCK_USUARIOS: UsuarioEquipe[] = [
     id: 'user-super-admin',
     nome: 'Fabio Lima',
     nomeCompleto: 'Fabio Lima',
-    email: 'fabio@teste.com',
+    email: 'fldslima94@gmail.com',
     senha: 'admin123',
     cargo: 'Super Admin (Master)',
     profissao: 'Proprietário & Administrador Geral',

@@ -22,7 +22,8 @@ import {
 } from 'lucide-react';
 import { Paciente, UsuarioEquipe } from '../types';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
-import { checkUserCustomPermission } from '../services/firebaseService';
+import { MasterEditableText } from './MasterEditableText';
+import { checkUserCustomPermission, COLLECTIONS } from '../services/firebaseService';
 import { calcularIdade } from '../utils/anamneseValidation';
 
 interface PatientsViewProps {
@@ -187,9 +188,18 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
                     </div>
                   </div>
 
-                  <h3 className="text-base font-bold text-slate-900 line-clamp-1">
-                    {paciente.nome}
-                  </h3>
+                  <MasterEditableText
+                    collectionName={COLLECTIONS.PACIENTES}
+                    documentId={paciente.id}
+                    fieldKey="nome"
+                    value={paciente.nome}
+                    allowDelete={true}
+                    deleteLabel={paciente.nome}
+                  >
+                    <h3 className="text-base font-bold text-slate-900 line-clamp-1">
+                      {paciente.nome}
+                    </h3>
+                  </MasterEditableText>
 
                   <div className="mt-2 space-y-1.5 text-xs text-slate-600">
                     <div className="flex items-center gap-2">
