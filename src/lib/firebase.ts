@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getFirestore, Firestore } from 'firebase/firestore';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import config from '../../firebase-applet-config.json';
 
@@ -19,24 +19,42 @@ const firebaseConfig = {
 // Initialize Firebase App instance
 export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Cloud Firestore with specified database ID, auto-detect long polling and persistent offline cache
-const databaseId = env.VITE_FIREBASE_DATABASE_ID || env.NEXT_PUBLIC_FIREBASE_DATABASE_ID || (config.firestoreDatabaseId && config.firestoreDatabaseId !== '(default)'
+// Initialize Cloud Firestore with specified database ID, auto-detect long polling and persistent offline cache with (default) fallback
+const configuredDbId = env.VITE_FIREBASE_DATABASE_ID || env.NEXT_PUBLIC_FIREBASE_DATABASE_ID || (config.firestoreDatabaseId && config.firestoreDatabaseId !== '(default)'
   ? config.firestoreDatabaseId
   : '(default)');
 
-export const db = initializeFirestore(
-  app,
-  {
-    experimentalAutoDetectLongPolling: true,
-    localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager(),
-    }),
-  },
-  databaseId
-);
+function initFirestoreInstance(): Firestore {
+  try {
+    return initializeFirestore(
+      app,
+      {
+        experimentalAutoDetectLongPolling: true,
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager(),
+        }),
+      },
+      configuredDbId
+    );
+  } catch (err) {
+    console.warn(`[Firestore] Falha ao inicializar com databaseId "${configuredDbId}", aplicando fallback para "(default)":`, err);
+    try {
+      return initializeFirestore(
+        app,
+        {
+          experimentalAutoDetectLongPolling: true,
+        },
+        '(default)'
+      );
+    } catch {
+      return getFirestore(app);
+    }
+  }
+}
+
+export const db: Firestore = initFirestoreInstance();
 
 // Initialize Firebase Auth
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
-

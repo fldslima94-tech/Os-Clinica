@@ -14,7 +14,7 @@ import {
   LockKeyhole
 } from 'lucide-react';
 import { UsuarioEquipe } from '../types';
-import { isUserAdminTotal } from '../services/firebaseService';
+import { isUserAdminTotal, loginWithFirebaseGoogle, SUPER_ADMIN_EMAILS } from '../services/firebaseService';
 
 interface LoginViewProps {
   usuarios: UsuarioEquipe[];
@@ -45,6 +45,84 @@ export const LoginView: React.FC<LoginViewProps> = ({
     }, 500);
   };
 
+  const handleGoogleLogin = async () => {
+    setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      const fbUser = await loginWithFirebaseGoogle();
+      if (!fbUser) {
+        setIsLoading(false);
+        return;
+      }
+
+      const cleanEmail = (fbUser.email || '').toLowerCase().trim();
+      let userFound = usuarios.find(u => (u.email || '').toLowerCase().trim() === cleanEmail);
+
+      const isSuper = SUPER_ADMIN_EMAILS.includes(cleanEmail) || cleanEmail.includes('fabio');
+
+      if (!userFound) {
+        userFound = {
+          id: fbUser.uid || `user-${Date.now()}`,
+          nome: fbUser.displayName || (isSuper ? 'Fabio Lima' : 'Usuário Google'),
+          nomeCompleto: fbUser.displayName || (isSuper ? 'Fabio Lima' : 'Usuário Google'),
+          email: cleanEmail,
+          cargo: isSuper ? 'Super Admin (Master)' : 'Usuário da Equipe',
+          profissao: isSuper ? 'Proprietário & Administrador Geral' : 'Especialista',
+          role: isSuper ? 'admin_total' : 'profissional',
+          status: 'ativo',
+          avatar_url: fbUser.photoURL || undefined,
+          permissoes: {
+            ver_financeiro_completo: true,
+            emitir_recibo: true,
+            editar_prontuario_clinico: true,
+            gerenciar_estoque_custos: true,
+            configuracoes_sistema: true,
+            visualizar_bens_ativos: true,
+          },
+          permissoesCustomizadas: {
+            financeiro: { verEntradas: true, verSaidas: true, verRecorrentes: true, excluir: true, verRelatorios: true },
+            clientes: { criar: true, editar: true, excluir: true, verHistorico: true, preencherAnamnese: true },
+            agenda: { verTodos: true, verPropria: true, criar: true, cancelar: true, finalizar: true },
+            procedimentos: { verCustos: true, verMargem: true, criar: true, excluir: true, ajustarEstoque: true },
+            bens: { visualizar: true, cadastrar: true, editar: true, gerenciar: true, excluir: true, manutencao: true },
+            estoque: { ajustar: true, excluir: true },
+            orcamentos: { verTodos: true, responder: true, verEmails: true }
+          }
+        };
+      } else if (isSuper) {
+        userFound = {
+          ...userFound,
+          role: 'admin_total',
+          cargo: 'Super Admin (Master)',
+          profissao: userFound.profissao || 'Proprietário & Administrador Geral',
+          permissoes: {
+            ver_financeiro_completo: true,
+            emitir_recibo: true,
+            editar_prontuario_clinico: true,
+            gerenciar_estoque_custos: true,
+            configuracoes_sistema: true,
+            visualizar_bens_ativos: true,
+          },
+          permissoesCustomizadas: {
+            financeiro: { verEntradas: true, verSaidas: true, verRecorrentes: true, excluir: true, verRelatorios: true },
+            clientes: { criar: true, editar: true, excluir: true, verHistorico: true, preencherAnamnese: true },
+            agenda: { verTodos: true, verPropria: true, criar: true, cancelar: true, finalizar: true },
+            procedimentos: { verCustos: true, verMargem: true, criar: true, excluir: true, ajustarEstoque: true },
+            bens: { visualizar: true, cadastrar: true, editar: true, gerenciar: true, excluir: true, manutencao: true },
+            estoque: { ajustar: true, excluir: true },
+            orcamentos: { verTodos: true, responder: true, verEmails: true }
+          }
+        };
+      }
+
+      executeLogin(userFound);
+    } catch (err: any) {
+      console.warn('Erro no login com Google:', err);
+      setErrorMessage(err.message || 'Falha ao autenticar com a conta Google.');
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -63,11 +141,45 @@ export const LoginView: React.FC<LoginViewProps> = ({
     }
 
     // Match user in database (including super admin alias matching)
-    let userFound = usuarios.find(u => (u.email || '').toLowerCase() === cleanEmail);
+    let userFound = usuarios.find(u => (u.email || '').toLowerCase().trim() === cleanEmail);
+
+    const isSuper = SUPER_ADMIN_EMAILS.includes(cleanEmail) || cleanEmail.includes('fabio');
 
     // Fallback: Super Admin recognition for fldslima94@gmail.com or fabio@teste.com
-    if (!userFound && (cleanEmail === 'fldslima94@gmail.com' || cleanEmail === 'fabio@teste.com' || cleanEmail.includes('fabio'))) {
+    if (!userFound && isSuper) {
       userFound = usuarios.find(u => isUserAdminTotal(u) || u.id === 'user-super-admin' || u.nome?.toLowerCase().includes('fabio lima'));
+    }
+
+    // Dynamic Super Admin creation fallback if not pre-seeded in array
+    if (!userFound && isSuper) {
+      userFound = {
+        id: 'user-super-admin',
+        nome: 'Fabio Lima',
+        nomeCompleto: 'Fabio Lima',
+        email: cleanEmail,
+        senha: 'admin123',
+        cargo: 'Super Admin (Master)',
+        profissao: 'Proprietário & Administrador Geral',
+        role: 'admin_total',
+        status: 'ativo',
+        permissoes: {
+          ver_financeiro_completo: true,
+          emitir_recibo: true,
+          editar_prontuario_clinico: true,
+          gerenciar_estoque_custos: true,
+          configuracoes_sistema: true,
+          visualizar_bens_ativos: true,
+        },
+        permissoesCustomizadas: {
+          financeiro: { verEntradas: true, verSaidas: true, verRecorrentes: true, excluir: true, verRelatorios: true },
+          clientes: { criar: true, editar: true, excluir: true, verHistorico: true, preencherAnamnese: true },
+          agenda: { verTodos: true, verPropria: true, criar: true, cancelar: true, finalizar: true },
+          procedimentos: { verCustos: true, verMargem: true, criar: true, excluir: true, ajustarEstoque: true },
+          bens: { visualizar: true, cadastrar: true, editar: true, gerenciar: true, excluir: true, manutencao: true },
+          estoque: { ajustar: true, excluir: true },
+          orcamentos: { verTodos: true, responder: true, verEmails: true }
+        }
+      };
     }
 
     if (!userFound) {
@@ -79,8 +191,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
     if (
       isUserAdminTotal(userFound) || 
       userFound.id === 'user-super-admin' || 
-      cleanEmail === 'fldslima94@gmail.com' || 
-      cleanEmail === 'fabio@teste.com' || 
+      isSuper ||
       userFound.nome?.toLowerCase().includes('fabio lima')
     ) {
       userFound = {
@@ -195,8 +306,42 @@ export const LoginView: React.FC<LoginViewProps> = ({
             </div>
             <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Entrar no Sistema</h2>
             <p className="text-xs text-slate-500 mt-1">
-              Informe suas credenciais para acessar os recursos da clínica.
+              Informe suas credenciais ou use sua conta Google para acessar.
             </p>
+          </div>
+
+          {/* Google Sign-in Button */}
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={isLoading}
+            className="w-full mb-4 py-2.5 px-4 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold rounded-xl shadow-xs transition-all flex items-center justify-center gap-3 cursor-pointer text-xs disabled:opacity-60"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24">
+              <path
+                fill="#4285F4"
+                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+              />
+              <path
+                fill="#34A853"
+                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+              />
+              <path
+                fill="#EA4335"
+                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+              />
+            </svg>
+            <span>Entrar com Google (Firebase Auth)</span>
+          </button>
+
+          <div className="relative flex py-2 items-center mb-4">
+            <div className="grow border-t border-slate-200"></div>
+            <span className="shrink mx-3 text-[11px] font-medium text-slate-400 uppercase tracking-wider">ou com e-mail</span>
+            <div className="grow border-t border-slate-200"></div>
           </div>
 
           {/* Error Alert Box */}
@@ -399,3 +544,4 @@ export const LoginView: React.FC<LoginViewProps> = ({
     </div>
   );
 };
+

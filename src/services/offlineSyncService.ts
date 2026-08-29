@@ -56,6 +56,52 @@ const STORE_CONFLICTS = 'sync_conflicts';
 const STORE_CACHE = 'cached_records';
 
 /**
+ * Converte recursivamente objetos Timestamp do Firestore para ISO string antes de salvar no IndexedDB
+ */
+export function convertTimestampsToISO(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+
+  // Objeto Timestamp do Firestore com método toDate()
+  if (typeof obj?.toDate === 'function') {
+    try {
+      return obj.toDate().toISOString();
+    } catch {
+      return new Date().toISOString();
+    }
+  }
+
+  // Objeto serializado de Timestamp { seconds, nanoseconds }
+  if (typeof obj === 'object' && typeof obj.seconds === 'number' && typeof obj.nanoseconds === 'number') {
+    try {
+      return new Date(obj.seconds * 1000 + obj.nanoseconds / 1000000).toISOString();
+    } catch {
+      return new Date().toISOString();
+    }
+  }
+
+  // Instância nativa de Date
+  if (obj instanceof Date) {
+    return isNaN(obj.getTime()) ? new Date().toISOString() : obj.toISOString();
+  }
+
+  // Array recursivo
+  if (Array.isArray(obj)) {
+    return obj.map(item => convertTimestampsToISO(item));
+  }
+
+  // Objeto recursivo
+  if (typeof obj === 'object') {
+    const res: Record<string, any> = {};
+    for (const key of Object.keys(obj)) {
+      res[key] = convertTimestampsToISO(obj[key]);
+    }
+    return res;
+  }
+
+  return obj;
+}
+
+/**
  * Abre ou inicializa o banco IndexedDB seguro para sincronização offline
  */
 function openIndexedDB(): Promise<IDBDatabase> {
@@ -68,23 +114,23 @@ function openIndexedDB(): Promise<IDBDatabase> {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
+      const dbInstance = (event.target as IDBOpenDBRequest).result;
 
-      if (!db.objectStoreNames.contains(STORE_QUEUE)) {
-        const queueStore = db.createObjectStore(STORE_QUEUE, { keyPath: 'id' });
+      if (!dbInstance.objectStoreNames.contains(STORE_QUEUE)) {
+        const queueStore = dbInstance.createObjectStore(STORE_QUEUE, { keyPath: 'id' });
         queueStore.createIndex('entityId', 'entityId', { unique: false });
         queueStore.createIndex('status', 'status', { unique: false });
         queueStore.createIndex('localUpdatedAt', 'localUpdatedAt', { unique: false });
       }
 
-      if (!db.objectStoreNames.contains(STORE_CONFLICTS)) {
-        const conflictsStore = db.createObjectStore(STORE_CONFLICTS, { keyPath: 'id' });
+      if (!dbInstance.objectStoreNames.contains(STORE_CONFLICTS)) {
+        const conflictsStore = dbInstance.createObjectStore(STORE_CONFLICTS, { keyPath: 'id' });
         conflictsStore.createIndex('entityId', 'entityId', { unique: false });
         conflictsStore.createIndex('resolved', 'resolved', { unique: false });
       }
 
-      if (!db.objectStoreNames.contains(STORE_CACHE)) {
-        const cacheStore = db.createObjectStore(STORE_CACHE, { keyPath: 'id' });
+      if (!dbInstance.objectStoreNames.contains(STORE_CACHE)) {
+        const cacheStore = dbInstance.createObjectStore(STORE_CACHE, { keyPath: 'id' });
         cacheStore.createIndex('entityType', 'entityType', { unique: false });
       }
     };
@@ -100,7 +146,7 @@ function openIndexedDB(): Promise<IDBDatabase> {
 }
 
 /**
- * Adiciona uma ação de criação/atualização à Fila IndexedDB
+ * Adiciona uma ação de criação/atualização à Fila IndexedDB com conversão de Timestamps
  */
 export async function enqueueSyncAction(params: {
   entityType: 'paciente' | 'anamnese' | 'evolucao_retorno' | 'agendamento' | 'generico';
@@ -112,14 +158,19 @@ export async function enqueueSyncAction(params: {
   userEmail?: string;
   userName?: string;
 }): Promise<SyncQueueItem> {
+  const safePayload = convertTimestampsToISO(params.payload);
+  const safeBaseVersion = params.baseVersionTimestamp 
+    ? convertTimestampsToISO(params.baseVersionTimestamp) 
+    : new Date().toISOString();
+
   const queueItem: SyncQueueItem = {
     id: `queue-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     entityType: params.entityType,
     entityId: params.entityId,
     entityTitle: params.entityTitle,
     action: params.action,
-    payload: params.payload,
-    baseVersionTimestamp: params.baseVersionTimestamp || new Date().toISOString(),
+    payload: safePayload,
+    baseVersionTimestamp: safeBaseVersion,
     localUpdatedAt: new Date().toISOString(),
     retries: 0,
     status: 'pending',
@@ -140,7 +191,7 @@ export async function enqueueSyncAction(params: {
         id: `${params.entityType}_${params.entityId}`,
         entityType: params.entityType,
         entityId: params.entityId,
-        data: params.payload,
+        data: safePayload,
         cachedAt: new Date().toISOString(),
       });
 
@@ -229,15 +280,16 @@ export async function removeQueueItem(queueId: string): Promise<void> {
 }
 
 /**
- * Atualiza o status de um item na fila
+ * Atualiza o status de um item na fila com conversão de timestamps
  */
 export async function updateQueueItem(item: SyncQueueItem): Promise<void> {
   try {
     const idb = await openIndexedDB();
+    const safeItem = convertTimestampsToISO(item);
     await new Promise<void>((resolve, reject) => {
       const transaction = idb.transaction(STORE_QUEUE, 'readwrite');
       const store = transaction.objectStore(STORE_QUEUE);
-      store.put(item);
+      store.put(safeItem);
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error);
     });
@@ -253,6 +305,8 @@ export async function updateQueueItem(item: SyncQueueItem): Promise<void> {
 export async function recordSyncConflict(conflict: Omit<SyncConflict, 'id' | 'detectedAt' | 'resolved'>): Promise<SyncConflict> {
   const fullConflict: SyncConflict = {
     ...conflict,
+    localData: convertTimestampsToISO(conflict.localData),
+    remoteData: convertTimestampsToISO(conflict.remoteData),
     id: `conflict-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     detectedAt: new Date().toISOString(),
     resolved: false,
@@ -308,8 +362,173 @@ function detectFieldConflicts(localData: any, remoteData: any): string[] {
 }
 
 /**
+ * Sincroniza um item individual para a nuvem tratando anamneses embutidas no documento do paciente
+ */
+async function processSyncItemToCloud(
+  item: SyncQueueItem,
+  options?: {
+    forceOverwrite?: boolean;
+    onConflict?: (conflict: SyncConflict) => void;
+  }
+): Promise<{ success: boolean; conflict?: SyncConflict; error?: string }> {
+  // CASO ESPECIAL: Anamnese Completa - NÃO deve ser salva como documento avulso!
+  if (item.entityType === 'anamnese') {
+    const patientId = item.payload?.clienteId || item.payload?.paciente_id || item.entityId;
+    const patientDocRef = doc(db, COLLECTIONS.PACIENTES, patientId);
+    const patientSnap = await getDoc(patientDocRef);
+
+    const novaAnamnese = convertTimestampsToISO(item.payload);
+
+    if (patientSnap.exists()) {
+      const patientData = patientSnap.data();
+      const existingAnamneses: any[] = Array.isArray(patientData.anamneses_completas) ? patientData.anamneses_completas : [];
+
+      // Upsert anamnese no array existente
+      const updatedAnamneses = existingAnamneses.some((a: any) => a.id === novaAnamnese.id)
+        ? existingAnamneses.map((a: any) => (a.id === novaAnamnese.id ? novaAnamnese : a))
+        : [novaAnamnese, ...existingAnamneses];
+
+      const dadosAtualizados: any = {
+        anamneses_completas: updatedAnamneses,
+        atualizado_em: new Date().toISOString(),
+        atualizadoEm: serverTimestamp(),
+      };
+
+      // Mesclar campos clínicos derivados da anamnese
+      if (novaAnamnese.saudeGeral?.possuiAlergias && novaAnamnese.saudeGeral.detalhesAlergias) {
+        dadosAtualizados.alergias = novaAnamnese.saudeGeral.detalhesAlergias;
+      }
+      if (novaAnamnese.saudeGeral?.usoAcidos && novaAnamnese.saudeGeral.detalhesAcidos) {
+        dadosAtualizados.medicacoes = novaAnamnese.saudeGeral.detalhesAcidos;
+      }
+      if (novaAnamnese.dadosPessoais?.profissao) {
+        dadosAtualizados.profissao = novaAnamnese.dadosPessoais.profissao;
+      }
+      if (novaAnamnese.dadosPessoais?.endereco) {
+        dadosAtualizados.endereco = novaAnamnese.dadosPessoais.endereco;
+      }
+      if (novaAnamnese.dadosPessoais?.contatoEmergencia) {
+        dadosAtualizados.contato_emergencia = novaAnamnese.dadosPessoais.contatoEmergencia;
+      }
+      if (novaAnamnese.dadosPessoais?.dataNascimento) {
+        dadosAtualizados.data_nascimento = novaAnamnese.dadosPessoais.dataNascimento;
+      }
+
+      await setDoc(patientDocRef, sanitizeForFirestore(dadosAtualizados), { merge: true });
+    } else {
+      // Paciente ainda não cadastrado na nuvem - cria ficha inicial com a anamnese embutida
+      const novoPacienteData = {
+        id: patientId,
+        nome: novaAnamnese.dadosPessoais?.nomeCompleto || novaAnamnese.pacienteNome || 'Cliente',
+        telefone: novaAnamnese.dadosPessoais?.telefone || '',
+        email: novaAnamnese.dadosPessoais?.email || '',
+        cpf: novaAnamnese.dadosPessoais?.cpf || '',
+        data_nascimento: novaAnamnese.dadosPessoais?.dataNascimento || '',
+        endereco: novaAnamnese.dadosPessoais?.endereco || '',
+        profissao: novaAnamnese.dadosPessoais?.profissao || '',
+        alergias: novaAnamnese.saudeGeral?.possuiAlergias ? novaAnamnese.saudeGeral.detalhesAlergias : '',
+        medicacoes: novaAnamnese.saudeGeral?.usoAcidos ? novaAnamnese.saudeGeral.detalhesAcidos : '',
+        anamneses_completas: [novaAnamnese],
+        criado_em: new Date().toISOString(),
+        atualizado_em: new Date().toISOString(),
+        atualizadoEm: serverTimestamp(),
+      };
+      await setDoc(patientDocRef, sanitizeForFirestore(novoPacienteData), { merge: true });
+    }
+
+    await removeQueueItem(item.id);
+    return { success: true };
+  }
+
+  // CASO ESPECIAL: Evolução de Retorno Clínica - salvar embutida no paciente
+  if (item.entityType === 'evolucao_retorno') {
+    const patientId = item.payload?.paciente_id || item.entityId;
+    const patientDocRef = doc(db, COLLECTIONS.PACIENTES, patientId);
+    const patientSnap = await getDoc(patientDocRef);
+    const novaEvolucao = convertTimestampsToISO(item.payload);
+
+    if (patientSnap.exists()) {
+      const patientData = patientSnap.data();
+      const existingEvolucoes: any[] = Array.isArray(patientData.evolucoes_retornos) ? patientData.evolucoes_retornos : [];
+      const updatedEvolucoes = existingEvolucoes.some((e: any) => e.id === novaEvolucao.id)
+        ? existingEvolucoes.map((e: any) => (e.id === novaEvolucao.id ? novaEvolucao : e))
+        : [novaEvolucao, ...existingEvolucoes];
+
+      await setDoc(patientDocRef, sanitizeForFirestore({
+        evolucoes_retornos: updatedEvolucoes,
+        atualizado_em: new Date().toISOString(),
+        atualizadoEm: serverTimestamp(),
+      }), { merge: true });
+    } else {
+      await setDoc(patientDocRef, sanitizeForFirestore({
+        id: patientId,
+        evolucoes_retornos: [novaEvolucao],
+        atualizado_em: new Date().toISOString(),
+        atualizadoEm: serverTimestamp(),
+      }), { merge: true });
+    }
+
+    await removeQueueItem(item.id);
+    return { success: true };
+  }
+
+  // Sincronização padrão para entidades regulares (paciente, agendamento, etc.)
+  const collectionName = item.entityType === 'paciente' ? COLLECTIONS.PACIENTES :
+    item.entityType === 'agendamento' ? COLLECTIONS.AGENDAMENTOS :
+    COLLECTIONS.PACIENTES;
+
+  const docRef = doc(db, collectionName, item.entityId);
+  const remoteSnap = await getDoc(docRef);
+
+  if (remoteSnap.exists() && !options?.forceOverwrite) {
+    const remoteData = convertTimestampsToISO(remoteSnap.data());
+    const remoteTimestamp = remoteData.atualizadoEm || remoteData.atualizado_em || remoteData.criado_em || remoteData.criadoEm;
+    const localBaseTimestamp = item.baseVersionTimestamp;
+
+    if (remoteTimestamp && localBaseTimestamp && new Date(remoteTimestamp).getTime() > new Date(localBaseTimestamp).getTime()) {
+      const conflictingFields = detectFieldConflicts(item.payload, remoteData);
+
+      if (conflictingFields.length > 0) {
+        item.status = 'conflict';
+        item.lastError = `Conflito detectado nos campos: ${conflictingFields.join(', ')}`;
+        await updateQueueItem(item);
+
+        const conflict = await recordSyncConflict({
+          queueItemId: item.id,
+          entityType: item.entityType,
+          entityId: item.entityId,
+          entityTitle: item.entityTitle,
+          localData: item.payload,
+          remoteData: remoteData,
+          conflictFields: conflictingFields,
+        });
+
+        if (options?.onConflict) {
+          options.onConflict(conflict);
+        }
+
+        return {
+          success: false,
+          conflict,
+          error: `Conflito de dados detectado ao atualizar ${item.entityTitle}.`,
+        };
+      }
+    }
+  }
+
+  const payloadSanitized = sanitizeForFirestore({
+    ...convertTimestampsToISO(item.payload),
+    atualizado_em: new Date().toISOString(),
+    atualizadoEm: serverTimestamp(),
+  });
+
+  await setDoc(docRef, payloadSanitized, { merge: true });
+  await removeQueueItem(item.id);
+  return { success: true };
+}
+
+/**
  * Função de Sincronização Individual: Sincroniza todas as alterações pendentes de um Paciente/Usuário com a Nuvem
- * Suporta Anamnese Completa, Evoluções Clínicas, Treinos/Procedimentos e Dados Cadastrais.
  */
 export async function syncSingleUserToCloud(
   patientOrUserId: string,
@@ -329,7 +548,10 @@ export async function syncSingleUserToCloud(
   }
 
   const queue = await getPendingSyncQueue();
-  const userItems = queue.filter(item => item.entityId === patientOrUserId || (item.payload && (item.payload.paciente_id === patientOrUserId || item.payload.clienteId === patientOrUserId)));
+  const userItems = queue.filter(item => 
+    item.entityId === patientOrUserId || 
+    (item.payload && (item.payload.paciente_id === patientOrUserId || item.payload.clienteId === patientOrUserId))
+  );
 
   if (userItems.length === 0) {
     return {
@@ -345,63 +567,16 @@ export async function syncSingleUserToCloud(
       item.status = 'syncing';
       await updateQueueItem(item);
 
-      // Determinar coleção do Firestore
-      const collectionName = item.entityType === 'paciente' ? COLLECTIONS.PACIENTES :
-        item.entityType === 'agendamento' ? COLLECTIONS.AGENDAMENTOS :
-        COLLECTIONS.PACIENTES;
-
-      const docRef = doc(db, collectionName, item.entityId);
-      const remoteSnap = await getDoc(docRef);
-
-      if (remoteSnap.exists() && !options?.forceOverwrite) {
-        const remoteData = remoteSnap.data();
-        const remoteTimestamp = remoteData.atualizadoEm || remoteData.atualizado_em || remoteData.criado_em || remoteData.criadoEm;
-        const localBaseTimestamp = item.baseVersionTimestamp;
-
-        // Se o dado remoto foi modificado após o ponto em que o usuário começou a editar localmente
-        if (remoteTimestamp && localBaseTimestamp && new Date(remoteTimestamp).getTime() > new Date(localBaseTimestamp).getTime()) {
-          const conflictingFields = detectFieldConflicts(item.payload, remoteData);
-
-          if (conflictingFields.length > 0) {
-            item.status = 'conflict';
-            item.lastError = `Conflito detectado nos campos: ${conflictingFields.join(', ')}`;
-            await updateQueueItem(item);
-
-            const conflict = await recordSyncConflict({
-              queueItemId: item.id,
-              entityType: item.entityType,
-              entityId: item.entityId,
-              entityTitle: item.entityTitle,
-              localData: item.payload,
-              remoteData: remoteData,
-              conflictFields: conflictingFields,
-            });
-
-            if (options?.onConflict) {
-              options.onConflict(conflict);
-            }
-
-            return {
-              success: false,
-              syncedItemsCount: syncedCount,
-              conflict,
-              error: `Conflito de dados detectado ao atualizar ${item.entityTitle}. A versão na nuvem foi modificada em outra sessão.`,
-            };
-          }
-        }
+      const res = await processSyncItemToCloud(item, options);
+      if (!res.success) {
+        return {
+          success: false,
+          syncedItemsCount: syncedCount,
+          conflict: res.conflict,
+          error: res.error,
+        };
       }
 
-      // Se não há conflito ou forceOverwrite está habilitado: persistir na nuvem
-      const payloadSanitized = sanitizeForFirestore({
-        ...item.payload,
-        atualizado_em: new Date().toISOString(),
-        atualizadoEm: serverTimestamp(),
-      });
-
-      await setDoc(docRef, payloadSanitized, { merge: true });
-
-      // Remover da fila de pendentes
-      await removeQueueItem(item.id);
       syncedCount++;
     } catch (error: any) {
       console.error(`[OfflineSync] Erro ao sincronizar item ${item.id}:`, error);
@@ -462,50 +637,18 @@ export async function syncAllPendingQueue(): Promise<SyncBatchResult> {
       item.status = 'syncing';
       await updateQueueItem(item);
 
-      const collectionName = item.entityType === 'paciente' ? COLLECTIONS.PACIENTES :
-        item.entityType === 'agendamento' ? COLLECTIONS.AGENDAMENTOS :
-        COLLECTIONS.PACIENTES;
-
-      const docRef = doc(db, collectionName, item.entityId);
-      const remoteSnap = await getDoc(docRef);
-
-      if (remoteSnap.exists()) {
-        const remoteData = remoteSnap.data();
-        const remoteTimestamp = remoteData.atualizadoEm || remoteData.atualizado_em;
-        const localBaseTimestamp = item.baseVersionTimestamp;
-
-        if (remoteTimestamp && localBaseTimestamp && new Date(remoteTimestamp).getTime() > new Date(localBaseTimestamp).getTime()) {
-          const conflictingFields = detectFieldConflicts(item.payload, remoteData);
-          if (conflictingFields.length > 0) {
-            item.status = 'conflict';
-            item.lastError = `Conflito detectado nos campos: ${conflictingFields.join(', ')}`;
-            await updateQueueItem(item);
-
-            const conflict = await recordSyncConflict({
-              queueItemId: item.id,
-              entityType: item.entityType,
-              entityId: item.entityId,
-              entityTitle: item.entityTitle,
-              localData: item.payload,
-              remoteData: remoteData,
-              conflictFields: conflictingFields,
-            });
-
-            result.conflictsCount++;
-            result.conflicts.push(conflict);
-            continue;
-          }
+      const res = await processSyncItemToCloud(item);
+      if (!res.success) {
+        if (res.conflict) {
+          result.conflictsCount++;
+          result.conflicts.push(res.conflict);
+        } else if (res.error) {
+          result.failedCount++;
+          result.errors.push(`[${item.entityTitle}] ${res.error}`);
         }
+        continue;
       }
 
-      const payloadSanitized = sanitizeForFirestore({
-        ...item.payload,
-        atualizado_em: new Date().toISOString(),
-        atualizadoEm: serverTimestamp(),
-      });
-
-      await setDoc(docRef, payloadSanitized, { merge: true });
-      await removeQueueItem(item.id);
       result.syncedCount++;
     } catch (error: any) {
       item.status = 'failed';
@@ -547,7 +690,7 @@ export async function resolveSyncConflict(
 
     if (resolution === 'keep_local') {
       const payloadSanitized = sanitizeForFirestore({
-        ...conflict.localData,
+        ...convertTimestampsToISO(conflict.localData),
         atualizado_em: new Date().toISOString(),
         atualizadoEm: serverTimestamp(),
       });
@@ -578,7 +721,7 @@ export async function resolveSyncConflict(
         atualizadoEm: serverTimestamp(),
       };
 
-      const payloadSanitized = sanitizeForFirestore(mergedPayload);
+      const payloadSanitized = sanitizeForFirestore(convertTimestampsToISO(mergedPayload));
       await setDoc(docRef, payloadSanitized, { merge: true });
       await removeQueueItem(conflict.queueItemId);
     }

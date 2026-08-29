@@ -11,6 +11,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { UsuarioEquipe, UserRole } from '../types';
+import { isUserAdminTotal } from '../services/firebaseService';
 
 interface SwitchUserPasswordModalProps {
   isOpen: boolean;
@@ -65,7 +66,7 @@ export const SwitchUserPasswordModal: React.FC<SwitchUserPasswordModalProps> = (
       setIsLoading(false);
       const cleanPass = senha.trim();
       const roleDefault = 
-        selectedUser.role === 'admin_total' || selectedUser.role === 'admin_local' || selectedUser.role === 'admin' || selectedUser.role === 'gestor'
+        isUserAdminTotal(selectedUser) || selectedUser.role === 'admin_total' || selectedUser.role === 'admin_local' || selectedUser.role === 'admin' || selectedUser.role === 'gestor'
           ? 'admin123'
           : selectedUser.role === 'profissional'
           ? 'pro123'
@@ -95,21 +96,22 @@ export const SwitchUserPasswordModal: React.FC<SwitchUserPasswordModalProps> = (
     }, 400);
   };
 
-  const getRoleLabel = (role: UserRole) => {
-    switch (role) {
+  const getRoleLabel = (u: UsuarioEquipe) => {
+    if (isUserAdminTotal(u)) return '👑 Master';
+    switch (u.role) {
       case 'admin_total':
-        return 'Master';
+        return '👑 Master';
       case 'admin_local':
       case 'admin':
       case 'gestor':
-        return 'Admin';
+        return '⭐ Admin';
       case 'profissional':
-        return 'Profissional';
+        return '🩺 Profissional';
       case 'recepcao':
       case 'operador':
-        return 'Recepção';
+        return '🧑‍💼 Recepção';
       case 'cliente':
-        return 'Cliente';
+        return '👤 Cliente';
       default:
         return 'Usuário';
     }
@@ -185,13 +187,17 @@ export const SwitchUserPasswordModal: React.FC<SwitchUserPasswordModalProps> = (
                     </div>
 
                     <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border ${
-                      u.role === 'admin'
+                      isUserAdminTotal(u)
+                        ? 'bg-amber-100 text-amber-800 border-amber-200'
+                        : u.role === 'admin_local' || u.role === 'admin' || u.role === 'gestor'
                         ? 'bg-indigo-100 text-indigo-800 border-indigo-200'
-                        : u.role === 'operador'
+                        : u.role === 'profissional'
+                        ? 'bg-teal-100 text-teal-800 border-teal-200'
+                        : u.role === 'recepcao' || u.role === 'operador'
                         ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
                         : 'bg-blue-100 text-blue-800 border-blue-200'
                     }`}>
-                      {getRoleLabel(u.role)}
+                      {getRoleLabel(u)}
                     </span>
                   </button>
                 );

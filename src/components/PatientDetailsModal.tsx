@@ -56,6 +56,19 @@ import { calcularIdade } from '../utils/anamneseValidation';
 import { useConnectionStatus } from '../contexts/ConnectionStatusContext';
 import { Wifi, WifiOff, Database, RefreshCw, CloudCheck } from 'lucide-react';
 
+const parseDate = (d: any): Date => {
+  if (!d) return new Date();
+  if (typeof d?.toDate === 'function') {
+    try {
+      return d.toDate();
+    } catch {
+      return new Date();
+    }
+  }
+  const parsed = new Date(d);
+  return isNaN(parsed.getTime()) ? new Date() : parsed;
+};
+
 interface PatientDetailsModalProps {
   paciente: Paciente | null;
   isOpen: boolean;
@@ -549,7 +562,7 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
-                    {paciente.nome}
+                    {paciente.nome || 'Cliente'}
                   </h3>
                   {idadeCalculada !== '' && (
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-white border border-white/30">
@@ -565,7 +578,7 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
                 <p className="text-xs text-indigo-200 font-medium flex items-center gap-3 mt-0.5">
                   <span className="flex items-center gap-1">
                     <Phone className="w-3.5 h-3.5 text-emerald-400" />
-                    {paciente.telefone}
+                    {paciente.telefone || 'Sem telefone'}
                   </span>
                   {paciente.email && <span>{paciente.email}</span>}
                 </p>
@@ -789,11 +802,11 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
                                 {ana.procedimentoNome || 'Avaliação Clínica'}
                               </span>
                               <h6 className="text-xs font-bold text-slate-900 mt-1">
-                                {ana.dadosPessoais?.nomeCompleto || paciente.nome}
+                                {ana.dadosPessoais?.nomeCompleto || paciente.nome || 'Cliente'}
                               </h6>
                               <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
                                 <Clock className="w-3 h-3" />
-                                {ana.criadoEm ? new Date(ana.criadoEm).toLocaleString('pt-BR') : '-'}
+                                {ana.criadoEm ? parseDate(ana.criadoEm).toLocaleString('pt-BR') : '-'}
                               </span>
                             </div>
 
@@ -1075,7 +1088,7 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
                             <h5 className="text-xs font-bold text-slate-900">{evo.procedimento_nome}</h5>
                           </div>
                           <span className="text-[11px] text-slate-500 font-medium">
-                            {new Date(evo.data).toLocaleDateString('pt-BR')} • {evo.profissional_nome}
+                            {parseDate(evo.data).toLocaleDateString('pt-BR')} • {evo.profissional_nome}
                           </span>
                         </div>
 
@@ -1391,7 +1404,7 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
                                 {foto.procedimento_nome || foto.procedimento || foto.titulo || 'Procedimento Clínico'}
                               </h5>
                               <span className="text-[11px] text-slate-500 font-medium">
-                                {foto.data ? new Date(foto.data).toLocaleDateString('pt-BR') : 'Data não informada'}
+                                {foto.data ? parseDate(foto.data).toLocaleDateString('pt-BR') : 'Data não informada'}
                               </span>
                             </div>
 
@@ -1549,7 +1562,7 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
                 ) : (
                   <div className="space-y-2">
                     {pacienteAgendamentos.map((ag) => {
-                      const dt = new Date(ag.data_hora);
+                      const dt = parseDate(ag.data_hora);
                       const dateStr = isNaN(dt.getTime()) ? '--/--/----' : dt.toLocaleDateString('pt-BR');
                       const timeStr = isNaN(dt.getTime()) ? '--:--' : dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
@@ -1604,7 +1617,7 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
                       </div>
                     )}
                     <div className="text-[11px] text-emerald-700">
-                      Assinado em {new Date(termoConsentimento.data_assinatura).toLocaleString('pt-BR')} por {termoConsentimento.nome_paciente_declarado}
+                      Assinado em {parseDate(termoConsentimento.data_assinatura).toLocaleString('pt-BR')} por {termoConsentimento.nome_paciente_declarado || paciente.nome || 'Cliente'}
                     </div>
                   </div>
                 ) : (

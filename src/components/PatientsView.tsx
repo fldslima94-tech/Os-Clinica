@@ -37,8 +37,21 @@ interface PatientsViewProps {
   currentUser?: UsuarioEquipe;
 }
 
+export const parseDate = (d: any): Date => {
+  if (!d) return new Date();
+  if (typeof d?.toDate === 'function') {
+    try {
+      return d.toDate();
+    } catch {
+      return new Date();
+    }
+  }
+  const parsed = new Date(d);
+  return isNaN(parsed.getTime()) ? new Date() : parsed;
+};
+
 export const PatientsView: React.FC<PatientsViewProps> = ({
-  pacientes,
+  pacientes = [],
   onOpenNewPatient,
   onOpenNewAnamnese,
   onViewPatient,
@@ -51,25 +64,34 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
   const [search, setSearch] = useState('');
   const [patientToDelete, setPatientToDelete] = useState<Paciente | null>(null);
 
-  const filteredPacientes = pacientes.filter(p => {
+  // Blindagem contra documentos nulos ou corrompidos
+  const safePacientes = (pacientes || []).filter(p => Boolean(p && (p.nome || p.telefone)));
+
+  const filteredPacientes = safePacientes.filter(p => {
     const q = search.toLowerCase().trim();
+    const nome = (p.nome || '').toLowerCase();
+    const telefone = (p.telefone || '');
+    const email = (p.email || '').toLowerCase();
+    const cpf = (p.cpf || '');
+    const historico = (p.historico_clinico || '').toLowerCase();
+
     return (
       !q ||
-      p.nome.toLowerCase().includes(q) ||
-      p.telefone.includes(q) ||
-      (p.email && p.email.toLowerCase().includes(q)) ||
-      (p.cpf && p.cpf.includes(q)) ||
-      (p.historico_clinico && p.historico_clinico.toLowerCase().includes(q))
+      nome.includes(q) ||
+      telefone.includes(q) ||
+      email.includes(q) ||
+      cpf.includes(q) ||
+      historico.includes(q)
     );
   });
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return '-';
+  const formatDate = (dateValue?: any) => {
+    if (!dateValue) return '-';
     try {
-      const d = new Date(dateString);
+      const d = parseDate(dateValue);
       return d.toLocaleDateString('pt-BR');
     } catch {
-      return dateString;
+      return String(dateValue);
     }
   };
 
@@ -141,10 +163,12 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredPacientes.map((paciente) => {
-            const age = calcularIdade(paciente.data_nascimento);
+            const age = paciente.data_nascimento ? calcularIdade(paciente.data_nascimento) : '';
             const totalFotos = (paciente.fotos_antes_depois?.length || 0) + (paciente.galeria_clinica?.length || 0);
             const totalEvolucoes = paciente.evolucoes_retornos?.length || 0;
             const totalAnamneses = paciente.anamneses_completas?.length || 0;
+            const nomeExibicao = paciente.nome || 'Cliente';
+            const inicial = (paciente.nome || 'Cliente').charAt(0).toUpperCase();
 
             return (
               <div
@@ -154,7 +178,7 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-3">
                     <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm">
-                      {paciente.nome.charAt(0).toUpperCase()}
+                      {inicial}
                     </div>
 
                     <div className="flex items-center gap-1.5 flex-wrap justify-end">
@@ -183,19 +207,19 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
                     collectionName={COLLECTIONS.PACIENTES}
                     documentId={paciente.id}
                     fieldKey="nome"
-                    value={paciente.nome}
+                    value={nomeExibicao}
                     allowDelete={true}
-                    deleteLabel={paciente.nome}
+                    deleteLabel={nomeExibicao}
                   >
                     <h3 className="text-base font-bold text-slate-900 line-clamp-1">
-                      {paciente.nome}
+                      {nomeExibicao}
                     </h3>
                   </MasterEditableText>
 
                   <div className="mt-2 space-y-1.5 text-xs text-slate-600">
                     <div className="flex items-center gap-2">
                       <Phone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span className="font-semibold text-slate-800">{paciente.telefone}</span>
+                      <span className="font-semibold text-slate-800">{paciente.telefone || 'Sem telefone'}</span>
                     </div>
 
                     {paciente.data_nascimento && (
@@ -263,7 +287,7 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
           }}
           title="Excluir Ficha de Cliente"
           description={`Tem certeza que deseja excluir o cadastro do cliente? Esta operação será registrada no log de auditoria.`}
-          itemName={patientToDelete.nome}
+          itemName={patientToDelete.nome || 'Cliente'}
           itemCategory="Ficha de Cliente / Prontuário"
           requireReason={true}
         />

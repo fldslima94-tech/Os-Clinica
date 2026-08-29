@@ -236,26 +236,43 @@ export async function executeAtomicCheckout(params: {
   const newTransacaoId = `tx-${Date.now()}`;
   const supplies = params.insumosUsados || params.insumosConsumidos || [];
   const clinicaId = params.clinicaId || 'clinica-matriz';
-  const valor = params.valorPago ?? params.transacao?.valor ?? 0;
   const forma = params.formaPagamento || params.transacao?.forma_pagamento || 'pix';
   const status = params.statusPagamento || params.transacao?.status || 'pago';
   const pacienteNome = params.pacienteNome || params.transacao?.paciente_nome || 'Cliente';
   const procedimentoNome = params.procedimentoNome || params.transacao?.procedimento || 'Procedimento Estético';
   const profNome = params.profissionalNome || params.transacao?.profissional_nome || 'Profissional';
 
+  // Standardize tipo to 'entrada' or 'saida'
+  const rawTipo = params.transacao?.tipo || 'entrada';
+  const standardizedTipo: 'entrada' | 'saida' = (rawTipo === 'receita' || rawTipo === 'entrada') ? 'entrada' : 'saida';
+
   try {
+    let transactionCreated = false;
+
     await runTransaction(db, async (transaction) => {
       // 1. Fetch & Verify Appointment safely
       const agRef = doc(db, COLLECTIONS.AGENDAMENTOS, params.agendamentoId);
       let agObs = params.observacoes || '';
+      let alreadyPaidAtCheckin = false;
+      let existingValor = 0;
+
       try {
         const agDoc = await transaction.get(agRef);
-        if (agDoc.exists() && !params.observacoes) {
-          agObs = agDoc.data().observacoes || '';
+        if (agDoc.exists()) {
+          const agData = agDoc.data();
+          if (!params.observacoes) {
+            agObs = agData.observacoes || '';
+          }
+          if (agData.status_pagamento === 'pago' || agData.pagamento_registrado_no_caixa === true) {
+            alreadyPaidAtCheckin = true;
+          }
+          existingValor = Number(agData.valor_estimado || agData.valor || 0);
         }
       } catch (err) {
         console.warn('[Transaction Agendamento Read]', err);
       }
+
+      const valorFinal = alreadyPaidAtCheckin ? 0 : (params.valorPago ?? params.transacao?.valor ?? 0);
       
       // 2. Fetch inventory items to verify and debit
       const inventoryUpdates: { ref: any; newQty: number }[] = [];
@@ -281,7 +298,7 @@ export async function executeAtomicCheckout(params: {
       // A. Update appointment status strictly to 'concluido'
       transaction.set(agRef, {
         status: 'concluido',
-        valor_estimado: valor > 0 ? valor : undefined,
+        valor_estimado: (valorFinal > 0 ? valorFinal : existingValor) || undefined,
         forma_pagamento: forma,
         status_pagamento: status,
         insumos_consumidos: supplies,
@@ -295,8 +312,8 @@ export async function executeAtomicCheckout(params: {
         transaction.update(update.ref, { quantidade: update.newQty });
       }
 
-      // C. Create Financial Transaction (Cash Inflow) ONLY if valor > 0
-      if (valor > 0) {
+      // C. Create Financial Transaction (Cash Inflow) ONLY if valor > 0 and NOT already settled
+      if (valorFinal > 0 && !alreadyPaidAtCheckin) {
         const txRef = doc(db, COLLECTIONS.TRANSACOES, newTransacaoId);
         const totalCustoInsumos = supplies.reduce((sum, item) => sum + ((item.custo_unitario || 0) * (item.quantidade_utilizada || item.quantidade || 1)), 0);
         
@@ -309,25 +326,27 @@ export async function executeAtomicCheckout(params: {
           profissional_id: params.profissionalId || params.transacao?.profissional_id,
           profissional_nome: profNome,
           procedimento: procedimentoNome,
-          valor: valor,
+          valor: valorFinal,
           custo_insumos: totalCustoInsumos,
           forma_pagamento: forma,
           status: status,
           data: new Date().toISOString(),
-          tipo: 'entrada',
+          tipo: standardizedTipo,
           categoria: 'atendimento',
           observacao: params.observacoes || params.transacao?.observacao || `Atendimento concluído - ${procedimentoNome}`,
           excluido: false
         };
         transaction.set(txRef, newTx);
+        transactionCreated = true;
       }
     });
 
-    return { success: true, transacaoId: valor > 0 ? newTransacaoId : undefined };
+    return { success: true, transacaoId: transactionCreated ? newTransacaoId : undefined };
   } catch (error) {
     console.warn('[executeAtomicCheckout fallback direct save]', error);
     // Direct Fallback Persistence to ensure status 'concluido' is ALWAYS applied
     try {
+      const valor = params.valorPago ?? params.transacao?.valor ?? 0;
       await saveDocument(COLLECTIONS.AGENDAMENTOS, {
         id: params.agendamentoId,
         status: 'concluido',
@@ -337,7 +356,7 @@ export async function executeAtomicCheckout(params: {
         insumos_utilizados: supplies,
         concluido_em: new Date().toISOString()
       });
-      if (valor > 0) {
+      if (valor > 0 && params.statusPagamento !== 'pago') {
         await saveDocument(COLLECTIONS.TRANSACOES, {
           id: newTransacaoId,
           clinica_id: clinicaId,
@@ -349,7 +368,7 @@ export async function executeAtomicCheckout(params: {
           forma_pagamento: forma,
           status: status,
           data: new Date().toISOString(),
-          tipo: 'entrada',
+          tipo: standardizedTipo,
           categoria: 'atendimento',
           excluido: false
         });
@@ -805,29 +824,35 @@ export async function excluirUsuario(usuarioId: string): Promise<{ success: bool
 }
 
 // Permission & Role Helper Checking Utilities (Hierarquia: Admin Master > Admin Local > Usuário > Cliente)
+export const SUPER_ADMIN_EMAILS = [
+  'fldslima94@gmail.com',
+  'fabio@teste.com'
+];
+
 export function isUserAdminTotal(user?: UsuarioEquipe | null): boolean {
   if (!user) return false;
   const userEmail = (user.email || '').toLowerCase().trim();
+  if (SUPER_ADMIN_EMAILS.includes(userEmail)) return true;
   const userName = (user.nome || user.nomeCompleto || '').toLowerCase().trim();
   const userRole = (user.role || '').toLowerCase().trim();
   const userCargo = (user.cargo || '').toLowerCase().trim();
   
   return (
-    userRole === 'admin_master' || 
     userRole === 'admin_total' || 
+    userRole === 'admin_master' || 
     userRole === 'admin' || 
     userRole === 'master' ||
     userRole === 'super_admin' ||
     user.id === 'user-super-admin' ||
     user.id === 'user-super-admin-alt' ||
-    userEmail === 'fldslima94@gmail.com' ||
-    userEmail === 'fabio@teste.com' ||
     userName === 'fabio lima' ||
     userName.includes('fabio lima') ||
-    userCargo.includes('master') ||
-    userCargo.includes('super admin') ||
-    userCargo.includes('administrador geral') ||
-    userCargo.includes('admin total')
+    Boolean(userCargo && (
+      userCargo.includes('master') || 
+      userCargo.includes('super admin') || 
+      userCargo.includes('administrador geral') || 
+      userCargo.includes('admin total')
+    ))
   );
 }
 
@@ -837,10 +862,10 @@ export function isUserAdminMaster(user?: UsuarioEquipe | null): boolean {
 
 export function isUserAdminLocalOrTotal(user?: UsuarioEquipe | null): boolean {
   if (!user) return false;
+  if (isUserAdminTotal(user)) return true;
   const userRole = (user.role || '').toLowerCase().trim();
   const userCargo = (user.cargo || '').toLowerCase().trim();
   return (
-    isUserAdminTotal(user) || 
     userRole === 'admin_local' || 
     userRole === 'gestor' ||
     userCargo.includes('admin local') ||

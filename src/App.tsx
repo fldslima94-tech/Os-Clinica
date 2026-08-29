@@ -96,6 +96,7 @@ import {
   onFirebaseAuthStateChange,
   logoutFirebase,
   ensureSuperAdminInFirestore,
+  SUPER_ADMIN_EMAILS,
   COLLECTIONS 
 } from './services/firebaseService';
 
@@ -123,7 +124,32 @@ function getInitialUser(): UsuarioEquipe {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.id) return parsed;
+        if (parsed && parsed.id) {
+          if (isUserAdminTotal(parsed)) {
+            return {
+              ...parsed,
+              role: 'admin_total',
+              permissoes: {
+                ver_financeiro_completo: true,
+                emitir_recibo: true,
+                editar_prontuario_clinico: true,
+                gerenciar_estoque_custos: true,
+                configuracoes_sistema: true,
+                visualizar_bens_ativos: true,
+              },
+              permissoesCustomizadas: {
+                financeiro: { verEntradas: true, verSaidas: true, verRecorrentes: true, excluir: true, verRelatorios: true },
+                clientes: { criar: true, editar: true, excluir: true, verHistorico: true, preencherAnamnese: true },
+                agenda: { verTodos: true, verPropria: true, criar: true, cancelar: true, finalizar: true },
+                procedimentos: { verCustos: true, verMargem: true, criar: true, excluir: true, ajustarEstoque: true },
+                bens: { visualizar: true, cadastrar: true, editar: true, gerenciar: true, excluir: true, manutencao: true },
+                estoque: { ajustar: true, excluir: true },
+                orcamentos: { verTodos: true, responder: true, verEmails: true }
+              }
+            };
+          }
+          return parsed;
+        }
       } catch (e) {
         console.warn('Erro ao carregar usuário salvo:', e);
       }
@@ -514,6 +540,44 @@ export default function App() {
         } catch (e) {
           // ignore
         }
+
+        const cleanEmail = (fbUser.email || '').toLowerCase().trim();
+        const isSuper = SUPER_ADMIN_EMAILS.includes(cleanEmail) || cleanEmail.includes('fabio');
+
+        if (isSuper) {
+          setCurrentUser(prev => {
+            const updated: UsuarioEquipe = {
+              ...prev,
+              email: cleanEmail,
+              nome: fbUser.displayName || prev.nome || 'Fabio Lima',
+              nomeCompleto: fbUser.displayName || prev.nomeCompleto || 'Fabio Lima',
+              role: 'admin_total',
+              cargo: 'Super Admin (Master)',
+              profissao: prev.profissao || 'Proprietário & Administrador Geral',
+              permissoes: {
+                ver_financeiro_completo: true,
+                emitir_recibo: true,
+                editar_prontuario_clinico: true,
+                gerenciar_estoque_custos: true,
+                configuracoes_sistema: true,
+                visualizar_bens_ativos: true,
+              },
+              permissoesCustomizadas: {
+                financeiro: { verEntradas: true, verSaidas: true, verRecorrentes: true, excluir: true, verRelatorios: true },
+                clientes: { criar: true, editar: true, excluir: true, verHistorico: true, preencherAnamnese: true },
+                agenda: { verTodos: true, verPropria: true, criar: true, cancelar: true, finalizar: true },
+                procedimentos: { verCustos: true, verMargem: true, criar: true, excluir: true, ajustarEstoque: true },
+                bens: { visualizar: true, cadastrar: true, editar: true, gerenciar: true, excluir: true, manutencao: true },
+                estoque: { ajustar: true, excluir: true },
+                orcamentos: { verTodos: true, responder: true, verEmails: true }
+              }
+            };
+            try {
+              localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(updated));
+            } catch (e) {}
+            return updated;
+          });
+        }
       }
     });
     return () => unsubscribe();
@@ -567,8 +631,11 @@ export default function App() {
 
     const patient = pacientes.find(p => p.id === targetAgendamento.paciente_id) || targetAgendamento.paciente;
 
-    // Se já foi pago e lançado no Check-In, NÃO gera nova receita duplicada no caixa
-    const jaLancadoNoCheckIn = Boolean(targetAgendamento.pagamento_registrado_no_caixa);
+    // Se já foi pago e liquidado no Check-In (ou status_pagamento já é 'pago'), NÃO gera nova receita duplicada no caixa
+    const jaLancadoNoCheckIn = Boolean(
+      targetAgendamento.pagamento_registrado_no_caixa ||
+      targetAgendamento.status_pagamento === 'pago'
+    );
     const valorALancar = jaLancadoNoCheckIn ? 0 : (Number(pagamento.valor) || 0);
 
     // Normalize supplies array with both quantidade and quantidade_utilizada
@@ -1115,12 +1182,15 @@ export default function App() {
 
   // Financial Handlers
   const handleAddTransaction = (nova: Partial<TransacaoFinanceira>) => {
+    const rawTipo = nova.tipo || 'entrada';
+    const standardizedTipo: 'entrada' | 'saida' = (rawTipo === 'receita' || rawTipo === 'entrada') ? 'entrada' : 'saida';
+
     const created: TransacaoFinanceira = {
       id: nova.id || `tx-${Date.now()}`,
       paciente_nome: nova.paciente_nome || 'Cliente / Fornecedor',
       procedimento: nova.procedimento || 'Lançamento Manual',
       valor: nova.valor || 0,
-      tipo: nova.tipo || 'receita',
+      tipo: standardizedTipo,
       forma_pagamento: nova.forma_pagamento || 'pix',
       status: nova.status || 'pago',
       data: nova.data || new Date().toISOString(),
