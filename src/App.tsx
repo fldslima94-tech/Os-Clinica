@@ -634,12 +634,9 @@ export default function App() {
 
     const patient = pacientes.find(p => p.id === targetAgendamento.paciente_id) || targetAgendamento.paciente;
 
-    // Se já foi pago e liquidado no Check-In (ou status_pagamento já é 'pago'), NÃO gera nova receita duplicada no caixa
-    const jaLancadoNoCheckIn = Boolean(
-      targetAgendamento.pagamento_registrado_no_caixa ||
-      targetAgendamento.status_pagamento === 'pago'
-    );
-    const valorALancar = jaLancadoNoCheckIn ? 0 : (Number(pagamento.valor) || 0);
+    // Se já foi pago e liquidado no Check-In, NÃO gera nova receita duplicada no caixa
+    const jaLancadoNoCheckIn = Boolean(targetAgendamento.pagamento_registrado_no_caixa === true);
+    const valorALancar = jaLancadoNoCheckIn ? 0 : (Number(pagamento.valor) || Number(targetAgendamento.valor_estimado) || 0);
 
     // Normalize supplies array with both quantidade and quantidade_utilizada
     const normalizedSupplies: InsumoConsumido[] = insumosUsados.map(i => ({

@@ -437,7 +437,7 @@ export async function executeAtomicCheckout(params: {
           if (!params.observacoes) {
             agObs = agData.observacoes || '';
           }
-          if (agData.status_pagamento === 'pago' || agData.pagamento_registrado_no_caixa === true) {
+          if (agData.pagamento_registrado_no_caixa === true) {
             alreadyPaidAtCheckin = true;
           }
           existingValor = Number(agData.valor_estimado || agData.valor || 0);
@@ -446,7 +446,7 @@ export async function executeAtomicCheckout(params: {
         console.warn('[Transaction Agendamento Read]', err);
       }
 
-      const valorFinal = alreadyPaidAtCheckin ? 0 : (params.valorPago ?? params.transacao?.valor ?? 0);
+      const valorFinal = alreadyPaidAtCheckin ? 0 : (params.valorPago ?? params.transacao?.valor ?? existingValor ?? 0);
       
       // 2. Fetch inventory items to verify and debit
       const inventoryUpdates: { ref: any; newQty: number }[] = [];
@@ -530,7 +530,7 @@ export async function executeAtomicCheckout(params: {
         insumos_utilizados: supplies,
         concluido_em: new Date().toISOString()
       });
-      if (valor > 0 && params.statusPagamento !== 'pago') {
+      if (valor > 0) {
         await saveDocument(COLLECTIONS.TRANSACOES, {
           id: newTransacaoId,
           clinica_id: clinicaId,

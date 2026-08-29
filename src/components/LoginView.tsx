@@ -171,8 +171,12 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
     setIsLoading(true);
 
-    // 1. Busca local nos usuários já carregados
-    let userFound = allAvailableUsers.find(u => (u.email || '').toLowerCase().trim() === cleanEmail);
+    // 1. Busca local nos usuários já carregados (por e-mail ou nome)
+    let userFound = allAvailableUsers.find(u => {
+      const uEmail = (u.email || '').toLowerCase().trim();
+      const uNome = (u.nome || u.nomeCompleto || '').toLowerCase().trim();
+      return uEmail === cleanEmail || uNome === cleanEmail;
+    });
 
     // 2. Se não encontrar na memória local (ex: usuário recém-criado em outro navegador), busca diretamente no Firestore
     if (!userFound) {
@@ -199,7 +203,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
         id: 'user-super-admin',
         nome: 'Fabio Lima',
         nomeCompleto: 'Fabio Lima',
-        email: cleanEmail,
+        email: cleanEmail.includes('@') ? cleanEmail : 'fldslima94@gmail.com',
         senha: 'admin123',
         cargo: 'Super Admin (Master)',
         profissao: 'Proprietário & Administrador Geral',
@@ -516,9 +520,42 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
           </form>
 
+          {/* Quick Access Credentials / Fast Login */}
+          <div className="mt-5 pt-4 border-t border-slate-100">
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 text-center">
+              Acesso Rápido por Perfil
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('fldslima94@gmail.com');
+                  setSenha('admin123');
+                  setErrorMessage(null);
+                }}
+                className="p-2 text-left bg-indigo-50/70 hover:bg-indigo-100/70 border border-indigo-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <span className="block text-[11px] font-bold text-indigo-900">Fabio Lima</span>
+                <span className="block text-[10px] text-indigo-600">Super Admin Master</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('camila@aura.com');
+                  setSenha('admin123');
+                  setErrorMessage(null);
+                }}
+                className="p-2 text-left bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer"
+              >
+                <span className="block text-[11px] font-bold text-slate-800">Dra. Camila</span>
+                <span className="block text-[10px] text-slate-500">Admin Biomédica</span>
+              </button>
+            </div>
+          </div>
+
           {/* Security Note Footer */}
-          <div className="mt-6 pt-4 border-t border-slate-100 text-center text-[11px] text-slate-500">
-            <span>Acesso restrito a usuários com perfis autorizados (Admin, Operador e Cliente).</span>
+          <div className="mt-4 text-center text-[11px] text-slate-500">
+            <span>Acesso seguro com sincronização em tempo real via Firestore.</span>
           </div>
 
         </div>

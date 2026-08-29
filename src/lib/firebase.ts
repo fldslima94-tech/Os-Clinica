@@ -5,14 +5,20 @@ import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
+const targetDbId = (firebaseConfig as any).firestoreDatabaseId || '(default)';
+
 export const db = (() => {
   try {
-    return initializeFirestore(app, {
-      experimentalAutoDetectLongPolling: true,
-      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-    }, '(default)');
+    return initializeFirestore(
+      app,
+      {
+        experimentalAutoDetectLongPolling: true,
+        localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+      },
+      targetDbId
+    );
   } catch {
-    return getFirestore(app);
+    return getFirestore(app, targetDbId);
   }
 })();
 
