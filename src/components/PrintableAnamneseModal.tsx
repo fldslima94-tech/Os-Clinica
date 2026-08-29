@@ -35,9 +35,9 @@ export const PrintableAnamneseModal: React.FC<PrintableAnamneseModalProps> = ({
     window.print();
   };
 
-  const dp = anamnese.dadosPessoais;
-  const sg = anamnese.saudeGeral;
-  const proc = anamnese.detalhesProcedimento;
+  const dp = anamnese.dadosPessoais || ({} as any);
+  const sg = anamnese.saudeGeral || ({} as any);
+  const proc = anamnese.detalhesProcedimento || ({} as any);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/70 backdrop-blur-xs overflow-y-auto print:p-0 print:bg-white print:static">

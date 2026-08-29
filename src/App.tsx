@@ -160,18 +160,18 @@ export default function App() {
 
   // Application State synchronized in Real-Time via Cloud Firestore
   const [clinicaConfig, setClinicaConfig] = useState<ClinicaConfig>(MOCK_CLINICA_CONFIG);
-  const [pacientes, setPacientes] = useState<Paciente[]>(MOCK_PACIENTES);
-  const [agendamentos, setAgendamentos] = useState<Agendamento[]>(MOCK_AGENDAMENTOS);
-  const [estoque, setEstoque] = useState<EstoqueInsumo[]>(MOCK_ESTOQUE);
-  const [bensPatrimoniais, setBensPatrimoniais] = useState<BemPatrimonial[]>(MOCK_BENS_PATRIMONIAIS);
-  const [procedimentos, setProcedimentos] = useState<ProcedimentoClinico[]>(MOCK_PROCEDIMENTOS);
-  const [orcamentos, setOrcamentos] = useState<SolicitacaoOrcamento[]>(MOCK_ORCAMENTOS);
-  const [transacoes, setTransacoes] = useState<TransacaoFinanceira[]>(MOCK_TRANSACOES);
-  const [despesasRecorrentes, setDespesasRecorrentes] = useState<DespesaRecorrente[]>(MOCK_DESPESAS_RECORRENTES);
-  const [fornecedores, setFornecedores] = useState<Fornecedor[]>(MOCK_FORNECEDORES);
-  const [usuarios, setUsuarios] = useState<UsuarioEquipe[]>(MOCK_USUARIOS);
-  const [avisos, setAvisos] = useState<AvisoQuadro[]>(MOCK_AVISOS);
-  const [alertasRetorno, setAlertasRetorno] = useState<AlertaRetornoPos[]>(MOCK_ALERTAS_RETORNO);
+  const [pacientes, setPacientes] = useState<Paciente[]>([]);
+  const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
+  const [estoque, setEstoque] = useState<EstoqueInsumo[]>([]);
+  const [bensPatrimoniais, setBensPatrimoniais] = useState<BemPatrimonial[]>([]);
+  const [procedimentos, setProcedimentos] = useState<ProcedimentoClinico[]>([]);
+  const [orcamentos, setOrcamentos] = useState<SolicitacaoOrcamento[]>([]);
+  const [transacoes, setTransacoes] = useState<TransacaoFinanceira[]>([]);
+  const [despesasRecorrentes, setDespesasRecorrentes] = useState<DespesaRecorrente[]>([]);
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
+  const [usuarios, setUsuarios] = useState<UsuarioEquipe[]>([MOCK_USUARIOS[0], MOCK_USUARIOS[1]]);
+  const [avisos, setAvisos] = useState<AvisoQuadro[]>([]);
+  const [alertasRetorno, setAlertasRetorno] = useState<AlertaRetornoPos[]>([]);
   const [configuracaoCampos, setConfiguracaoCampos] = useState<ConfiguracaoCampos>({
     clinicaId: 'config_matriz',
     camposOcultos: [],
@@ -275,24 +275,7 @@ export default function App() {
 
   // Firebase Cloud Firestore Real-Time Synchronizations (onSnapshot)
   useEffect(() => {
-    // Seed initial dataset into Cloud Firestore if not already seeded
-    seedInitialFirestoreData({
-      clinica_config: MOCK_CLINICA_CONFIG,
-      pacientes: MOCK_PACIENTES,
-      agendamentos: MOCK_AGENDAMENTOS,
-      estoque: MOCK_ESTOQUE,
-      procedimentos: MOCK_PROCEDIMENTOS,
-      orcamentos: MOCK_ORCAMENTOS,
-      transacoes: MOCK_TRANSACOES,
-      despesas_recorrentes: MOCK_DESPESAS_RECORRENTES,
-      bens: MOCK_BENS_PATRIMONIAIS,
-      usuarios: MOCK_USUARIOS,
-      avisos: MOCK_AVISOS,
-      alertas_retorno: MOCK_ALERTAS_RETORNO,
-      fornecedores: MOCK_FORNECEDORES
-    });
-
-    // Auto-heal super admin credentials in Firestore
+    // Auto-heal super admin master credentials in Firestore
     ensureSuperAdminInFirestore();
 
     // Real-Time onSnapshot Collection Subscriptions
@@ -309,62 +292,62 @@ export default function App() {
     const unsubPacientes = subscribeToCollection<Paciente>(
       COLLECTIONS.PACIENTES, 
       (data) => setPacientes(data), 
-      MOCK_PACIENTES
+      []
     );
 
     const unsubFornecedores = subscribeToCollection<Fornecedor>(
       COLLECTIONS.FORNECEDORES, 
       (data) => setFornecedores(data), 
-      MOCK_FORNECEDORES
+      []
     );
 
     const unsubAgendamentos = subscribeToCollection<Agendamento>(
       COLLECTIONS.AGENDAMENTOS, 
       (data) => setAgendamentos(data), 
-      MOCK_AGENDAMENTOS
+      []
     );
 
     const unsubEstoque = subscribeToCollection<EstoqueInsumo>(
       COLLECTIONS.ESTOQUE, 
       (data) => setEstoque(data), 
-      MOCK_ESTOQUE
+      []
     );
 
     const unsubBens = subscribeToCollection<BemPatrimonial>(
       COLLECTIONS.BENS, 
       (data) => setBensPatrimoniais(data), 
-      MOCK_BENS_PATRIMONIAIS
+      []
     );
 
     const unsubProcedimentos = subscribeToCollection<ProcedimentoClinico>(
       COLLECTIONS.PROCEDIMENTOS, 
       (data) => setProcedimentos(data), 
-      MOCK_PROCEDIMENTOS
+      []
     );
 
     const unsubOrcamentos = subscribeToCollection<SolicitacaoOrcamento>(
       COLLECTIONS.ORCAMENTOS, 
       (data) => setOrcamentos(data), 
-      MOCK_ORCAMENTOS
+      []
     );
 
     const unsubTransacoes = subscribeToCollection<TransacaoFinanceira>(
       COLLECTIONS.TRANSACOES, 
       (data) => setTransacoes(data), 
-      MOCK_TRANSACOES
+      []
     );
 
     const unsubDespesas = subscribeToCollection<DespesaRecorrente>(
       COLLECTIONS.DESPESAS_RECORRENTES, 
       (data) => setDespesasRecorrentes(data), 
-      MOCK_DESPESAS_RECORRENTES
+      []
     );
 
     const unsubUsuarios = subscribeToCollection<UsuarioEquipe>(
       COLLECTIONS.USUARIOS, 
       (data) => {
         if (!data || data.length === 0) {
-          setUsuarios(MOCK_USUARIOS);
+          setUsuarios([MOCK_USUARIOS[0], MOCK_USUARIOS[1]]);
           return;
         }
 
@@ -430,19 +413,19 @@ export default function App() {
           return prevUser;
         });
       }, 
-      MOCK_USUARIOS
+      [MOCK_USUARIOS[0], MOCK_USUARIOS[1]]
     );
 
     const unsubAvisos = subscribeToCollection<AvisoQuadro>(
       COLLECTIONS.AVISOS, 
       (data) => setAvisos(data), 
-      MOCK_AVISOS
+      []
     );
 
     const unsubAlertas = subscribeToCollection<AlertaRetornoPos>(
       COLLECTIONS.ALERTAS_RETORNO, 
       (data) => setAlertasRetorno(data), 
-      MOCK_ALERTAS_RETORNO
+      []
     );
 
     const unsubConfigCampos = subscribeToCollection<ConfiguracaoCampos>(
@@ -584,6 +567,10 @@ export default function App() {
 
     const patient = pacientes.find(p => p.id === targetAgendamento.paciente_id) || targetAgendamento.paciente;
 
+    // Se já foi pago e lançado no Check-In, NÃO gera nova receita duplicada no caixa
+    const jaLancadoNoCheckIn = Boolean(targetAgendamento.pagamento_registrado_no_caixa);
+    const valorALancar = jaLancadoNoCheckIn ? 0 : (Number(pagamento.valor) || 0);
+
     // Normalize supplies array with both quantidade and quantidade_utilizada
     const normalizedSupplies: InsumoConsumido[] = insumosUsados.map(i => ({
       ...i,
@@ -594,53 +581,23 @@ export default function App() {
     const updatedCompletedAgendamento: Agendamento = {
       ...targetAgendamento,
       status: 'concluido' as StatusAgendamento,
-      valor_estimado: pagamento.valor,
+      valor_estimado: pagamento.valor || targetAgendamento.valor_estimado,
       forma_pagamento: pagamento.forma,
       status_pagamento: pagamento.status,
       insumos_utilizados: normalizedSupplies,
       insumos_consumidos: normalizedSupplies,
+      concluido_em: new Date().toISOString(),
       observacoes: pagamento.observacao 
         ? `${targetAgendamento.observacoes ? targetAgendamento.observacoes + ' | ' : ''}Checkout: ${pagamento.observacao}`
         : targetAgendamento.observacoes,
     };
 
-    // 1. Update Local States immediately to guarantee removal from 'em_espera' queue
+    // 1. Atualização otimista no estado
     setAgendamentos(prev =>
       prev.map(a => (a.id === targetAgendamento.id ? updatedCompletedAgendamento : a))
     );
 
-    // 2. Persist appointment directly in Firestore with status 'concluido'
-    await saveDocument(COLLECTIONS.AGENDAMENTOS, updatedCompletedAgendamento);
-
-    // 3. Execute atomic checkout (Stock debit + Transaction)
-    try {
-      await executeAtomicCheckout({
-        agendamentoId: targetAgendamento.id,
-        pacienteId: targetAgendamento.paciente_id,
-        pacienteNome: patient?.nome || 'Cliente',
-        procedimentoNome: targetAgendamento.procedimento,
-        profissionalId: targetAgendamento.profissional_id,
-        profissionalNome: targetAgendamento.profissional_nome || currentUser.nome,
-        valorPago: pagamento.valor,
-        formaPagamento: pagamento.forma,
-        statusPagamento: pagamento.status,
-        insumosConsumidos: normalizedSupplies,
-        observacoes: pagamento.observacao,
-        transacao: {
-          paciente_nome: patient?.nome || 'Cliente',
-          procedimento: targetAgendamento.procedimento,
-          valor: pagamento.valor,
-          tipo: 'receita',
-          forma_pagamento: pagamento.forma,
-          status: pagamento.status,
-          profissional_nome: targetAgendamento.profissional_nome || currentUser.nome,
-          observacao: pagamento.observacao,
-        }
-      });
-    } catch (err) {
-      console.warn('[executeAtomicCheckout error in handleSaveProcedureCompletion]', err);
-    }
-
+    // 2. Débito otimista de estoque
     setEstoque(prev =>
       prev.map(item => {
         const consumed = normalizedSupplies.find(c => c.insumo_id === item.id);
@@ -655,24 +612,60 @@ export default function App() {
       })
     );
 
-    const newTx: TransacaoFinanceira = {
-      id: `tx-${Date.now()}`,
-      paciente_id: targetAgendamento.paciente_id,
-      paciente_nome: patient?.nome || 'Cliente',
-      procedimento: targetAgendamento.procedimento,
-      valor: pagamento.valor,
-      tipo: 'receita',
-      forma_pagamento: pagamento.forma,
-      status: pagamento.status,
-      data: new Date().toISOString(),
-      profissional_nome: targetAgendamento.profissional_nome || currentUser.nome,
-      observacao: pagamento.observacao,
-      excluido: false,
-    };
+    // 3. Se valorALancar > 0, atualiza transações localmente
+    if (valorALancar > 0) {
+      const newTx: TransacaoFinanceira = {
+        id: `tx-${Date.now()}`,
+        agendamento_id: targetAgendamento.id,
+        paciente_id: targetAgendamento.paciente_id,
+        paciente_nome: patient?.nome || 'Cliente',
+        procedimento: targetAgendamento.procedimento,
+        valor: valorALancar,
+        tipo: 'entrada',
+        categoria: 'atendimento',
+        forma_pagamento: pagamento.forma,
+        status: pagamento.status,
+        data: new Date().toISOString(),
+        profissional_nome: targetAgendamento.profissional_nome || currentUser.nome,
+        observacao: pagamento.observacao || 'Recebido na finalização do procedimento',
+        excluido: false,
+      };
+      setTransacoes(prev => [newTx, ...prev]);
+    }
 
-    setTransacoes(prev => [newTx, ...prev]);
+    // 4. Executa checkout atômico no Firestore
+    try {
+      await executeAtomicCheckout({
+        agendamentoId: targetAgendamento.id,
+        pacienteId: targetAgendamento.paciente_id,
+        pacienteNome: patient?.nome || 'Cliente',
+        procedimentoNome: targetAgendamento.procedimento,
+        profissionalId: targetAgendamento.profissional_id,
+        profissionalNome: targetAgendamento.profissional_nome || currentUser.nome,
+        valorPago: valorALancar,
+        formaPagamento: pagamento.forma,
+        statusPagamento: pagamento.status,
+        insumosConsumidos: normalizedSupplies,
+        observacoes: pagamento.observacao,
+        transacao: valorALancar > 0 ? {
+          agendamento_id: targetAgendamento.id,
+          paciente_id: targetAgendamento.paciente_id,
+          paciente_nome: patient?.nome || 'Cliente',
+          procedimento: targetAgendamento.procedimento,
+          valor: valorALancar,
+          tipo: 'entrada',
+          categoria: 'atendimento',
+          forma_pagamento: pagamento.forma,
+          status: pagamento.status,
+          profissional_nome: targetAgendamento.profissional_nome || currentUser.nome,
+          observacao: pagamento.observacao || 'Recebido na finalização do procedimento',
+        } : undefined
+      });
+    } catch (err) {
+      console.warn('[executeAtomicCheckout error in handleSaveProcedureCompletion]', err);
+    }
 
-    // If Return Appointment is suggested, schedule it directly
+    // Se Retorno for sugerido, agenda diretamente
     if (dataRetornoSugerida) {
       const returnAgendamento: Agendamento = {
         id: `ag-retorno-${Date.now()}`,
@@ -692,7 +685,7 @@ export default function App() {
       saveDocument(COLLECTIONS.AGENDAMENTOS, returnAgendamento);
       showToast(`Procedimento concluído e Retorno de ${patient?.nome} agendado com sucesso!`);
     } else {
-      showToast(`Procedimento concluído com baixa em ${normalizedSupplies.length} insumo(s) e receita registrada.`);
+      showToast(`Procedimento concluído com baixa em ${normalizedSupplies.length} insumo(s) e caixa atualizado.`);
     }
 
     setAppointmentToComplete(null);
@@ -720,6 +713,8 @@ export default function App() {
     if (!ag) return;
     const patientObj = ag.paciente || pacientes.find(p => p.id === ag.paciente_id);
 
+    const isPagoAgora = data.pagamento.status === 'pago' && Number(data.pagamento.valor) > 0;
+
     // 1. Atualizar agendamento para 'em_espera' na recepção com status de pagamento
     const updatedAg: Agendamento = {
       ...ag,
@@ -727,28 +722,31 @@ export default function App() {
       forma_pagamento: data.pagamento.forma,
       status_pagamento: data.pagamento.status,
       valor_estimado: data.pagamento.valor || ag.valor_estimado,
+      pagamento_registrado_no_caixa: isPagoAgora, // Flag de controle anti-duplicação
     };
     setAgendamentos(prev => prev.map(a => a.id === ag.id ? updatedAg : a));
-    saveDocument(COLLECTIONS.AGENDAMENTOS, updatedAg);
+    await saveDocument(COLLECTIONS.AGENDAMENTOS, updatedAg);
 
-    // 2. Registrar transação financeira caso valor positivo
-    if (data.pagamento.valor > 0) {
+    // 2. Registrar transação financeira caso valor positivo (Lançamento único)
+    if (isPagoAgora) {
       const novaTx: TransacaoFinanceira = {
         id: `tx-checkin-${Date.now()}`,
+        agendamento_id: ag.id,
         paciente_id: ag.paciente_id,
         paciente_nome: patientObj?.nome || 'Cliente',
         procedimento: ag.procedimento,
         valor: data.pagamento.valor,
-        tipo: 'receita',
+        tipo: 'entrada',
+        categoria: 'atendimento',
         forma_pagamento: data.pagamento.forma,
-        status: data.pagamento.status,
+        status: 'pago',
         data: new Date().toISOString(),
         profissional_nome: ag.profissional_nome || currentUser.nome,
-        observacao: data.pagamento.observacao || 'Pagamento confirmado no check-in da recepção.',
+        observacao: data.pagamento.observacao || 'Recebido no Check-in (Balcão)',
         excluido: false,
       };
-      setTransacoes(prev => [novaTx, ...prev]);
-      saveDocument(COLLECTIONS.TRANSACOES, novaTx);
+      setTransacoes(prev => [novaTx, ...prev.filter(t => t.id !== novaTx.id)]);
+      await saveDocument(COLLECTIONS.TRANSACOES, novaTx);
     }
 
     // 3. Agendar retorno caso solicitado
@@ -768,7 +766,7 @@ export default function App() {
         paciente: patientObj,
       };
       setAgendamentos(prev => [returnAg, ...prev]);
-      saveDocument(COLLECTIONS.AGENDAMENTOS, returnAg);
+      await saveDocument(COLLECTIONS.AGENDAMENTOS, returnAg);
       showToast(`Check-in de ${patientObj?.nome || 'paciente'} confirmado e retorno agendado com sucesso!`);
     } else {
       showToast(`Check-in de ${patientObj?.nome || 'paciente'} confirmado com sucesso!`);
@@ -841,80 +839,80 @@ export default function App() {
     }
   };
 
-  const handleSaveNovaAnamneseCompletaGlobal = (novaAnamnese: AnamneseCompleta) => {
+  const handleSaveNovaAnamneseCompletaGlobal = async (novaAnamnese: AnamneseCompleta) => {
     let target = pacientes.find(p => p.id === novaAnamnese.clienteId);
 
     if (!target) {
-      // Cria novo paciente se não existir
+      // 1. Monta o objeto completo do paciente com a anamnese vinculada
+      const dp = novaAnamnese.dadosPessoais || ({} as any);
+      const sg = novaAnamnese.saudeGeral || ({} as any);
+      const nomeFinal = (dp.nomeCompleto || 'Cliente').trim();
+      const telefoneFinal = (dp.telefone || '').trim();
+
       const newPac: Paciente = {
-        id: novaAnamnese.clienteId,
-        nome: novaAnamnese.dadosPessoais.nomeCompleto,
-        telefone: novaAnamnese.dadosPessoais.telefone,
-        data_nascimento: novaAnamnese.dadosPessoais.dataNascimento,
-        email: novaAnamnese.dadosPessoais.email,
-        endereco: novaAnamnese.dadosPessoais.endereco,
-        profissao: novaAnamnese.dadosPessoais.profissao,
-        contato_emergencia: novaAnamnese.dadosPessoais.contatoEmergencia,
-        cpf: novaAnamnese.dadosPessoais.cpf,
-        alergias: novaAnamnese.saudeGeral.possuiAlergias ? novaAnamnese.saudeGeral.detalhesAlergias : undefined,
-        medicacoes: novaAnamnese.saudeGeral.usoAcidos ? novaAnamnese.saudeGeral.detalhesAcidos : undefined,
-        historico_clinico: `[Anamnese Completa Inicial: ${novaAnamnese.procedimentoNome} realizada em ${new Date(novaAnamnese.criadoEm).toLocaleDateString('pt-BR')}]`,
+        id: novaAnamnese.clienteId || `pac-${Date.now()}`,
+        nome: nomeFinal,
+        telefone: telefoneFinal,
+        data_nascimento: dp.dataNascimento,
+        email: dp.email?.trim() || undefined,
+        cpf: dp.cpf?.trim() || undefined,
+        endereco: dp.endereco?.trim() || undefined,
+        profissao: dp.profissao?.trim() || undefined,
+        contato_emergencia: dp.contatoEmergencia,
+        alergias: sg.possuiAlergias ? sg.detalhesAlergias : undefined,
+        medicacoes: sg.usoAcidos ? sg.detalhesAcidos : undefined,
+        historico_clinico: `[Anamnese Inicial: ${novaAnamnese.procedimentoNome || 'Avaliação'} realizada em ${new Date().toLocaleDateString('pt-BR')}]`,
         criado_em: new Date().toISOString(),
         anamneses_completas: [novaAnamnese],
-        fotos_antes_depois: [],
+        fotos_antes_depois: novaAnamnese.fotoPacienteUrl ? [{
+          id: `foto-${Date.now()}`,
+          titulo: 'Foto Inicial Anamnese',
+          data: new Date().toISOString().split('T')[0],
+          foto_antes_url: novaAnamnese.fotoPacienteUrl,
+          procedimento_nome: novaAnamnese.procedimentoNome || 'Avaliação',
+        }] : [],
         evolucoes_retornos: [],
         termo_consentimento: {
           assinado: true,
-          data_assinatura: novaAnamnese.assinadoEm,
+          data_assinatura: novaAnamnese.assinadoEm || new Date().toISOString(),
           assinatura_base64: novaAnamnese.assinaturaUrl,
-          nome_paciente_declarado: novaAnamnese.dadosPessoais.nomeCompleto,
-          cpf_declarado: novaAnamnese.dadosPessoais.cpf,
+          nome_paciente_declarado: dp.nomeCompleto || nomeFinal,
+          cpf_declarado: dp.cpf,
         },
       };
 
-      setPacientes(prev => [newPac, ...prev]);
-      queueOfflineMutation({
-        entityType: 'paciente',
-        entityId: newPac.id,
-        entityTitle: `Nova Ficha & Anamnese: ${newPac.nome}`,
-        action: 'create',
-        payload: newPac,
-      });
-
-      if (isOnline) {
-        saveDocument(COLLECTIONS.PACIENTES, newPac);
-        showToast(`Nova ficha e anamnese de "${newPac.nome}" gravadas e sincronizadas com a nuvem!`);
-      } else {
-        showToast(`Nova ficha e anamnese de "${newPac.nome}" salvas offline no IndexedDB.`, 'info');
-      }
+      // 2. Atualização otimista no estado e persistência imediata no Firestore
+      setPacientes(prev => [newPac, ...prev.filter(p => p.id !== newPac.id)]);
+      await saveDocument(COLLECTIONS.PACIENTES, newPac);
+      
+      showToast(`Cadastro e Anamnese de "${newPac.nome}" concluídos com sucesso!`);
     } else {
       const existing = target.anamneses_completas || [];
+      const dp = novaAnamnese.dadosPessoais || ({} as any);
+      const sg = novaAnamnese.saudeGeral || ({} as any);
+      const dataFormatada = novaAnamnese.criadoEm ? new Date(novaAnamnese.criadoEm).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
+
       const updated: Paciente = {
         ...target,
         anamneses_completas: [novaAnamnese, ...existing],
-        alergias: novaAnamnese.saudeGeral.possuiAlergias ? novaAnamnese.saudeGeral.detalhesAlergias : target.alergias,
-        medicacoes: novaAnamnese.saudeGeral.usoAcidos ? novaAnamnese.saudeGeral.detalhesAcidos : target.medicacoes,
-        profissao: novaAnamnese.dadosPessoais.profissao || target.profissao,
-        endereco: novaAnamnese.dadosPessoais.endereco || target.endereco,
-        contato_emergencia: novaAnamnese.dadosPessoais.contatoEmergencia || target.contato_emergencia,
-        historico_clinico: `${target.historico_clinico || ''}\n[Anamnese Completa: ${novaAnamnese.procedimentoNome} realizada em ${new Date(novaAnamnese.criadoEm).toLocaleDateString('pt-BR')}]`,
+        alergias: sg.possuiAlergias ? sg.detalhesAlergias : target.alergias,
+        medicacoes: sg.usoAcidos ? sg.detalhesAcidos : target.medicacoes,
+        profissao: dp.profissao || target.profissao,
+        endereco: dp.endereco || target.endereco,
+        contato_emergencia: dp.contatoEmergencia || target.contato_emergencia,
+        historico_clinico: `${target.historico_clinico || ''}\n[Anamnese Completa: ${novaAnamnese.procedimentoNome || 'Avaliação'} realizada em ${dataFormatada}]`.trim(),
+        termo_consentimento: {
+          assinado: true,
+          data_assinatura: novaAnamnese.assinadoEm || new Date().toISOString(),
+          assinatura_base64: novaAnamnese.assinaturaUrl,
+          nome_paciente_declarado: dp.nomeCompleto || target.nome,
+          cpf_declarado: dp.cpf || target.cpf,
+        },
       };
 
       setPacientes(prev => prev.map(p => p.id === target.id ? updated : p));
-      queueOfflineMutation({
-        entityType: 'paciente',
-        entityId: target.id,
-        entityTitle: `Anamnese Atualizada: ${target.nome}`,
-        action: 'update',
-        payload: updated,
-      });
-
-      if (isOnline) {
-        saveDocument(COLLECTIONS.PACIENTES, updated);
-        showToast(`Anamnese completa de "${target.nome}" gravada e sincronizada com a nuvem!`);
-      } else {
-        showToast(`Anamnese de "${target.nome}" salva offline. Sincronizará quando houver rede.`, 'info');
-      }
+      await saveDocument(COLLECTIONS.PACIENTES, updated);
+      showToast(`Anamnese de "${target.nome}" gravada e sincronizada com sucesso!`);
 
       if (selectedPatientForDetails?.id === target.id) {
         setSelectedPatientForDetails(updated);
@@ -1854,6 +1852,8 @@ export default function App() {
               transacoes={transacoes}
               despesasRecorrentes={despesasRecorrentes}
               fornecedores={fornecedores}
+              procedimentos={procedimentos}
+              profissionais={usuarios}
               onAddTransaction={handleAddTransaction}
               onUpdateTransactionStatus={handleUpdateTransactionStatus}
               onSoftDeleteTransaction={handleSoftDeleteTransaction}

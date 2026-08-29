@@ -84,7 +84,13 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
   
   const pendingPatientMutations = useMemo(() => {
     if (!paciente) return [];
-    return queueItems.filter(item => item.entityId === paciente.id || item.entityTitle?.toLowerCase().includes(paciente.nome.toLowerCase()));
+    const pNome = paciente.nome?.toLowerCase() || '';
+    return (queueItems || []).filter(item => 
+      item && (
+        item.entityId === paciente.id || 
+        (pNome && item.entityTitle && item.entityTitle.toLowerCase().includes(pNome))
+      )
+    );
   }, [queueItems, paciente]);
 
   const isGestor = !currentUser || isUserAdminTotal(currentUser) || isUserAdminLocalOrTotal(currentUser) || currentUser.role === 'admin_total' || currentUser.role === 'admin' || currentUser.role === 'gestor';
@@ -164,9 +170,9 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
 
   if (!isOpen || !paciente) return null;
 
-  const pacienteAgendamentos = agendamentos.filter(a => a.paciente_id === paciente.id);
-  const anamnesesCompletas = paciente.anamneses_completas || [];
-  const idadeCalculada = calcularIdade(paciente.data_nascimento);
+  const pacienteAgendamentos = (agendamentos || []).filter(a => a && a.paciente_id === paciente.id);
+  const anamnesesCompletas = (paciente.anamneses_completas || []).filter(Boolean);
+  const idadeCalculada = paciente.data_nascimento ? calcularIdade(paciente.data_nascimento) : '';
 
   const handleSaveNovaAnamneseCompleta = (novaAnamnese: AnamneseCompleta) => {
     const updatedAnamneses = [novaAnamnese, ...anamnesesCompletas];
@@ -179,7 +185,7 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
         data: new Date().toISOString().split('T')[0],
         foto_antes: novaAnamnese.fotoPacienteUrl,
         foto_antes_url: novaAnamnese.fotoPacienteUrl,
-        procedimento_nome: novaAnamnese.procedimentoNome,
+        procedimento_nome: novaAnamnese.procedimentoNome || 'Avaliação Clínica',
         observacoes: 'Foto clínica capturada via câmera durante preenchimento da anamnese.',
         criado_em: new Date().toISOString(),
       },
@@ -188,19 +194,20 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
 
     const dadosAtualizados: Partial<Paciente> = {
       anamneses_completas: updatedAnamneses,
-      alergias: novaAnamnese.saudeGeral.possuiAlergias ? novaAnamnese.saudeGeral.detalhesAlergias : paciente.alergias,
-      medicacoes: novaAnamnese.saudeGeral.usoAcidos ? novaAnamnese.saudeGeral.detalhesAcidos : paciente.medicacoes,
-      profissao: novaAnamnese.dadosPessoais.profissao || paciente.profissao,
-      endereco: novaAnamnese.dadosPessoais.endereco || paciente.endereco,
-      contato_emergencia: novaAnamnese.dadosPessoais.contatoEmergencia || paciente.contato_emergencia,
-      data_nascimento: novaAnamnese.dadosPessoais.dataNascimento || paciente.data_nascimento,
+      alergias: novaAnamnese.saudeGeral?.possuiAlergias ? novaAnamnese.saudeGeral.detalhesAlergias : paciente.alergias,
+      medicacoes: novaAnamnese.saudeGeral?.usoAcidos ? novaAnamnese.saudeGeral.detalhesAcidos : paciente.medicacoes,
+      profissao: novaAnamnese.dadosPessoais?.profissao || paciente.profissao,
+      endereco: novaAnamnese.dadosPessoais?.endereco || paciente.endereco,
+      contato_emergencia: novaAnamnese.dadosPessoais?.contatoEmergencia || paciente.contato_emergencia,
+      data_nascimento: novaAnamnese.dadosPessoais?.dataNascimento || paciente.data_nascimento,
       ...(novaAnamnese.fotoPacienteUrl ? { foto_url: novaAnamnese.fotoPacienteUrl } : {}),
       ...(novasFotosGaleria ? { fotos_antes_depois: novasFotosGaleria } : {}),
     };
 
+    const dataFormatada = novaAnamnese.criadoEm ? new Date(novaAnamnese.criadoEm).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
     onUpdatePatientHistory(
       paciente.id,
-      `${historico}\n[Anamnese Completa: ${novaAnamnese.procedimentoNome} realizada em ${new Date(novaAnamnese.criadoEm).toLocaleDateString('pt-BR')}]`,
+      `${historico || ''}\n[Anamnese Completa: ${novaAnamnese.procedimentoNome || 'Avaliação'} realizada em ${dataFormatada}]`.trim(),
       dadosAtualizados
     );
 
@@ -292,12 +299,12 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
 
     // Anamneses photos
     anamnesesCompletas.forEach((anamnese) => {
-      if (anamnese.fotoPacienteUrl) {
+      if (anamnese?.fotoPacienteUrl) {
         list.push({
           id: `anamnese-${anamnese.id}`,
           url: anamnese.fotoPacienteUrl,
           label: 'Anamnese',
-          date: new Date(anamnese.criadoEm).toLocaleDateString('pt-BR'),
+          date: anamnese.criadoEm ? new Date(anamnese.criadoEm).toLocaleDateString('pt-BR') : '',
           procedure: anamnese.procedimentoNome || 'Avaliação Inicial',
           notes: 'Foto registrada no termo de anamnese',
         });
@@ -779,14 +786,14 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
                           <div className="flex items-start justify-between">
                             <div>
                               <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-[10px] font-bold">
-                                {ana.procedimentoNome}
+                                {ana.procedimentoNome || 'Avaliação Clínica'}
                               </span>
                               <h6 className="text-xs font-bold text-slate-900 mt-1">
-                                {ana.dadosPessoais.nomeCompleto}
+                                {ana.dadosPessoais?.nomeCompleto || paciente.nome}
                               </h6>
                               <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
                                 <Clock className="w-3 h-3" />
-                                {new Date(ana.criadoEm).toLocaleString('pt-BR')}
+                                {ana.criadoEm ? new Date(ana.criadoEm).toLocaleString('pt-BR') : '-'}
                               </span>
                             </div>
 
@@ -805,26 +812,26 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
                           <div className="grid grid-cols-2 gap-1.5 text-[11px] bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                             <div>
                               <span className="text-slate-500">Gestante: </span>
-                              <strong className={ana.saudeGeral.gestanteOuAmamentando ? 'text-rose-600' : 'text-slate-700'}>
-                                {ana.saudeGeral.gestanteOuAmamentando ? 'SIM' : 'NÃO'}
+                              <strong className={ana.saudeGeral?.gestanteOuAmamentando ? 'text-rose-600' : 'text-slate-700'}>
+                                {ana.saudeGeral?.gestanteOuAmamentando ? 'SIM' : 'NÃO'}
                               </strong>
                             </div>
                             <div>
                               <span className="text-slate-500">Alergias: </span>
-                              <strong className={ana.saudeGeral.possuiAlergias ? 'text-rose-600' : 'text-slate-700'}>
-                                {ana.saudeGeral.possuiAlergias ? 'SIM' : 'NÃO'}
+                              <strong className={ana.saudeGeral?.possuiAlergias ? 'text-rose-600' : 'text-slate-700'}>
+                                {ana.saudeGeral?.possuiAlergias ? 'SIM' : 'NÃO'}
                               </strong>
                             </div>
                             <div>
                               <span className="text-slate-500">Queloide: </span>
-                              <strong className={ana.saudeGeral.historicoQueloide ? 'text-amber-600' : 'text-slate-700'}>
-                                {ana.saudeGeral.historicoQueloide ? 'SIM' : 'NÃO'}
+                              <strong className={ana.saudeGeral?.historicoQueloide ? 'text-amber-600' : 'text-slate-700'}>
+                                {ana.saudeGeral?.historicoQueloide ? 'SIM' : 'NÃO'}
                               </strong>
                             </div>
                             <div>
                               <span className="text-slate-500">Uso de Ácidos: </span>
-                              <strong className={ana.saudeGeral.usoAcidos ? 'text-amber-600' : 'text-slate-700'}>
-                                {ana.saudeGeral.usoAcidos ? 'SIM' : 'NÃO'}
+                              <strong className={ana.saudeGeral?.usoAcidos ? 'text-amber-600' : 'text-slate-700'}>
+                                {ana.saudeGeral?.usoAcidos ? 'SIM' : 'NÃO'}
                               </strong>
                             </div>
                           </div>

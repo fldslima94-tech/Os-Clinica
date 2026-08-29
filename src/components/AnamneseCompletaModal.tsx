@@ -41,6 +41,7 @@ interface AnamneseCompletaModalProps {
   onClose: () => void;
   onSave: (anamnese: AnamneseCompleta, novoPacienteDados?: Partial<Paciente>) => void;
   pacienteExistente?: Paciente | null;
+  paciente?: Paciente | null;
   anamneseParaVisualizar?: AnamneseCompleta | null;
   currentUser?: UsuarioEquipe;
   clinicaConfig?: ClinicaConfig;
@@ -51,11 +52,13 @@ export const AnamneseCompletaModal: React.FC<AnamneseCompletaModalProps> = ({
   onClose,
   onSave,
   pacienteExistente,
+  paciente,
   anamneseParaVisualizar,
   currentUser,
   clinicaConfig,
 }) => {
   const { isOnline, isSyncing } = useConnectionStatus();
+  const targetPaciente = pacienteExistente || paciente;
   const isVisualizacao = !!anamneseParaVisualizar;
   const [etapaAtual, setEtapaAtual] = useState<number>(1);
   const [errosValidacao, setErrosValidacao] = useState<{ [campo: string]: string }>({});
@@ -173,22 +176,25 @@ export const AnamneseCompletaModal: React.FC<AnamneseCompletaModalProps> = ({
       setAssinaturaUrl(anamneseParaVisualizar.assinaturaUrl || '');
       setFotoPacienteUrl(anamneseParaVisualizar.fotoPacienteUrl || '');
       setEtapaAtual(1);
-    } else if (pacienteExistente) {
+    } else if (targetPaciente) {
       // Preenche com os dados do paciente existente
-      setNomeCompleto(pacienteExistente.nome || '');
-      setDataNascimento(pacienteExistente.data_nascimento || '');
-      setTelefone(pacienteExistente.telefone || '');
-      setEmail(pacienteExistente.email || '');
-      setCpf(pacienteExistente.cpf || '');
-      setEndereco(pacienteExistente.endereco || '');
-      setProfissao(pacienteExistente.profissao || '');
-      setContatoEmergenciaNome(pacienteExistente.contato_emergencia?.nome || '');
-      setContatoEmergenciaTel(pacienteExistente.contato_emergencia?.telefone || '');
-      setFotoPacienteUrl(pacienteExistente.foto_url || '');
+      setNomeCompleto(targetPaciente.nome || '');
+      setDataNascimento(targetPaciente.data_nascimento || '');
+      setTelefone(targetPaciente.telefone || '');
+      setEmail(targetPaciente.email || '');
+      setCpf(targetPaciente.cpf || '');
+      setEndereco(targetPaciente.endereco || '');
+      setProfissao(targetPaciente.profissao || '');
+      setContatoEmergenciaNome(targetPaciente.contato_emergencia?.nome || '');
+      setContatoEmergenciaTel(targetPaciente.contato_emergencia?.telefone || '');
+      setFotoPacienteUrl(targetPaciente.foto_url || '');
       
-      if (pacienteExistente.alergias) {
+      if (targetPaciente.alergias) {
         setPossuiAlergias(true);
-        setDetalhesAlergias(pacienteExistente.alergias);
+        setDetalhesAlergias(targetPaciente.alergias);
+      } else {
+        setPossuiAlergias(false);
+        setDetalhesAlergias('');
       }
       setTermoAceito(false);
       setAssinaturaUrl('');
@@ -237,7 +243,7 @@ export const AnamneseCompletaModal: React.FC<AnamneseCompletaModalProps> = ({
       setEtapaAtual(1);
     }
     setErrosValidacao({});
-  }, [isOpen, pacienteExistente, anamneseParaVisualizar]);
+  }, [isOpen, targetPaciente, anamneseParaVisualizar]);
 
   if (!isOpen) return null;
 

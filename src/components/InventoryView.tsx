@@ -648,6 +648,25 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               );
             })}
           </div>
+
+          {filteredInsumos.length === 0 && (
+            <div className="bg-white p-12 text-center rounded-2xl border border-slate-200">
+              <Package className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <h3 className="text-base font-bold text-slate-800">Nenhum insumo ou produto encontrado</h3>
+              <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                Cadastre novos insumos, produtos e cosméticos para controlar o saldo, alertas de vencimento e custo por procedimento.
+              </p>
+              {onOpenNewInventory && (
+                <button
+                  onClick={onOpenNewInventory}
+                  className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition-colors cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Cadastrar Primeiro Insumo
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 

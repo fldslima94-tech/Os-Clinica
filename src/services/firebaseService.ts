@@ -158,14 +158,23 @@ export function sanitizeForFirestore<T>(data: T): T {
 }
 
 // Firestore generic save/update helper
-export async function saveDocument<T extends { id: string }>(collectionName: string, item: T): Promise<void> {
+export async function saveDocument<T extends { id: string }>(
+  collectionName: string, 
+  item: T
+): Promise<{ success: boolean; error?: string }> {
   const docPath = `${collectionName}/${item.id}`;
   try {
     const docRef = doc(db, collectionName, item.id);
     const sanitized = sanitizeForFirestore(item);
-    await setDoc(docRef, sanitized, { merge: true });
-  } catch (error) {
+    await setDoc(docRef, {
+      ...sanitized,
+      atualizadoEm: serverTimestamp()
+    }, { merge: true });
+    return { success: true };
+  } catch (error: any) {
     handleFirestoreError(error, OperationType.WRITE, docPath);
+    console.error(`[Firestore Save Error] em ${collectionName}/${item.id}:`, error);
+    return { success: false, error: error?.message || String(error) };
   }
 }
 
@@ -206,7 +215,7 @@ export async function removeDocument(collectionName: string, id: string): Promis
  * Atomic Checkout Transaction (`runTransaction`):
  * 1. Updates Appointment status to 'concluido' and registers payment & used supplies.
  * 2. Debits quantity of each used supply in inventory.
- * 3. Creates financial entry (TransacaoFinanceira - Entrada de Caixa).
+ * 3. Creates financial entry (TransacaoFinanceira - Entrada de Caixa) ONLY if valor > 0.
  */
 export async function executeAtomicCheckout(params: {
   agendamentoId: string;
@@ -223,7 +232,7 @@ export async function executeAtomicCheckout(params: {
   insumosConsumidos?: InsumoConsumido[];
   transacao?: Partial<TransacaoFinanceira>;
   observacoes?: string;
-}): Promise<{ transacaoId: string }> {
+}): Promise<{ success: boolean; transacaoId?: string }> {
   const newTransacaoId = `tx-${Date.now()}`;
   const supplies = params.insumosUsados || params.insumosConsumidos || [];
   const clinicaId = params.clinicaId || 'clinica-matriz';
@@ -251,9 +260,10 @@ export async function executeAtomicCheckout(params: {
       // 2. Fetch inventory items to verify and debit
       const inventoryUpdates: { ref: any; newQty: number }[] = [];
       for (const insumo of supplies) {
-        if (insumo.insumo_id && !insumo.insumo_id.startsWith('temp-')) {
+        const insumoId = insumo.insumo_id;
+        if (insumoId && !insumoId.startsWith('temp-')) {
           try {
-            const itemRef = doc(db, COLLECTIONS.ESTOQUE, insumo.insumo_id);
+            const itemRef = doc(db, COLLECTIONS.ESTOQUE, insumoId);
             const itemDoc = await transaction.get(itemRef);
             if (itemDoc.exists()) {
               const currentQty = Number(itemDoc.data().quantidade) || 0;
@@ -271,11 +281,12 @@ export async function executeAtomicCheckout(params: {
       // A. Update appointment status strictly to 'concluido'
       transaction.set(agRef, {
         status: 'concluido',
-        valor_estimado: valor,
+        valor_estimado: valor > 0 ? valor : undefined,
         forma_pagamento: forma,
         status_pagamento: status,
         insumos_consumidos: supplies,
         insumos_utilizados: supplies,
+        concluido_em: new Date().toISOString(),
         observacoes: agObs
       }, { merge: true });
 
@@ -284,33 +295,35 @@ export async function executeAtomicCheckout(params: {
         transaction.update(update.ref, { quantidade: update.newQty });
       }
 
-      // C. Create Financial Transaction (Cash Inflow)
-      const txRef = doc(db, COLLECTIONS.TRANSACOES, newTransacaoId);
-      const totalCustoInsumos = supplies.reduce((sum, item) => sum + ((item.custo_unitario || 0) * (item.quantidade_utilizada || item.quantidade || 1)), 0);
-      
-      const newTx: TransacaoFinanceira = {
-        id: newTransacaoId,
-        clinica_id: clinicaId,
-        agendamento_id: params.agendamentoId,
-        paciente_id: params.pacienteId,
-        paciente_nome: pacienteNome,
-        profissional_id: params.profissionalId,
-        profissional_nome: profNome,
-        procedimento: procedimentoNome,
-        valor: valor,
-        custo_insumos: totalCustoInsumos,
-        forma_pagamento: forma,
-        status: status,
-        data: new Date().toISOString(),
-        tipo: 'entrada',
-        categoria: 'atendimento',
-        observacao: params.observacoes || `Atendimento concluído - ${procedimentoNome}`,
-        excluido: false
-      };
-      transaction.set(txRef, newTx);
+      // C. Create Financial Transaction (Cash Inflow) ONLY if valor > 0
+      if (valor > 0) {
+        const txRef = doc(db, COLLECTIONS.TRANSACOES, newTransacaoId);
+        const totalCustoInsumos = supplies.reduce((sum, item) => sum + ((item.custo_unitario || 0) * (item.quantidade_utilizada || item.quantidade || 1)), 0);
+        
+        const newTx: TransacaoFinanceira = {
+          id: newTransacaoId,
+          clinica_id: clinicaId,
+          agendamento_id: params.agendamentoId,
+          paciente_id: params.pacienteId || params.transacao?.paciente_id,
+          paciente_nome: pacienteNome,
+          profissional_id: params.profissionalId || params.transacao?.profissional_id,
+          profissional_nome: profNome,
+          procedimento: procedimentoNome,
+          valor: valor,
+          custo_insumos: totalCustoInsumos,
+          forma_pagamento: forma,
+          status: status,
+          data: new Date().toISOString(),
+          tipo: 'entrada',
+          categoria: 'atendimento',
+          observacao: params.observacoes || params.transacao?.observacao || `Atendimento concluído - ${procedimentoNome}`,
+          excluido: false
+        };
+        transaction.set(txRef, newTx);
+      }
     });
 
-    return { transacaoId: newTransacaoId };
+    return { success: true, transacaoId: valor > 0 ? newTransacaoId : undefined };
   } catch (error) {
     console.warn('[executeAtomicCheckout fallback direct save]', error);
     // Direct Fallback Persistence to ensure status 'concluido' is ALWAYS applied
@@ -318,31 +331,34 @@ export async function executeAtomicCheckout(params: {
       await saveDocument(COLLECTIONS.AGENDAMENTOS, {
         id: params.agendamentoId,
         status: 'concluido',
-        valor_estimado: valor,
         forma_pagamento: forma,
         status_pagamento: status,
         insumos_consumidos: supplies,
-        insumos_utilizados: supplies
+        insumos_utilizados: supplies,
+        concluido_em: new Date().toISOString()
       });
-      await saveDocument(COLLECTIONS.TRANSACOES, {
-        id: newTransacaoId,
-        clinica_id: clinicaId,
-        agendamento_id: params.agendamentoId,
-        paciente_nome: pacienteNome,
-        procedimento: procedimentoNome,
-        profissional_nome: profNome,
-        valor: valor,
-        forma_pagamento: forma,
-        status: status,
-        data: new Date().toISOString(),
-        tipo: 'entrada',
-        categoria: 'atendimento',
-        excluido: false
-      });
+      if (valor > 0) {
+        await saveDocument(COLLECTIONS.TRANSACOES, {
+          id: newTransacaoId,
+          clinica_id: clinicaId,
+          agendamento_id: params.agendamentoId,
+          paciente_nome: pacienteNome,
+          procedimento: procedimentoNome,
+          profissional_nome: profNome,
+          valor: valor,
+          forma_pagamento: forma,
+          status: status,
+          data: new Date().toISOString(),
+          tipo: 'entrada',
+          categoria: 'atendimento',
+          excluido: false
+        });
+      }
+      return { success: true, transacaoId: valor > 0 ? newTransacaoId : undefined };
     } catch (fallbackErr) {
-      console.warn('[Fallback saveDocument error]', fallbackErr);
+      console.error('[Fallback saveDocument error]', fallbackErr);
+      return { success: false };
     }
-    return { transacaoId: newTransacaoId };
   }
 }
 
@@ -428,55 +444,109 @@ export async function finalizarAtendimentoTransaction(
   });
 }
 
-// Seed initial mock data into Firestore if empty
-export async function seedInitialFirestoreData(mockData: {
-  clinica_config?: ClinicaConfig;
-  pacientes: Paciente[];
-  agendamentos: Agendamento[];
-  estoque: EstoqueInsumo[];
-  procedimentos: ProcedimentoClinico[];
-  orcamentos: SolicitacaoOrcamento[];
-  transacoes: TransacaoFinanceira[];
-  despesas_recorrentes?: DespesaRecorrente[];
-  bens?: BemAtivo[];
-  modelos_anamnese?: ModeloAnamnese[];
-  fichas_retorno?: FichaRetornoEvolucao[];
-  usuarios: UsuarioEquipe[];
-  avisos: AvisoQuadro[];
-  alertas_retorno: AlertaRetornoPos[];
-  fornecedores?: Fornecedor[];
-}): Promise<void> {
+// Seed initial mock data into Firestore if explicitly requested (Default: Disabled for clean production)
+export async function seedInitialFirestoreData(_mockData?: any): Promise<void> {
+  // Desativado para iniciar o sistema completamente limpo e pronto para produção
+  console.log('[Firestore] Inicialização limpa: auto-seed de mocks desativado.');
+}
+
+/**
+ * Utilitário Master: Limpa todas as coleções de dados de teste/mock no Firestore e no cache local,
+ * preservando estritamente a configuração da clínica e os usuários Administradores Master.
+ */
+export async function wipeDatabaseAndResetToProduction(): Promise<{ success: boolean; message: string }> {
   try {
-    const checkPacientes = await getDocs(collection(db, COLLECTIONS.PACIENTES));
-    if (!checkPacientes.empty) {
-      return;
+    console.log('[Firestore Wipe] Iniciando limpeza geral para produção...');
+
+    const collectionsToClear = [
+      COLLECTIONS.PACIENTES,
+      COLLECTIONS.AGENDAMENTOS,
+      COLLECTIONS.ESTOQUE,
+      COLLECTIONS.TRANSACOES,
+      COLLECTIONS.DESPESAS_RECORRENTES,
+      COLLECTIONS.BENS,
+      COLLECTIONS.FORNECEDORES,
+      COLLECTIONS.ORCAMENTOS,
+      COLLECTIONS.AVISOS,
+      COLLECTIONS.ALERTAS_RETORNO,
+      COLLECTIONS.MODELOS_ANAMNESE,
+      COLLECTIONS.FICHAS_RETORNO,
+    ];
+
+    for (const colName of collectionsToClear) {
+      try {
+        const snap = await getDocs(collection(db, colName));
+        if (!snap.empty) {
+          const batch = writeBatch(db);
+          snap.docs.forEach((docSnap) => {
+            batch.delete(docSnap.ref);
+          });
+          await batch.commit();
+        }
+      } catch (err) {
+        console.warn(`[Firestore Wipe] Aviso ao limpar coleção ${colName}:`, err);
+      }
     }
 
-    console.log('[Firestore] Semeando banco de dados completo do Studio...');
-    const batch = writeBatch(db);
+    // Limpar usuários e perfis não-master
+    try {
+      const userSnap = await getDocs(collection(db, COLLECTIONS.USUARIOS));
+      if (!userSnap.empty) {
+        const batchUsers = writeBatch(db);
+        userSnap.docs.forEach((d) => {
+          const u = d.data() as UsuarioEquipe;
+          if (
+            d.id !== 'user-super-admin' &&
+            d.id !== 'user-super-admin-alt' &&
+            u.email !== 'fldslima94@gmail.com' &&
+            u.email !== 'fabio@teste.com'
+          ) {
+            batchUsers.delete(d.ref);
+          }
+        });
+        await batchUsers.commit();
+      }
 
-    if (mockData.clinica_config) {
-      batch.set(doc(db, COLLECTIONS.CLINICA_CONFIG, mockData.clinica_config.id), mockData.clinica_config);
+      const perfilSnap = await getDocs(collection(db, COLLECTIONS.PERFIS));
+      if (!perfilSnap.empty) {
+        const batchPerfis = writeBatch(db);
+        perfilSnap.docs.forEach((d) => {
+          if (d.id !== 'user-super-admin' && d.id !== 'user-super-admin-alt') {
+            batchPerfis.delete(d.ref);
+          }
+        });
+        await batchPerfis.commit();
+      }
+    } catch (err) {
+      console.warn('[Firestore Wipe] Aviso ao limpar usuários secundários:', err);
     }
-    mockData.pacientes.forEach(p => batch.set(doc(db, COLLECTIONS.PACIENTES, p.id), p));
-    if (mockData.fornecedores) mockData.fornecedores.forEach(f => batch.set(doc(db, COLLECTIONS.FORNECEDORES, f.id), f));
-    mockData.agendamentos.forEach(a => batch.set(doc(db, COLLECTIONS.AGENDAMENTOS, a.id), a));
-    mockData.estoque.forEach(e => batch.set(doc(db, COLLECTIONS.ESTOQUE, e.id), e));
-    mockData.procedimentos.forEach(pr => batch.set(doc(db, COLLECTIONS.PROCEDIMENTOS, pr.id), pr));
-    mockData.orcamentos.forEach(o => batch.set(doc(db, COLLECTIONS.ORCAMENTOS, o.id), o));
-    mockData.transacoes.forEach(t => batch.set(doc(db, COLLECTIONS.TRANSACOES, t.id), t));
-    if (mockData.despesas_recorrentes) mockData.despesas_recorrentes.forEach(dr => batch.set(doc(db, COLLECTIONS.DESPESAS_RECORRENTES, dr.id), dr));
-    if (mockData.bens) mockData.bens.forEach(b => batch.set(doc(db, COLLECTIONS.BENS, b.id), b));
-    if (mockData.modelos_anamnese) mockData.modelos_anamnese.forEach(m => batch.set(doc(db, COLLECTIONS.MODELOS_ANAMNESE, m.id), m));
-    if (mockData.fichas_retorno) mockData.fichas_retorno.forEach(f => batch.set(doc(db, COLLECTIONS.FICHAS_RETORNO, f.id), f));
-    mockData.usuarios.forEach(u => batch.set(doc(db, COLLECTIONS.USUARIOS, u.id), u));
-    mockData.avisos.forEach(av => batch.set(doc(db, COLLECTIONS.AVISOS, av.id), av));
-    mockData.alertas_retorno.forEach(ar => batch.set(doc(db, COLLECTIONS.ALERTAS_RETORNO, ar.id), ar));
 
-    await batch.commit();
-    console.log('[Firestore] Banco de dados semeado com sucesso.');
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, 'batch/seed');
+    // Re-garante Super Admin Master no Firestore
+    await ensureSuperAdminInFirestore();
+
+    // Limpar IndexedDB local e caches de sincronização
+    if (typeof window !== 'undefined') {
+      try {
+        if (window.indexedDB && window.indexedDB.deleteDatabase) {
+          window.indexedDB.deleteDatabase('AuraEsteticaSyncDB');
+        }
+        localStorage.removeItem('aura_offline_mutations_v2');
+        localStorage.removeItem('aura_sync_pending_v1');
+      } catch (cacheErr) {
+        console.warn('[Cache Wipe] Aviso ao limpar caches locais:', cacheErr);
+      }
+    }
+
+    return { 
+      success: true, 
+      message: 'Banco de dados e cache local limpos com sucesso! Apenas o Administrador Master foi mantido.' 
+    };
+  } catch (error: any) {
+    console.error('[Firestore Wipe] Erro ao resetar banco de dados:', error);
+    return { 
+      success: false, 
+      message: error?.message || 'Falha ao executar limpeza do banco de dados.' 
+    };
   }
 }
 
@@ -484,7 +554,7 @@ export async function seedInitialFirestoreData(mockData: {
 export function subscribeToCollection<T>(
   collectionName: string, 
   onData: (data: T[]) => void,
-  fallbackData: T[],
+  fallbackData: T[] = [],
   clinicaId?: string
 ): () => void {
   try {
@@ -493,12 +563,9 @@ export function subscribeToCollection<T>(
     const unsubscribe = onSnapshot(
       q, 
       (snapshot) => {
-        if (!snapshot.empty) {
-          const items = snapshot.docs.map(d => ({ ...d.data(), id: d.id }) as T);
-          onData(items);
-        } else if (fallbackData.length > 0) {
-          onData(fallbackData);
-        }
+        // Envia os documentos da coleção diretamente (array vazio [] se não houver documentos)
+        const items = snapshot.docs.map(d => ({ ...d.data(), id: d.id }) as T);
+        onData(items);
       },
       (error) => {
         handleFirestoreError(error, OperationType.GET, collectionName);

@@ -26,7 +26,9 @@ import {
   Sparkles,
   Info,
   Edit3,
-  Save
+  Save,
+  Repeat,
+  BarChart3
 } from 'lucide-react';
 import { 
   TransacaoFinanceira, 
@@ -34,14 +36,18 @@ import {
   StatusPagamento, 
   UsuarioEquipe, 
   DespesaRecorrente,
-  Fornecedor
+  Fornecedor,
+  ProcedimentoClinico
 } from '../types';
 import { checkUserCustomPermission, isUserAdminTotal } from '../services/firebaseService';
+import { FinancialReportsView } from './FinancialReportsView';
 
 interface FinancialViewProps {
   transacoes: TransacaoFinanceira[];
   despesasRecorrentes?: DespesaRecorrente[];
   fornecedores?: Fornecedor[];
+  procedimentos?: ProcedimentoClinico[];
+  profissionais?: UsuarioEquipe[];
   onAddTransaction: (nova: Partial<TransacaoFinanceira>) => void;
   onUpdateTransactionStatus: (id: string, status: StatusPagamento) => void;
   onSoftDeleteTransaction?: (id: string, motivo: string) => void;
@@ -56,6 +62,8 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
   transacoes,
   despesasRecorrentes = [],
   fornecedores = [],
+  procedimentos = [],
+  profissionais = [],
   onAddTransaction,
   onUpdateTransactionStatus,
   onSoftDeleteTransaction,
@@ -72,8 +80,8 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
   const canViewRecorrentes = checkUserCustomPermission(currentUser, 'financeiro', 'verRecorrentes');
   const canViewFullFinancials = isGestor || checkUserCustomPermission(currentUser, 'financeiro', 'verRelatorios');
 
-  // Active Financial Tab: 'entradas' | 'saidas' | 'recorrentes'
-  const [activeFinTab, setActiveFinTab] = useState<'entradas' | 'saidas' | 'recorrentes'>('entradas');
+  // Active Financial Tab: 'entradas' | 'saidas' | 'recorrentes' | 'relatorios'
+  const [activeFinTab, setActiveFinTab] = useState<'entradas' | 'saidas' | 'recorrentes' | 'relatorios'>('entradas');
   const [filterPeriod, setFilterPeriod] = useState<'hoje' | '7dias' | 'mes' | 'todos'>('mes');
   const [search, setSearch] = useState('');
   const [isNewTxModalOpen, setIsNewTxModalOpen] = useState(false);
@@ -388,11 +396,23 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
               <RefreshCw className="w-3.5 h-3.5" />
               <span>3. Despesas Recorrentes ({despesasRecorrentes.length})</span>
             </button>
+
+            <button
+              onClick={() => setActiveFinTab('relatorios')}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                activeFinTab === 'relatorios' 
+                  ? 'bg-white text-indigo-700 shadow-xs' 
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>4. Relatórios & Gráficos</span>
+            </button>
           </div>
 
           {/* Search & Audit Toggle */}
           <div className="flex items-center gap-3">
-            {activeFinTab !== 'recorrentes' && (
+            {activeFinTab !== 'recorrentes' && activeFinTab !== 'relatorios' && (
               <>
                 <div className="relative flex-1 md:w-64">
                   <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -429,8 +449,20 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
           </div>
         </div>
 
+        {/* Tab 4: Relatórios & Gráficos Analytics */}
+        {activeFinTab === 'relatorios' && (
+          <div className="p-4 sm:p-6 bg-slate-50/50">
+            <FinancialReportsView
+              transacoes={transacoes}
+              procedimentos={procedimentos}
+              profissionais={profissionais}
+              despesasRecorrentes={despesasRecorrentes}
+            />
+          </div>
+        )}
+
         {/* Tab 1 & 2: Entradas / Saídas Table */}
-        {activeFinTab !== 'recorrentes' && (
+        {activeFinTab !== 'recorrentes' && activeFinTab !== 'relatorios' && (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -559,7 +591,25 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
         {/* Tab 3: Despesas Recorrentes List */}
         {activeFinTab === 'recorrentes' && (
           <div className="p-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {despesasRecorrentes.length === 0 ? (
+              <div className="bg-slate-50 border border-dashed border-slate-300 rounded-2xl p-12 text-center">
+                <Repeat className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                <h4 className="text-base font-bold text-slate-800">Nenhuma despesa fixa ou recorrente cadastrada</h4>
+                <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                  Adicione despesas mensais como aluguel, luz, internet, sistemas e taxas fixas para controle automático de fluxo de caixa.
+                </p>
+                {onAddDespesaRecorrente && (
+                  <button
+                    onClick={onAddDespesaRecorrente}
+                    className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-semibold hover:bg-rose-700 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Cadastrar Primeira Despesa Fixa
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {despesasRecorrentes.map((desp) => (
                 <div 
                   key={desp.id}
@@ -635,6 +685,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
                 </div>
               ))}
             </div>
+            )}
           </div>
         )}
       </div>

@@ -466,6 +466,9 @@ export interface Agendamento {
   // Sessão atual
   numero_sessao?: number;
   total_sessoes_pacote?: number;
+  // Controle de fluxo de caixa e finalização
+  pagamento_registrado_no_caixa?: boolean;
+  concluido_em?: string;
   // Populated relation
   paciente?: Paciente;
 }

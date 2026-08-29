@@ -48,7 +48,8 @@ import {
   createRecordMaster,
   batchRenameCategory,
   batchDeleteCategory,
-  deletePatientClinicalHistoryItem
+  deletePatientClinicalHistoryItem,
+  wipeDatabaseAndResetToProduction
 } from '../services/firebaseService';
 
 interface DatabaseMasterViewProps {
@@ -129,9 +130,37 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
   // Seleção de Paciente para Auditoria de Históricos Clínicos
   const [selectedPatientId, setSelectedPatientId] = useState<string>(pacientes[0]?.id || '');
 
+  // Modal de Limpeza Total / Reset de Produção
+  const [isWipeModalOpen, setIsWipeModalOpen] = useState(false);
+  const [wipeConfirmInput, setWipeConfirmInput] = useState('');
+
   const showStatus = (type: 'success' | 'error' | 'info', text: string) => {
     setStatusMessage({ type, text });
     setTimeout(() => setStatusMessage(null), 5000);
+  };
+
+  const handleWipeDatabase = async () => {
+    if (wipeConfirmInput.trim().toUpperCase() !== 'LIMPAR') {
+      showStatus('error', 'Digite exatamente a palavra "LIMPAR" para autorizar a remoção total.');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      const res = await wipeDatabaseAndResetToProduction();
+      setIsWipeModalOpen(false);
+      setWipeConfirmInput('');
+      if (res.success) {
+        showStatus('success', 'Banco limpo com sucesso! Mocks removidos e Super Admin preservado para produção.');
+        if (onRefreshData) onRefreshData();
+      } else {
+        showStatus('error', `Falha na limpeza do banco: ${res.message}`);
+      }
+    } catch (err: any) {
+      showStatus('error', `Erro ao limpar banco: ${err?.message || 'Falha desconhecida'}`);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // Categorias únicas por coleção
@@ -368,17 +397,30 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
             <button
               onClick={() => {
                 if (onRefreshData) onRefreshData();
                 showStatus('info', 'Sincronizando todas as coleções do banco de dados em tempo real...');
               }}
               disabled={isProcessing}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition shadow-sm"
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition shadow-sm cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isProcessing ? 'animate-spin text-rose-400' : ''}`} />
               Sincronizar Banco
+            </button>
+
+            <button
+              onClick={() => {
+                setWipeConfirmInput('');
+                setIsWipeModalOpen(true);
+              }}
+              disabled={isProcessing}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black border border-rose-500 transition shadow-md cursor-pointer"
+              title="Limpar todos os dados e cadastros de teste preservando o Super Admin"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Limpar Dados / Reset Produção
             </button>
           </div>
         </div>
@@ -1562,6 +1604,81 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 Confirmar Atualização em Lote
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONFIRMAÇÃO DE LIMPEZA TOTAL / RESET DE PRODUÇÃO */}
+      {isWipeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl border border-rose-200 shadow-2xl max-w-lg w-full p-6 space-y-5 animate-in fade-in zoom-in-95">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-rose-100 text-rose-600 rounded-2xl border border-rose-200 shrink-0">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-black text-slate-900">
+                  Limpar Todos os Dados e Iniciar Produção
+                </h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Esta operação apagará todos os dados fictícios e registros de teste de todas as coleções do Firestore (pacientes, agendamentos, transações, estoque, histórico, bens, avisos).
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-rose-50 border border-rose-200 rounded-xl p-3.5 space-y-2">
+              <div className="flex items-center gap-2 text-xs font-bold text-rose-900">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>O Administrador Master (Fabio Lima / fabio@teste.com) será preservado com permissão total de acesso.</span>
+              </div>
+              <p className="text-[11px] text-rose-700">
+                Para confirmar a exclusão irreversível dos dados de teste, digite <strong className="font-mono font-bold text-rose-900">LIMPAR</strong> abaixo:
+              </p>
+              <input
+                type="text"
+                value={wipeConfirmInput}
+                onChange={(e) => setWipeConfirmInput(e.target.value)}
+                placeholder='Digite LIMPAR para confirmar'
+                className="w-full text-xs font-mono font-bold uppercase p-2.5 rounded-lg border border-rose-300 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsWipeModalOpen(false);
+                  setWipeConfirmInput('');
+                }}
+                disabled={isProcessing}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                onClick={handleWipeDatabase}
+                disabled={isProcessing || wipeConfirmInput.trim().toUpperCase() !== 'LIMPAR'}
+                className={`flex items-center gap-2 px-5 py-2 text-xs font-black text-white rounded-xl transition shadow-sm cursor-pointer ${
+                  wipeConfirmInput.trim().toUpperCase() === 'LIMPAR'
+                    ? 'bg-rose-600 hover:bg-rose-700'
+                    : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                }`}
+              >
+                {isProcessing ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Limpando Coleções...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Executar Limpeza do Banco</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

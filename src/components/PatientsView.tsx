@@ -93,22 +93,13 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
-          {onOpenNewAnamnese && (
-            <button
-              onClick={onOpenNewAnamnese}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 text-indigo-700 rounded-xl text-xs sm:text-sm font-bold border border-indigo-200 transition-all cursor-pointer shadow-xs"
-            >
-              <Sparkles className="w-4 h-4 text-indigo-600" />
-              <span>Nova Anamnese Completa</span>
-            </button>
-          )}
-
+          {/* Botão Unificado: Cadastro Direto com Anamnese Obrigatória */}
           <button
-            onClick={onOpenNewPatient}
+            onClick={onOpenNewAnamnese || onOpenNewPatient}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-xs"
           >
-            <Plus className="w-4 h-4" />
-            <span>Cadastrar Cliente</span>
+            <Sparkles className="w-4 h-4" />
+            <span>Novo Cadastro com Anamnese</span>
           </button>
         </div>
       </div>
@@ -140,11 +131,11 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
             Cadastre novos clientes com anamnese clínica, fotos de acompanhamento e termos de consentimento.
           </p>
           <button
-            onClick={onOpenNewPatient}
+            onClick={onOpenNewAnamnese || onOpenNewPatient}
             className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition-colors cursor-pointer"
           >
-            <Plus className="w-3.5 h-3.5" />
-            Cadastrar Primeira Ficha
+            <Sparkles className="w-3.5 h-3.5" />
+            Novo Cadastro com Anamnese
           </button>
         </div>
       ) : (

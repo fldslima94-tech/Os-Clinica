@@ -860,7 +860,23 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
           </div>
 
           {/* Grid of Appointments */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center">
+              <CalendarIcon className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <h3 className="text-base font-semibold text-slate-800">Nenhum agendamento encontrado</h3>
+              <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                Não há consultas ou procedimentos agendados para os filtros selecionados.
+              </p>
+              <button
+                onClick={onOpenNewAppointment}
+                className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition-colors cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Criar Primeiro Agendamento
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map(ag => {
               const patient = ag.paciente || pacientes.find(p => p.id === ag.paciente_id);
               const dt = formatDateTime(ag.data_hora);
@@ -1023,6 +1039,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
               );
             })}
           </div>
+          )}
         </>
       )}
 
