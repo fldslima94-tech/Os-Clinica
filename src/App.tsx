@@ -776,10 +776,15 @@ export default function App() {
   };
 
   const handleSaveAppointment = (novo: Partial<Agendamento>) => {
+    if (!novo.paciente_id) {
+      showToast('Selecione um paciente para o agendamento.', 'info');
+      return;
+    }
+
     const patientObj = pacientes.find(p => p.id === novo.paciente_id);
     const createdAgendamento: Agendamento = {
       id: `ag-${Date.now()}`,
-      paciente_id: novo.paciente_id!,
+      paciente_id: novo.paciente_id,
       data_hora: novo.data_hora || new Date().toISOString(),
       procedimento: novo.procedimento || 'Procedimento Estético',
       status: novo.status || 'confirmado',
@@ -787,13 +792,35 @@ export default function App() {
       duracao_minutos: novo.duracao_minutos || 45,
       valor_estimado: novo.valor_estimado,
       observacoes: novo.observacoes,
-      profissional_nome: novo.profissional_nome || currentUser.nome,
-      paciente: patientObj,
+      profissional_id: novo.profissional_id || currentUser?.id,
+      profissional_nome: novo.profissional_nome || currentUser?.nome || 'Profissional Clínico',
+      profissional_cargo: novo.profissional_cargo || currentUser?.cargo,
+      contrato_vinculado: novo.contrato_vinculado,
+      contrato_assinado: novo.contrato_assinado ?? false,
+      paciente: patientObj || {
+        id: novo.paciente_id,
+        nome: 'Paciente',
+        telefone: '',
+        historico_clinico: '',
+        criado_em: new Date().toISOString(),
+      },
     };
 
     setAgendamentos(prev => [createdAgendamento, ...prev]);
-    saveDocument(COLLECTIONS.AGENDAMENTOS, createdAgendamento);
-    showToast(`Agendamento de ${patientObj?.nome || 'paciente'} registrado!`);
+
+    queueOfflineMutation({
+      entityType: 'agendamento',
+      entityId: createdAgendamento.id,
+      entityTitle: `Agendamento: ${patientObj?.nome || 'Paciente'} - ${createdAgendamento.procedimento}`,
+      action: 'create',
+      payload: createdAgendamento,
+    });
+
+    if (isOnline) {
+      saveDocument(COLLECTIONS.AGENDAMENTOS, createdAgendamento);
+    }
+
+    showToast(`Agendamento de "${patientObj?.nome || 'Paciente'}" registrado com sucesso!`);
   };
 
   const handleSavePatient = (novo: Partial<Paciente>) => {
