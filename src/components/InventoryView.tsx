@@ -89,9 +89,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     if (filterMode === 'vencimento' && valStatus.status !== 'expired' && valStatus.status !== 'warning') return false;
     if (filterMode === 'ok' && (isCritical || valStatus.status === 'expired')) return false;
 
-    const q = search.toLowerCase();
+    const q = (search || '').toLowerCase();
     return (
-      item.nome_item.toLowerCase().includes(q) ||
+      (item.nome_item || '').toLowerCase().includes(q) ||
       (item.categoria?.toLowerCase() || '').includes(q) ||
       (item.procedimento_vinculado_nome?.toLowerCase() || '').includes(q) ||
       (item.lote?.toLowerCase() || '').includes(q)
@@ -101,11 +101,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   // Procedimentos filtering
   const filteredProcedimentos = procedimentos.filter(proc => {
     if (categoryFilter !== 'todos' && proc.categoria !== categoryFilter) return false;
-    const q = search.toLowerCase();
+    const q = (search || '').toLowerCase();
     return (
-      proc.nome.toLowerCase().includes(q) ||
-      proc.categoria.toLowerCase().includes(q) ||
-      proc.descricao.toLowerCase().includes(q)
+      (proc.nome || '').toLowerCase().includes(q) ||
+      (proc.categoria || '').toLowerCase().includes(q) ||
+      (proc.descricao || '').toLowerCase().includes(q)
     );
   });
 

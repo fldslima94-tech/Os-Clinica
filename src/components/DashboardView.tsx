@@ -226,7 +226,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     if (!query) return matchesStatus && matchesProf;
 
     const patient = pacientes.find(p => p.id === ag.paciente_id) || ag.paciente;
-    const patientName = patient?.nome.toLowerCase() || '';
+    const patientName = (patient?.nome || '').toLowerCase();
     const profName = (ag.profissional_nome || '').toLowerCase();
 
     return matchesStatus && matchesProf && (patientName.includes(query) || profName.includes(query));

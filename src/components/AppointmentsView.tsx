@@ -123,9 +123,9 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
       ag.profissional_id === filterProfissional || 
       ag.profissional_nome === filterProfissional;
     
-    const q = search.toLowerCase();
-    const patientName = ag.paciente?.nome.toLowerCase() || '';
-    const proc = ag.procedimento.toLowerCase();
+    const q = (search || '').toLowerCase();
+    const patientName = (ag.paciente?.nome || '').toLowerCase();
+    const proc = (ag.procedimento || '').toLowerCase();
     const profName = (ag.profissional_nome || '').toLowerCase();
     
     return matchesStatus && matchesProfissional && (patientName.includes(q) || proc.includes(q) || profName.includes(q));
@@ -469,14 +469,14 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                           {/* Procedimento */}
                           <td className="py-3.5 px-4 text-slate-800 font-medium">
                             <div className="flex items-center gap-1.5">
-                              {(ag.procedimento.toLowerCase().includes('retorno') || ag.procedimento.toLowerCase().includes('revisão')) && (
+                              {((ag.procedimento || '').toLowerCase().includes('retorno') || (ag.procedimento || '').toLowerCase().includes('revisão')) && (
                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[10px] font-extrabold border border-purple-200 shrink-0">
                                   <RotateCcw className="w-2.5 h-2.5" />
                                   Retorno
                                 </span>
                               )}
-                              <div className="line-clamp-1 max-w-[200px]" title={ag.procedimento}>
-                                {ag.procedimento}
+                              <div className="line-clamp-1 max-w-[200px]" title={ag.procedimento || ''}>
+                                {ag.procedimento || 'Procedimento'}
                               </div>
                             </div>
                             {ag.valor_estimado ? (
@@ -485,7 +485,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                               </span>
                             ) : (
                               <span className="text-[10px] text-slate-400 font-medium block">
-                                {(ag.procedimento.toLowerCase().includes('retorno') || ag.procedimento.toLowerCase().includes('revisão'))
+                                {((ag.procedimento || '').toLowerCase().includes('retorno') || (ag.procedimento || '').toLowerCase().includes('revisão'))
                                   ? 'Retorno incluso (R$ 0,00)'
                                   : 'Sem valor lançado'}
                               </span>
@@ -653,9 +653,9 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                   ag.profissional_nome === prof.nome ||
                   (!ag.profissional_id && !ag.profissional_nome && prof.role === 'admin');
                 
-                const q = search.toLowerCase();
-                const patientName = ag.paciente?.nome.toLowerCase() || '';
-                const proc = ag.procedimento.toLowerCase();
+                const q = (search || '').toLowerCase();
+                const patientName = (ag.paciente?.nome || '').toLowerCase();
+                const proc = (ag.procedimento || '').toLowerCase();
                 return isThisProf && (patientName.includes(q) || proc.includes(q));
               });
 
@@ -743,7 +743,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                                     <Sparkles className="w-3 h-3 text-indigo-600" />
                                     <span>Procedimento Agendado</span>
                                   </div>
-                                  {(ag.procedimento.toLowerCase().includes('retorno') || ag.procedimento.toLowerCase().includes('revisão')) && (
+                                  {((ag.procedimento || '').toLowerCase().includes('retorno') || (ag.procedimento || '').toLowerCase().includes('revisão')) && (
                                     <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-purple-200/80 text-purple-900 text-[9px] font-black">
                                       <RotateCcw className="w-2.5 h-2.5" />
                                       RETORNO
@@ -898,14 +898,14 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
 
                     <div className="mb-3">
                       <div className="flex items-center gap-1.5 mb-1">
-                        {(ag.procedimento.toLowerCase().includes('retorno') || ag.procedimento.toLowerCase().includes('revisão')) && (
+                        {((ag.procedimento || '').toLowerCase().includes('retorno') || (ag.procedimento || '').toLowerCase().includes('revisão')) && (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-purple-100 text-purple-800 text-[10px] font-extrabold border border-purple-200 shrink-0">
                             <RotateCcw className="w-2.5 h-2.5" />
                             Retorno
                           </span>
                         )}
                         <h3 className="text-sm font-bold text-slate-900 line-clamp-1">
-                          {ag.procedimento}
+                          {ag.procedimento || 'Procedimento'}
                         </h3>
                       </div>
                       {ag.valor_estimado ? (
@@ -914,7 +914,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                         </p>
                       ) : (
                         <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-                          {(ag.procedimento.toLowerCase().includes('retorno') || ag.procedimento.toLowerCase().includes('revisão'))
+                          {((ag.procedimento || '').toLowerCase().includes('retorno') || (ag.procedimento || '').toLowerCase().includes('revisão'))
                             ? 'Retorno incluso (R$ 0,00)'
                             : 'Sem valor lançado'}
                         </p>

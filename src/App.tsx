@@ -2043,7 +2043,8 @@ export default function App() {
               onAddAlerta={handleSaveAlertaRetorno}
               currentUser={currentUser}
               onViewPatientByName={(nome) => {
-                const found = pacientes.find(p => p.nome.toLowerCase() === nome.toLowerCase());
+                const searchN = (nome || '').toLowerCase().trim();
+                const found = searchN ? pacientes.find(p => (p.nome || '').toLowerCase().trim() === searchN) : undefined;
                 if (found) {
                   handleOpenPatientDetails(found);
                 } else {

@@ -69,13 +69,13 @@ export const PostCareReturnView: React.FC<PostCareReturnViewProps> = ({
     const matchesTipo = activeTipoTab === 'todos' || itemTipo === activeTipoTab;
     const matchesStatus = filter === 'todos' || a.status === filter;
     
-    const q = search.toLowerCase();
+    const q = (search || '').toLowerCase();
     const matchesSearch = 
-      a.paciente_nome.toLowerCase().includes(q) || 
-      a.procedimento_origem.toLowerCase().includes(q) ||
-      (a.produto_nome && a.produto_nome.toLowerCase().includes(q)) ||
-      a.telefone.includes(q) ||
-      a.motivo.toLowerCase().includes(q);
+      (a.paciente_nome || '').toLowerCase().includes(q) || 
+      (a.procedimento_origem || '').toLowerCase().includes(q) ||
+      ((a.produto_nome || '').toLowerCase().includes(q)) ||
+      (a.telefone || '').includes(q) ||
+      (a.motivo || '').toLowerCase().includes(q);
 
     return matchesTipo && matchesStatus && matchesSearch;
   });

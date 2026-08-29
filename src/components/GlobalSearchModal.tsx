@@ -124,13 +124,13 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
     }
 
     const patientMatches = pacientes
-      .filter(p => p.nome.toLowerCase().includes(q) || p.telefone.includes(q) || p.cpf?.includes(q))
+      .filter(p => (p.nome || '').toLowerCase().includes(q) || (p.telefone || '').includes(q) || (p.cpf || '').includes(q))
       .slice(0, 5)
       .map(p => ({
         id: `p-${p.id}`,
         type: 'paciente' as const,
-        title: p.nome,
-        subtitle: `Tel: ${p.telefone} • ${p.historico_clinico.slice(0, 45)}...`,
+        title: p.nome || 'Paciente',
+        subtitle: `Tel: ${p.telefone || 'S/N'} • ${(p.historico_clinico || '').slice(0, 45)}...`,
         icon: User,
         action: () => {
           onClose();
@@ -140,16 +140,16 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
 
     const appointmentMatches = agendamentos
       .filter(a => 
-        a.procedimento.toLowerCase().includes(q) || 
-        a.paciente?.nome.toLowerCase().includes(q) ||
-        a.observacoes?.toLowerCase().includes(q)
+        (a.procedimento || '').toLowerCase().includes(q) || 
+        (a.paciente?.nome || '').toLowerCase().includes(q) ||
+        (a.observacoes || '').toLowerCase().includes(q)
       )
       .slice(0, 4)
       .map(a => ({
         id: `a-${a.id}`,
         type: 'agendamento' as const,
-        title: `${a.paciente?.nome || 'Paciente'} - ${a.procedimento}`,
-        subtitle: `Status: ${a.status.toUpperCase()} • ${new Date(a.data_hora).toLocaleDateString('pt-BR')} às ${new Date(a.data_hora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
+        title: `${a.paciente?.nome || 'Paciente'} - ${a.procedimento || 'Procedimento'}`,
+        subtitle: `Status: ${(a.status || '').toUpperCase()} • ${new Date(a.data_hora).toLocaleDateString('pt-BR')} às ${new Date(a.data_hora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
         icon: Calendar,
         action: () => {
           onClose();
@@ -158,7 +158,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
       }));
 
     const inventoryMatches = estoque
-      .filter(i => i.nome_item.toLowerCase().includes(q) || i.categoria?.toLowerCase().includes(q))
+      .filter(i => (i.nome_item || '').toLowerCase().includes(q) || (i.categoria || '').toLowerCase().includes(q))
       .slice(0, 3)
       .map(i => ({
         id: `i-${i.id}`,

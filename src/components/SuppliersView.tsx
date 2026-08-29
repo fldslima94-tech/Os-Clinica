@@ -61,12 +61,12 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({
   };
 
   const filteredFornecedores = fornecedores.filter(f => {
-    const q = search.toLowerCase().trim();
+    const q = (search || '').toLowerCase().trim();
     const matchesSearch = !q || 
-      f.razao_social.toLowerCase().includes(q) ||
+      (f.razao_social || '').toLowerCase().includes(q) ||
       (f.nome_fantasia && f.nome_fantasia.toLowerCase().includes(q)) ||
       (f.cnpj_cpf && f.cnpj_cpf.includes(q)) ||
-      f.telefone.includes(q) ||
+      (f.telefone && f.telefone.includes(q)) ||
       (f.email && f.email.toLowerCase().includes(q)) ||
       (f.contato_responsavel && f.contato_responsavel.toLowerCase().includes(q));
 
@@ -75,10 +75,11 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({
   });
 
   const getSpentWithSupplier = (forn: Fornecedor) => {
-    const nameMatch = forn.nome_fantasia?.toLowerCase() || forn.razao_social.toLowerCase();
+    const nameMatch = (forn.nome_fantasia || forn.razao_social || '').toLowerCase();
+    if (!nameMatch) return 0;
     return transacoes
-      .filter(t => (t.tipo === 'saida' || t.tipo === 'despesa') && !t.excluido && t.paciente_nome.toLowerCase().includes(nameMatch.slice(0, 8)))
-      .reduce((acc, t) => acc + t.valor, 0);
+      .filter(t => (t.tipo === 'saida' || t.tipo === 'despesa') && !t.excluido && (t.paciente_nome || t.procedimento || '').toLowerCase().includes(nameMatch.slice(0, 8)))
+      .reduce((acc, t) => acc + (t.valor || 0), 0);
   };
 
   return (

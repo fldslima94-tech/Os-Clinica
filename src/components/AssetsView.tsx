@@ -95,9 +95,9 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   };
 
   const filteredBens = bens.filter(b => {
-    const q = search.toLowerCase().trim();
+    const q = (search || '').toLowerCase().trim();
     const matchesSearch = !q || 
-      b.nome.toLowerCase().includes(q) || 
+      (b.nome || '').toLowerCase().includes(q) || 
       (b.numero_serie && b.numero_serie.toLowerCase().includes(q)) ||
       (b.localizacao_sala && b.localizacao_sala.toLowerCase().includes(q)) ||
       (b.responsavel_nome && b.responsavel_nome.toLowerCase().includes(q)) ||

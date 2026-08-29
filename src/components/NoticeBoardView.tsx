@@ -66,10 +66,10 @@ export const NoticeBoardView: React.FC<NoticeBoardViewProps> = ({
 
     // Search filter
     if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      const matchTitle = a.titulo.toLowerCase().includes(term);
-      const matchMsg = a.mensagem.toLowerCase().includes(term);
-      const matchAuthor = a.autor_nome.toLowerCase().includes(term);
+      const term = (searchTerm || '').toLowerCase();
+      const matchTitle = (a.titulo || '').toLowerCase().includes(term);
+      const matchMsg = (a.mensagem || '').toLowerCase().includes(term);
+      const matchAuthor = (a.autor_nome || '').toLowerCase().includes(term);
       if (!matchTitle && !matchMsg && !matchAuthor) return false;
     }
 

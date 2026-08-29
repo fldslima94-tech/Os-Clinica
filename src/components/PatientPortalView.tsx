@@ -93,8 +93,8 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
   const filteredProcedures = procedimentos.filter(p => {
     if (!p.ativo || !p.destaque_portal) return false;
     if (categoryFilter !== 'todos' && p.categoria !== categoryFilter) return false;
-    const q = search.toLowerCase();
-    return p.nome.toLowerCase().includes(q) || p.descricao.toLowerCase().includes(q);
+    const q = (search || '').toLowerCase();
+    return (p.nome || '').toLowerCase().includes(q) || (p.descricao || '').toLowerCase().includes(q);
   });
 
   // Toggle procedure in quote cart
@@ -217,7 +217,7 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
 
   // Filter quotes for current google profile or all
   const myQuotes = orçamentos.filter(o => 
-    googleProfile ? o.paciente_email.toLowerCase() === googleProfile.email.toLowerCase() : true
+    googleProfile ? (o.paciente_email || '').toLowerCase() === (googleProfile.email || '').toLowerCase() : true
   );
 
   return (

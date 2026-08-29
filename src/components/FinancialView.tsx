@@ -147,9 +147,11 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
     const matchesTab = activeFinTab === 'entradas' ? isEntrada : activeFinTab === 'saidas' ? isSaida : true;
     const q = search.toLowerCase().trim();
     const matchesSearch = !q || 
-      t.paciente_nome.toLowerCase().includes(q) || 
-      t.procedimento.toLowerCase().includes(q) ||
-      (t.profissional_nome && t.profissional_nome.toLowerCase().includes(q));
+      (t.paciente_nome || '').toLowerCase().includes(q) || 
+      (t.procedimento || '').toLowerCase().includes(q) ||
+      (t.profissional_nome || '').toLowerCase().includes(q) ||
+      (t.categoria || '').toLowerCase().includes(q) ||
+      (t.forma_pagamento || '').toLowerCase().includes(q);
 
     return matchesTab && matchesSearch;
   });
