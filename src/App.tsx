@@ -58,6 +58,9 @@ import { AssetsView } from './components/AssetsView';
 import { PermissionsManagementView } from './components/PermissionsManagementView';
 import { UserProfileView } from './components/UserProfileView';
 import { LoginView } from './components/LoginView';
+import { GeminiChatbotView } from './components/GeminiChatbotView';
+import { MapsGroundingView } from './components/MapsGroundingView';
+import { ImageStudioAIView } from './components/ImageStudioAIView';
 import { UrgentAlertPopupModal } from './components/UrgentAlertPopupModal';
 import { SwitchUserPasswordModal } from './components/SwitchUserPasswordModal';
 import { NewAppointmentModal } from './components/NewAppointmentModal';
@@ -1534,6 +1537,51 @@ export default function App() {
     showToast('Orçamento excluído.');
   };
 
+  // AI & Image Studio Gallery Handler
+  const handleSaveAIToPatientGallery = (pacienteId: string, imageUrl: string, caption: string) => {
+    const target = pacientes.find(p => p.id === pacienteId);
+    if (!target) return;
+
+    const novaFoto = {
+      id: `ai-foto-${Date.now()}`,
+      titulo: caption || 'Simulação Estética IA',
+      data: new Date().toISOString().split('T')[0],
+      foto_depois_url: imageUrl,
+      procedimento_nome: 'Simulação Estética Generativa',
+      legenda: caption,
+      criado_em: new Date().toISOString()
+    };
+
+    const updated: Paciente = {
+      ...target,
+      fotos_antes_depois: [novaFoto, ...(target.fotos_antes_depois || [])]
+    };
+
+    setPacientes(prev => prev.map(p => p.id === pacienteId ? updated : p));
+    saveDocument(COLLECTIONS.PACIENTES, updated);
+    showToast(`Imagem IA vinculada ao prontuário de ${target.nome}!`);
+  };
+
+  // Maps Grounding Add Supplier Handler
+  const handleAddSupplierFromMaps = (novo: Partial<Fornecedor>) => {
+    const created: Fornecedor = {
+      id: `forn-maps-${Date.now()}`,
+      nome_empresa: novo.nome_empresa || 'Fornecedor Localizado',
+      razao_social: novo.razao_social || novo.nome_empresa || 'Fornecedor Localizado',
+      telefone: novo.telefone || '(11) 99999-0000',
+      endereco: novo.endereco || '',
+      site: novo.site || '',
+      categoria: novo.categoria || 'insumos_injetaveis',
+      status: 'ativo',
+      observacoes: novo.observacoes || 'Fornecedor salvo a partir do Google Maps Grounding.',
+      criado_em: new Date().toISOString()
+    };
+
+    setFornecedores(prev => [created, ...prev]);
+    saveDocument(COLLECTIONS.FORNECEDORES, created);
+    showToast(`Fornecedor "${created.nome_empresa}" cadastrado com sucesso!`);
+  };
+
   // Notice Board Handlers
   const handleAddAviso = (novo: Omit<AvisoQuadro, 'id' | 'data_publicacao'>) => {
     const created: AvisoQuadro = {
@@ -1967,6 +2015,25 @@ export default function App() {
               agendamentos={agendamentos}
               pacientes={pacientes}
               onMarkReminderSent={handleMarkReminderSent}
+            />
+          )}
+
+          {activeTab === 'gemini_copilot' && (
+            <GeminiChatbotView currentUser={currentUser} />
+          )}
+
+          {activeTab === 'studio_ia_imagem' && (
+            <ImageStudioAIView
+              currentUser={currentUser}
+              pacientes={pacientes}
+              onSaveToPatientGallery={handleSaveAIToPatientGallery}
+            />
+          )}
+
+          {activeTab === 'maps_grounding' && (
+            <MapsGroundingView
+              currentUser={currentUser}
+              onAddFornecedor={handleAddSupplierFromMaps}
             />
           )}
 

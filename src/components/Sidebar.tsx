@@ -17,7 +17,10 @@ import {
   Landmark,
   Settings,
   Sparkles,
-  Database
+  Database,
+  Bot,
+  Wand2,
+  MapPin
 } from 'lucide-react';
 import { TabType, UsuarioEquipe, ClinicaConfig } from '../types';
 import { isUserAdminTotal } from '../services/firebaseService';
@@ -158,6 +161,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
             icon: Landmark,
             badge: 'Ativos',
             badgeColor: 'bg-amber-100 text-amber-800 border-amber-200 font-semibold',
+          },
+        ]
+      },
+      {
+        title: 'Inteligência Artificial & Studio',
+        items: [
+          {
+            id: 'gemini_copilot' as TabType,
+            label: 'Aura Copilot IA',
+            icon: Bot,
+            badge: 'Gemini 3.7',
+            badgeColor: 'bg-teal-100 text-teal-800 border-teal-200 font-bold',
+          },
+          {
+            id: 'studio_ia_imagem' as TabType,
+            label: 'Estética Studio IA',
+            icon: Wand2,
+            badge: 'Criador & Simulação',
+            badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200 font-semibold',
+          },
+          {
+            id: 'maps_grounding' as TabType,
+            label: 'Google Maps & Fornecedores',
+            icon: MapPin,
+            badge: 'Grounding',
+            badgeColor: 'bg-blue-100 text-blue-800 border-blue-200 font-semibold',
           },
         ]
       },

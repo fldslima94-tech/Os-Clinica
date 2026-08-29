@@ -3,16 +3,64 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { requireAuth, AuthRequest } from "./src/middleware/auth.ts";
 import { getOrCreateUser, getUsers } from "./src/db/users.ts";
+import { handleGeminiChat, handleMapsGrounding, handleGenerateImage } from "./server/gemini.ts";
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  // Support JSON and large base64 payload for image editing
+  app.use(express.json({ limit: "25mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "25mb" }));
 
   // Health check endpoint
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  // Gemini AI Chat endpoint (Multi-turn, role-based, speed-modes)
+  app.post("/api/gemini/chat", async (req, res) => {
+    try {
+      const { message, history, role, mode } = req.body;
+      if (!message || typeof message !== "string") {
+        return res.status(400).json({ error: "A mensagem é obrigatória." });
+      }
+      const result = await handleGeminiChat({ message, history, role, mode });
+      res.json(result);
+    } catch (error: any) {
+      console.error("Erro no chat Gemini:", error);
+      res.status(500).json({ error: error.message || "Erro ao processar mensagem com Gemini" });
+    }
+  });
+
+  // Gemini Google Maps Grounding endpoint
+  app.post("/api/gemini/maps-grounding", async (req, res) => {
+    try {
+      const { query, location } = req.body;
+      if (!query || typeof query !== "string") {
+        return res.status(400).json({ error: "A consulta de busca é obrigatória." });
+      }
+      const result = await handleMapsGrounding({ query, location });
+      res.json(result);
+    } catch (error: any) {
+      console.error("Erro no Maps Grounding:", error);
+      res.status(500).json({ error: error.message || "Erro ao consultar Google Maps com Gemini" });
+    }
+  });
+
+  // Gemini Image Creation & Simulation Studio endpoint
+  app.post("/api/gemini/generate-image", async (req, res) => {
+    try {
+      const { prompt, aspectRatio, imageSize, base64Image, mimeType, mode } = req.body;
+      if (!prompt || typeof prompt !== "string") {
+        return res.status(400).json({ error: "O prompt descritivo da imagem é obrigatório." });
+      }
+      const result = await handleGenerateImage({ prompt, aspectRatio, imageSize, base64Image, mimeType, mode });
+      res.json(result);
+    } catch (error: any) {
+      console.error("Erro na geração de imagem Gemini:", error);
+      res.status(500).json({ error: error.message || "Erro ao gerar ou editar imagem com Gemini" });
+    }
   });
 
   // Protected user sync endpoint

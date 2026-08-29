@@ -24,7 +24,11 @@ import {
   updateProfile,
   updatePassword,
   reauthenticateWithCredential,
-  EmailAuthProvider
+  EmailAuthProvider,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  signInAnonymously
 } from 'firebase/auth';
 import { db, auth, googleProvider } from '../lib/firebase';
 export { db, auth, googleProvider };
@@ -587,14 +591,20 @@ export function subscribeToCollection<T>(
         onData(items);
       },
       (error) => {
+        console.error(`[Firestore Subscription Error] Erro ao sincronizar coleção "${collectionName}":`, error);
         handleFirestoreError(error, OperationType.GET, collectionName);
-        onData(fallbackData);
+        if (fallbackData && fallbackData.length > 0) {
+          onData(fallbackData);
+        }
       }
     );
     return unsubscribe;
   } catch (error) {
+    console.error(`[Firestore Subscription Init Error] Erro ao inicializar listener em "${collectionName}":`, error);
     handleFirestoreError(error, OperationType.GET, collectionName);
-    onData(fallbackData);
+    if (fallbackData && fallbackData.length > 0) {
+      onData(fallbackData);
+    }
     return () => {};
   }
 }
@@ -635,6 +645,44 @@ export function useCollectionData<T extends { id: string }>(
   }, [collectionName, clinicaId]);
 
   return [data, setData, loading];
+}
+
+// Firebase Email & Password Authentication Handlers
+export async function loginWithFirebaseEmailPassword(email: string, pass: string): Promise<FirebaseUser> {
+  const cleanEmail = email.trim().toLowerCase();
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, pass);
+    return userCredential.user;
+  } catch (error: any) {
+    // If user does not exist in Firebase Auth yet, attempt automatic creation
+    if (
+      error.code === 'auth/user-not-found' || 
+      error.code === 'auth/invalid-credential' ||
+      error.code === 'auth/invalid-login-credentials'
+    ) {
+      try {
+        const newCredential = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
+        return newCredential.user;
+      } catch (createErr: any) {
+        // If user actually existed or creation failed, rethrow original login error
+        console.warn('[Firebase Auth] Erro ao criar conta de sessão:', createErr);
+        throw error;
+      }
+    }
+    throw error;
+  }
+}
+
+export async function registerFirebaseEmailPassword(email: string, pass: string, displayName?: string): Promise<FirebaseUser> {
+  const userCredential = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), pass);
+  if (displayName) {
+    await updateProfile(userCredential.user, { displayName });
+  }
+  return userCredential.user;
+}
+
+export async function sendFirebasePasswordReset(email: string): Promise<void> {
+  await sendPasswordResetEmail(auth, email.trim().toLowerCase());
 }
 
 // Firebase Google Authentication Handlers

@@ -645,6 +645,7 @@ export interface Fornecedor {
   clinica_id?: string;
   razao_social: string; // Nome ou Razão Social
   nome_fantasia?: string;
+  nome_empresa?: string;
   cnpj_cpf?: string;
   inscricao_estadual?: string;
   telefone: string;
@@ -687,6 +688,9 @@ export type TabType =
   | 'financeiro' 
   | 'retorno_pos' 
   | 'whatsapp'
+  | 'gemini_copilot' // Aura Copilot IA & Chatbot Clínico
+  | 'studio_ia_imagem' // Estética Studio IA - Criador & Simulador de Imagens
+  | 'maps_grounding' // Google Maps Grounding & Fornecedores Locais
   | 'portal_paciente'
   | 'quadro_avisos'
   | 'usuarios'

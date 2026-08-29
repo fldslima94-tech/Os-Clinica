@@ -334,20 +334,19 @@ export async function recordSyncConflict(conflict: Omit<SyncConflict, 'id' | 'de
  */
 function detectFieldConflicts(localData: any, remoteData: any): string[] {
   if (!localData || !remoteData) return ['registro_completo'];
-
   const conflictingFields: string[] = [];
-  const keysToCheck = new Set([...Object.keys(localData), ...Object.keys(remoteData)]);
 
+  // Campos a ignorar na checagem de conflitos
+  const ignoreKeys = ['atualizadoEm', 'atualizado_em', 'id', 'criado_em', 'criadoEm', 'paciente'];
+
+  const keysToCheck = new Set([...Object.keys(localData), ...Object.keys(remoteData)]);
   for (const key of keysToCheck) {
-    if (key === 'atualizadoEm' || key === 'atualizado_em' || key === 'id') continue;
+    if (ignoreKeys.includes(key)) continue;
 
     const localVal = localData[key];
     const remoteVal = remoteData[key];
 
-    if (localVal === undefined || remoteVal === undefined) {
-      conflictingFields.push(key);
-      continue;
-    }
+    if (localVal === undefined || remoteVal === undefined) continue;
 
     if (typeof localVal === 'object' && typeof remoteVal === 'object') {
       if (JSON.stringify(localVal) !== JSON.stringify(remoteVal)) {
@@ -357,7 +356,6 @@ function detectFieldConflicts(localData: any, remoteData: any): string[] {
       conflictingFields.push(key);
     }
   }
-
   return conflictingFields;
 }
 

@@ -14,7 +14,13 @@ import {
   LockKeyhole
 } from 'lucide-react';
 import { UsuarioEquipe } from '../types';
-import { isUserAdminTotal, loginWithFirebaseGoogle, SUPER_ADMIN_EMAILS } from '../services/firebaseService';
+import { 
+  isUserAdminTotal, 
+  loginWithFirebaseGoogle, 
+  loginWithFirebaseEmailPassword, 
+  sendFirebasePasswordReset, 
+  SUPER_ADMIN_EMAILS 
+} from '../services/firebaseService';
 
 interface LoginViewProps {
   usuarios: UsuarioEquipe[];
@@ -123,7 +129,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -251,11 +257,29 @@ export const LoginView: React.FC<LoginViewProps> = ({
       return;
     }
 
+    setIsLoading(true);
+
+    // Authenticate with Firebase Auth to establish live auth.currentUser session
+    try {
+      await loginWithFirebaseEmailPassword(cleanEmail, cleanPass);
+    } catch (fbAuthErr: any) {
+      console.warn('[Firebase Auth Login] Aviso na autenticação de sessão:', fbAuthErr?.message || fbAuthErr);
+      // Continua login local mesmo se Firebase Auth estiver com restrição de rede momentânea
+    }
+
     executeLogin(userFound);
   };
 
-  const handleSendResetEmail = (e: React.FormEvent) => {
+  const handleSendResetEmail = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!forgotEmail.trim()) return;
+
+    try {
+      await sendFirebasePasswordReset(forgotEmail);
+    } catch (err: any) {
+      console.warn('[Firebase Auth Reset]', err);
+    }
+
     setForgotSuccess(true);
     setTimeout(() => {
       setIsForgotModalOpen(false);

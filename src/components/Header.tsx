@@ -158,6 +158,21 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Botão de Ativação do Modo Edição Master */}
           <MasterEditToggle />
 
+          {/* Quick Aura Copilot AI Button */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('gemini_copilot')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-2xs ${
+              activeTab === 'gemini_copilot'
+                ? 'bg-teal-600 border-teal-700 text-white'
+                : 'bg-teal-50 hover:bg-teal-100 border-teal-200 text-teal-800'
+            }`}
+            title="Abrir Aura Copilot IA (Gemini 3.7 Flash)"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+            <span className="hidden lg:inline">Aura Copilot</span>
+          </button>
+
           {/* Status de Conexão & Sincronização Nuvem / IndexedDB */}
           <ConnectionSyncStatusWidget />
 
