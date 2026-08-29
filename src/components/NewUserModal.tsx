@@ -89,24 +89,75 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
       role === 'admin_local' ? 'gestor123' :
       role === 'cliente' ? 'cliente123' : 'usuario123';
 
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanRole = role === 'admin_master' ? 'admin_total' : role;
+    const isMasterOrGestor = cleanRole === 'admin_total' || cleanRole === 'admin_local';
+
     if (saveHandler) {
       saveHandler({
         nome: nome.trim(),
         nomeCompleto: nome.trim(),
-        email: email.trim(),
+        email: cleanEmail,
         senha: senha.trim() || defaultPass,
         cargo: cargo.trim() || (
-          role === 'admin_master' || role === 'admin_total' ? 'Admin Master' :
-          role === 'admin_local' ? 'Admin Local' :
-          role === 'cliente' ? 'Cliente' : 'Usuário'
+          cleanRole === 'admin_total' ? 'Admin Master' :
+          cleanRole === 'admin_local' ? 'Admin Local' :
+          cleanRole === 'cliente' ? 'Cliente' : 'Profissional da Equipe'
         ),
-        role,
+        role: cleanRole,
         telefone: telefone.trim(),
         registro_profissional: registroProfissional.trim() || undefined,
         especialidade: especialidade.trim() || undefined,
         porcentagem_comissao: Number(comissaoPercent) || 0,
         status: 'ativo',
         permissoes,
+        permissoesCustomizadas: {
+          financeiro: {
+            verEntradas: permissoes.ver_financeiro_completo || isMasterOrGestor,
+            verSaidas: permissoes.ver_financeiro_completo || isMasterOrGestor,
+            verRecorrentes: permissoes.ver_financeiro_completo || isMasterOrGestor,
+            excluir: cleanRole === 'admin_total',
+            verRelatorios: permissoes.ver_financeiro_completo || isMasterOrGestor,
+          },
+          clientes: {
+            criar: true,
+            editar: true,
+            excluir: cleanRole === 'admin_total' || cleanRole === 'admin_local',
+            verHistorico: true,
+            preencherAnamnese: true,
+          },
+          agenda: {
+            verTodos: true,
+            verPropria: true,
+            criar: true,
+            cancelar: true,
+            finalizar: true,
+          },
+          procedimentos: {
+            verCustos: permissoes.ver_financeiro_completo || isMasterOrGestor,
+            verMargem: permissoes.ver_financeiro_completo || isMasterOrGestor,
+            criar: isMasterOrGestor,
+            excluir: cleanRole === 'admin_total',
+            ajustarEstoque: true,
+          },
+          bens: {
+            visualizar: true,
+            cadastrar: isMasterOrGestor,
+            editar: isMasterOrGestor,
+            gerenciar: isMasterOrGestor,
+            excluir: cleanRole === 'admin_total',
+            manutencao: true,
+          },
+          estoque: {
+            ajustar: true,
+            excluir: cleanRole === 'admin_total',
+          },
+          orcamentos: {
+            verTodos: true,
+            responder: true,
+            verEmails: true,
+          }
+        }
       });
     }
 

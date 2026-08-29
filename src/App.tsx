@@ -1596,26 +1596,32 @@ export default function App() {
 
   // User Management Handlers
   const handleSaveUser = (novo: Omit<UsuarioEquipe, 'id' | 'created_at'>) => {
+    const cleanEmail = (novo.email || '').trim().toLowerCase();
     const created: UsuarioEquipe = {
       ...novo,
+      email: cleanEmail,
       id: `usr-${Date.now()}`,
       created_at: new Date().toISOString(),
       ultimo_acesso: 'Agora',
     };
     setUsuarios(prev => [created, ...prev]);
     saveDocument(COLLECTIONS.USUARIOS, created);
-    showToast(`Novo profissional ${created.nome} cadastrado na equipe!`);
+    saveDocument(COLLECTIONS.PERFIS, created);
+    showToast(`Novo usuário ${created.nome} cadastrado e sincronizado no banco de dados!`);
   };
 
   const handleUpdateUser = (updated: UsuarioEquipe) => {
+    const cleanEmail = (updated.email || '').trim().toLowerCase();
+    const sanitized = { ...updated, email: cleanEmail };
     setUsuarios(prev =>
-      prev.map(u => (u.id === updated.id ? updated : u))
+      prev.map(u => (u.id === sanitized.id ? sanitized : u))
     );
-    saveDocument(COLLECTIONS.USUARIOS, updated);
-    if (currentUser.id === updated.id) {
-      setCurrentUser(updated);
+    saveDocument(COLLECTIONS.USUARIOS, sanitized);
+    saveDocument(COLLECTIONS.PERFIS, sanitized);
+    if (currentUser.id === sanitized.id) {
+      setCurrentUser(sanitized);
     }
-    showToast(`Dados de ${updated.nome} atualizados!`);
+    showToast(`Dados de ${sanitized.nome} atualizados e sincronizados!`);
   };
 
   const handleRequestSwitchUser = (targetUser?: UsuarioEquipe) => {

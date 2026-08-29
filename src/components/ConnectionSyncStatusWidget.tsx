@@ -19,9 +19,11 @@ import {
   ToggleLeft,
   ToggleRight,
   HelpCircle,
-  X
+  X,
+  Terminal
 } from 'lucide-react';
 import { useConnectionStatus } from '../contexts/ConnectionStatusContext';
+import { printWriteAttemptsToConsole, getRecentWriteAttempts } from '../services/firebaseService';
 
 export const ConnectionSyncStatusWidget: React.FC = () => {
   const {
@@ -285,8 +287,8 @@ export const ConnectionSyncStatusWidget: React.FC = () => {
               </div>
             )}
 
-            {/* Botão de Sincronização Manual */}
-            <div className="pt-2 border-t border-slate-100">
+            {/* Botão de Sincronização Manual & Debug Log */}
+            <div className="pt-2 border-t border-slate-100 space-y-1.5">
               <button
                 type="button"
                 disabled={!isOnline || isSyncing || pendingCount === 0}
@@ -295,6 +297,16 @@ export const ConnectionSyncStatusWidget: React.FC = () => {
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
                 <span>{isSyncing ? 'Sincronizando com Firestore...' : 'Sincronizar Fila com a Nuvem Agora'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => printWriteAttemptsToConsole()}
+                className="w-full py-1.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                title="Imprime todas as gravações Firestore no Console do navegador (F12)"
+              >
+                <Terminal className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Imprimir Logs de Gravação no Console (F12)</span>
               </button>
             </div>
 

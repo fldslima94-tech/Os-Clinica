@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Calendar, 
   Plus, 
@@ -12,10 +12,23 @@ import {
   Megaphone,
   ShieldCheck,
   UserCheck,
-  Wrench
+  Wrench,
+  Activity,
+  Terminal,
+  Wifi,
+  WifiOff,
+  RefreshCw
 } from 'lucide-react';
 import { TabType, UsuarioEquipe, UserRole } from '../types';
-import { isUserAdminTotal } from '../services/firebaseService';
+import { 
+  isUserAdminTotal,
+  getRecentWriteAttempts,
+  printWriteAttemptsToConsole,
+  setWriteDebugMode,
+  getWriteDebugMode,
+  subscribeToWriteAttempts
+} from '../services/firebaseService';
+import { useConnectionStatus } from '../contexts/ConnectionStatusContext';
 import { ConnectionSyncStatusWidget } from './ConnectionSyncStatusWidget';
 import { MasterEditToggle } from './MasterEditToggle';
 
@@ -55,6 +68,34 @@ export const Header: React.FC<HeaderProps> = ({
   onLogout,
 }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const { isOnline, isSyncing } = useConnectionStatus();
+  const [isDebugLogging, setIsDebugLogging] = useState<boolean>(() => getWriteDebugMode());
+  const [recentWritesCount, setRecentWritesCount] = useState<number>(() => getRecentWriteAttempts().length);
+  const [showConsoleFeedback, setShowConsoleFeedback] = useState(false);
+
+  // Subscribe to real-time write attempts
+  useEffect(() => {
+    return subscribeToWriteAttempts(() => {
+      setRecentWritesCount(getRecentWriteAttempts().length);
+    });
+  }, []);
+
+  // Compute current connection state
+  const connectionState: 'Online' | 'Syncing' | 'Offline' = isSyncing 
+    ? 'Syncing' 
+    : isOnline 
+    ? 'Online' 
+    : 'Offline';
+
+  const handleToggleDebug = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const nextMode = !isDebugLogging;
+    setIsDebugLogging(nextMode);
+    setWriteDebugMode(nextMode);
+    printWriteAttemptsToConsole();
+    setShowConsoleFeedback(true);
+    setTimeout(() => setShowConsoleFeedback(false), 2500);
+  };
 
   // Format current date in Portuguese
   const todayFormatted = new Intl.DateTimeFormat('pt-BR', {
@@ -173,7 +214,64 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden lg:inline">Aura Copilot</span>
           </button>
 
-          {/* Status de Conexão & Sincronização Nuvem / IndexedDB */}
+          {/* Status Indicator & Firestore Debug Toggle */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-50 border border-slate-200 rounded-xl shadow-2xs">
+            {/* Simple Connection State Indicator: Online | Syncing | Offline */}
+            <div 
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors ${
+                connectionState === 'Online'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : connectionState === 'Syncing'
+                  ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                  : 'bg-amber-50 text-amber-800 border-amber-200'
+              }`}
+              title={`Estado da Conexão: ${connectionState}`}
+            >
+              <span className="relative flex h-2 w-2">
+                {connectionState === 'Online' && (
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                )}
+                {connectionState === 'Syncing' && (
+                  <RefreshCw className="w-2.5 h-2.5 animate-spin text-indigo-600 -ml-0.5" />
+                )}
+                {connectionState !== 'Syncing' && (
+                  <span
+                    className={`relative inline-flex rounded-full h-2 w-2 ${
+                      connectionState === 'Online' ? 'bg-emerald-500' : 'bg-amber-500'
+                    }`}
+                  ></span>
+                )}
+              </span>
+              <span className="text-[11px] tracking-tight">{connectionState}</span>
+            </div>
+
+            {/* Small Debug Writes Toggle */}
+            <button
+              type="button"
+              onClick={handleToggleDebug}
+              className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-mono font-semibold transition-all cursor-pointer border ${
+                isDebugLogging
+                  ? 'bg-indigo-600 border-indigo-700 text-white shadow-2xs hover:bg-indigo-700'
+                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+              title="Debug: Imprimir no Console (F12) as gravações em tempo real do Firestore"
+            >
+              <Terminal className="w-3 h-3 text-current" />
+              <span className="hidden sm:inline">Debug</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                isDebugLogging ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-700'
+              }`}>
+                {recentWritesCount}
+              </span>
+              {showConsoleFeedback && (
+                <span className="text-[10px] text-emerald-300 font-sans font-bold animate-pulse">
+                  ✓ F12
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Status de Conexão Detalhado & Sincronização Nuvem / IndexedDB */}
           <ConnectionSyncStatusWidget />
 
           {/* Quadro de Avisos Notification Bell */}

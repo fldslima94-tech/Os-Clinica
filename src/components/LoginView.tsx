@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Lock, 
   Mail, 
@@ -19,6 +19,8 @@ import {
   loginWithFirebaseGoogle, 
   loginWithFirebaseEmailPassword, 
   sendFirebasePasswordReset, 
+  fetchUserFromFirestoreByEmail,
+  fetchAllUsersFromFirestore,
   SUPER_ADMIN_EMAILS 
 } from '../services/firebaseService';
 
@@ -40,6 +42,22 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSuccess, setForgotSuccess] = useState(false);
+  const [dbUsers, setDbUsers] = useState<UsuarioEquipe[]>([]);
+
+  // Background warm-up to ensure newly created users on Firestore are instantly ready in any browser
+  useEffect(() => {
+    let isMounted = true;
+    fetchAllUsersFromFirestore().then((fetched) => {
+      if (isMounted && fetched && fetched.length > 0) {
+        setDbUsers(fetched);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const allAvailableUsers = [...usuarios, ...dbUsers];
 
   const executeLogin = (userToLogin: UsuarioEquipe) => {
     setIsLoading(true);
@@ -62,7 +80,12 @@ export const LoginView: React.FC<LoginViewProps> = ({
       }
 
       const cleanEmail = (fbUser.email || '').toLowerCase().trim();
-      let userFound = usuarios.find(u => (u.email || '').toLowerCase().trim() === cleanEmail);
+      let userFound = allAvailableUsers.find(u => (u.email || '').toLowerCase().trim() === cleanEmail);
+
+      // Consulta direta no Firestore se não estiver ainda em memória
+      if (!userFound) {
+        userFound = await fetchUserFromFirestoreByEmail(cleanEmail);
+      }
 
       const isSuper = SUPER_ADMIN_EMAILS.includes(cleanEmail) || cleanEmail.includes('fabio');
 
@@ -146,14 +169,28 @@ export const LoginView: React.FC<LoginViewProps> = ({
       return;
     }
 
-    // Match user in database (including super admin alias matching)
-    let userFound = usuarios.find(u => (u.email || '').toLowerCase().trim() === cleanEmail);
+    setIsLoading(true);
+
+    // 1. Busca local nos usuários já carregados
+    let userFound = allAvailableUsers.find(u => (u.email || '').toLowerCase().trim() === cleanEmail);
+
+    // 2. Se não encontrar na memória local (ex: usuário recém-criado em outro navegador), busca diretamente no Firestore
+    if (!userFound) {
+      try {
+        const directFromDb = await fetchUserFromFirestoreByEmail(cleanEmail);
+        if (directFromDb) {
+          userFound = directFromDb;
+        }
+      } catch (err) {
+        console.warn('[Login Firestore Lookup]', err);
+      }
+    }
 
     const isSuper = SUPER_ADMIN_EMAILS.includes(cleanEmail) || cleanEmail.includes('fabio');
 
     // Fallback: Super Admin recognition for fldslima94@gmail.com or fabio@teste.com
     if (!userFound && isSuper) {
-      userFound = usuarios.find(u => isUserAdminTotal(u) || u.id === 'user-super-admin' || u.nome?.toLowerCase().includes('fabio lima'));
+      userFound = allAvailableUsers.find(u => isUserAdminTotal(u) || u.id === 'user-super-admin' || u.nome?.toLowerCase().includes('fabio lima'));
     }
 
     // Dynamic Super Admin creation fallback if not pre-seeded in array
@@ -189,6 +226,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
     }
 
     if (!userFound) {
+      setIsLoading(false);
       setErrorMessage('E-mail ou senha incorretos. Verifique suas credenciais de acesso.');
       return;
     }

@@ -161,12 +161,116 @@ export function sanitizeForFirestore<T>(data: T): T {
   return data;
 }
 
+// ==========================================
+// Firestore Real-Time Write Attempts Tracker
+// ==========================================
+export interface FirestoreWriteAttempt {
+  id: string;
+  timestamp: Date;
+  collection: string;
+  docId: string;
+  operation: 'setDoc' | 'updateDoc' | 'deleteDoc' | 'runTransaction';
+  status: 'pending' | 'success' | 'error';
+  durationMs?: number;
+  payloadSummary?: string;
+  payload?: any;
+  error?: string;
+}
+
+const writeAttemptsLog: FirestoreWriteAttempt[] = [];
+const writeAttemptListeners = new Set<() => void>();
+let isWriteDebugActive = true; // Enabled by default for transparency
+
+export function setWriteDebugMode(enabled: boolean): void {
+  isWriteDebugActive = enabled;
+  if (enabled) {
+    console.info('%c[Firestore Realtime Tracker] Debug logging ATIVADO. Todas as tentativas de escrita serão impressas no console.', 'color: #10b981; font-weight: bold;');
+    printWriteAttemptsToConsole();
+  } else {
+    console.info('%c[Firestore Realtime Tracker] Debug logging DESATIVADO.', 'color: #64748b;');
+  }
+}
+
+export function getWriteDebugMode(): boolean {
+  return isWriteDebugActive;
+}
+
+export function getRecentWriteAttempts(): FirestoreWriteAttempt[] {
+  return [...writeAttemptsLog];
+}
+
+export function subscribeToWriteAttempts(callback: () => void): () => void {
+  writeAttemptListeners.add(callback);
+  return () => {
+    writeAttemptListeners.delete(callback);
+  };
+}
+
+function recordWriteAttempt(attempt: Omit<FirestoreWriteAttempt, 'id'>): FirestoreWriteAttempt {
+  const item: FirestoreWriteAttempt = {
+    ...attempt,
+    id: `write-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+  };
+  writeAttemptsLog.unshift(item);
+  if (writeAttemptsLog.length > 50) {
+    writeAttemptsLog.pop();
+  }
+  
+  if (isWriteDebugActive) {
+    if (attempt.status === 'success') {
+      console.log(
+        `%c[Firestore Persistência OK] %c${attempt.operation.toUpperCase()} → %c${attempt.collection}/${attempt.docId} %c(${attempt.durationMs || 0}ms)`,
+        'color: #10b981; font-weight: bold;',
+        'color: #6366f1; font-weight: bold;',
+        'color: #0f172a; font-weight: bold;',
+        'color: #64748b;',
+        attempt.payload || attempt.payloadSummary
+      );
+    } else if (attempt.status === 'error') {
+      console.error(
+        `%c[Firestore Persistência ERRO] %c${attempt.operation.toUpperCase()} → %c${attempt.collection}/${attempt.docId}:`,
+        'color: #ef4444; font-weight: bold;',
+        'color: #f59e0b; font-weight: bold;',
+        'color: #0f172a;',
+        attempt.error
+      );
+    }
+  }
+
+  writeAttemptListeners.forEach(fn => {
+    try { fn(); } catch (e) { console.warn(e); }
+  });
+
+  return item;
+}
+
+export function printWriteAttemptsToConsole(): void {
+  const logs = getRecentWriteAttempts();
+  console.group('%c🔥 [Firestore Real-Time Writes Verification] Histórico Recente de Gravações', 'color: #6366f1; font-size: 13px; font-weight: bold;');
+  console.log(`Total de tentativas registradas nesta sessão: ${logs.length}`);
+  if (logs.length === 0) {
+    console.log('%cNenhuma gravação realizada ainda nesta sessão.', 'color: #94a3b8; font-style: italic;');
+  } else {
+    console.table(logs.map(log => ({
+      Horário: log.timestamp.toLocaleTimeString('pt-BR'),
+      Coleção: log.collection,
+      'ID Documento': log.docId,
+      Operação: log.operation,
+      Status: log.status.toUpperCase(),
+      'Latência (ms)': log.durationMs ?? '-',
+      Resumo: log.payloadSummary || '-'
+    })));
+  }
+  console.groupEnd();
+}
+
 // Firestore generic save/update helper
 export async function saveDocument<T extends { id: string }>(
   collectionName: string, 
   item: T
 ): Promise<{ success: boolean; error?: string }> {
   const docPath = `${collectionName}/${item.id}`;
+  const startTime = Date.now();
   try {
     const docRef = doc(db, collectionName, item.id);
     const sanitized = sanitizeForFirestore(item);
@@ -174,10 +278,36 @@ export async function saveDocument<T extends { id: string }>(
       ...sanitized,
       atualizadoEm: serverTimestamp()
     }, { merge: true });
+    
+    const duration = Date.now() - startTime;
+    recordWriteAttempt({
+      timestamp: new Date(),
+      collection: collectionName,
+      docId: item.id,
+      operation: 'setDoc',
+      status: 'success',
+      durationMs: duration,
+      payloadSummary: (item as any).nome || (item as any).procedimento || (item as any).descricao || (item as any).paciente_nome || 'Registro salvo',
+      payload: sanitized
+    });
+
     return { success: true };
   } catch (error: any) {
+    const duration = Date.now() - startTime;
     handleFirestoreError(error, OperationType.WRITE, docPath);
     console.error(`[Firestore Save Error] em ${collectionName}/${item.id}:`, error);
+
+    recordWriteAttempt({
+      timestamp: new Date(),
+      collection: collectionName,
+      docId: item.id,
+      operation: 'setDoc',
+      status: 'error',
+      durationMs: duration,
+      payloadSummary: (item as any).nome || 'Falha na gravação',
+      error: error?.message || String(error)
+    });
+
     return { success: false, error: error?.message || String(error) };
   }
 }
@@ -190,6 +320,7 @@ export async function softDeleteTransacao(
   usuarioRole?: string
 ): Promise<void> {
   const docPath = `${COLLECTIONS.TRANSACOES}/${transacaoId}`;
+  const startTime = Date.now();
   try {
     const docRef = doc(db, COLLECTIONS.TRANSACOES, transacaoId);
     await setDoc(docRef, {
@@ -199,19 +330,58 @@ export async function softDeleteTransacao(
       excluido_por_role: usuarioRole || 'gestor',
       data_exclusao: new Date().toISOString()
     }, { merge: true });
-  } catch (error) {
+
+    recordWriteAttempt({
+      timestamp: new Date(),
+      collection: COLLECTIONS.TRANSACOES,
+      docId: transacaoId,
+      operation: 'updateDoc',
+      status: 'success',
+      durationMs: Date.now() - startTime,
+      payloadSummary: `Soft delete transação: ${motivo}`
+    });
+  } catch (error: any) {
     handleFirestoreError(error, OperationType.UPDATE, docPath);
+    recordWriteAttempt({
+      timestamp: new Date(),
+      collection: COLLECTIONS.TRANSACOES,
+      docId: transacaoId,
+      operation: 'updateDoc',
+      status: 'error',
+      durationMs: Date.now() - startTime,
+      error: error?.message || String(error)
+    });
   }
 }
 
 // Firestore hard delete helper
 export async function removeDocument(collectionName: string, id: string): Promise<void> {
   const docPath = `${collectionName}/${id}`;
+  const startTime = Date.now();
   try {
     const docRef = doc(db, collectionName, id);
     await deleteDoc(docRef);
-  } catch (error) {
+
+    recordWriteAttempt({
+      timestamp: new Date(),
+      collection: collectionName,
+      docId: id,
+      operation: 'deleteDoc',
+      status: 'success',
+      durationMs: Date.now() - startTime,
+      payloadSummary: `Exclusão de documento em ${collectionName}`
+    });
+  } catch (error: any) {
     handleFirestoreError(error, OperationType.DELETE, docPath);
+    recordWriteAttempt({
+      timestamp: new Date(),
+      collection: collectionName,
+      docId: id,
+      operation: 'deleteDoc',
+      status: 'error',
+      durationMs: Date.now() - startTime,
+      error: error?.message || String(error)
+    });
   }
 }
 
@@ -706,6 +876,54 @@ export async function logoutFirebase(): Promise<void> {
 
 export function onFirebaseAuthStateChange(callback: (user: FirebaseUser | null) => void): () => void {
   return onAuthStateChanged(auth, callback);
+}
+
+/**
+ * Busca autoritativa em tempo real no Firestore por e-mail de usuário
+ */
+export async function fetchUserFromFirestoreByEmail(email: string): Promise<UsuarioEquipe | null> {
+  const cleanEmail = email.trim().toLowerCase();
+  if (!cleanEmail) return null;
+
+  try {
+    // 1. Busca direta na coleção principal de usuários
+    const snapUsuarios = await getDocs(collection(db, COLLECTIONS.USUARIOS));
+    for (const docSnap of snapUsuarios.docs) {
+      const data = docSnap.data() as UsuarioEquipe;
+      const uEmail = (data.email || '').trim().toLowerCase();
+      if (uEmail === cleanEmail) {
+        return { ...data, id: docSnap.id };
+      }
+    }
+
+    // 2. Busca de contingência na coleção de perfis
+    const snapPerfis = await getDocs(collection(db, COLLECTIONS.PERFIS));
+    for (const docSnap of snapPerfis.docs) {
+      const data = docSnap.data() as UsuarioEquipe;
+      const uEmail = (data.email || '').trim().toLowerCase();
+      if (uEmail === cleanEmail) {
+        return { ...data, id: docSnap.id };
+      }
+    }
+  } catch (err) {
+    console.warn('[fetchUserFromFirestoreByEmail] Aviso ao consultar usuário no Firestore:', err);
+  }
+  return null;
+}
+
+/**
+ * Carrega todos os usuários salvos no Firestore de forma direta e síncrona
+ */
+export async function fetchAllUsersFromFirestore(): Promise<UsuarioEquipe[]> {
+  try {
+    const snap = await getDocs(collection(db, COLLECTIONS.USUARIOS));
+    if (!snap.empty) {
+      return snap.docs.map(d => ({ ...d.data(), id: d.id }) as UsuarioEquipe);
+    }
+  } catch (err) {
+    console.warn('[fetchAllUsersFromFirestore] Aviso ao buscar lista de usuários:', err);
+  }
+  return [];
 }
 
 // Helper to update user profile in Firebase Auth and Firestore (perfis & usuarios)
