@@ -5,15 +5,17 @@ import {
   Clock, 
   User, 
   Plus, 
-  Calendar as CalendarIcon,
-  CheckCircle2,
-  AlertCircle
+  Calendar as CalendarIcon, 
+  CheckCircle2, 
+  AlertCircle,
+  Filter
 } from 'lucide-react';
-import { Agendamento, Paciente, StatusAgendamento } from '../types';
+import { Agendamento, Paciente, StatusAgendamento, UsuarioEquipe } from '../types';
 
 interface CalendarGridViewProps {
   agendamentos: Agendamento[];
   pacientes: Paciente[];
+  profissionais?: UsuarioEquipe[];
   onOpenNewAppointment: (initialData?: Partial<Agendamento>) => void;
   onSelectAgendamento: (agendamento: Agendamento) => void;
   onViewPatient: (paciente: Paciente) => void;
@@ -28,6 +30,7 @@ const HOURS = [
 export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
   agendamentos,
   pacientes,
+  profissionais = [],
   onOpenNewAppointment,
   onSelectAgendamento,
   onViewPatient,
@@ -35,6 +38,7 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
 }) => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<'semana' | 'dia'>('semana');
+  const [selectedProfissionalId, setSelectedProfissionalId] = useState<string>('todos');
 
   // Helper to get week days around selectedDate (Monday to Saturday)
   const getWeekDays = (baseDate: Date) => {
@@ -76,12 +80,21 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
 
   const isToday = (d: Date) => isSameDay(d, new Date());
 
-  // Filter appointments for the active period
+  // Filter appointments for the active period and selected professional
   const getAgendamentosForDayAndHour = (date: Date, hourStr: string) => {
     const hourNum = parseInt(hourStr.split(':')[0], 10);
     return agendamentos.filter(ag => {
       try {
-        const agDate = new Date(ag.data_hora);
+        if (selectedProfissionalId !== 'todos') {
+          const matchProf = ag.profissional_id === selectedProfissionalId || 
+            ag.profissional_nome === selectedProfissionalId;
+          if (!matchProf) return false;
+        }
+
+        const rawDate = ag.data_hora || ag.data_horario;
+        if (!rawDate) return false;
+        const agDate = new Date(rawDate);
+        if (isNaN(agDate.getTime())) return false;
         return isSameDay(agDate, date) && agDate.getHours() === hourNum;
       } catch {
         return false;
@@ -92,6 +105,10 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
   const formatHeaderMonth = () => {
     return selectedDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
   };
+
+  const clinicalProfessionals = profissionais.filter(
+    p => p.role !== 'cliente'
+  );
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
@@ -129,8 +146,26 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
           </span>
         </div>
 
-        {/* View mode switcher */}
-        <div className="flex items-center gap-2">
+        {/* Professional and View Mode Selectors */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Filter by Professional directly on Calendar */}
+          {clinicalProfessionals.length > 0 && (
+            <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
+              <User className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+              <select
+                value={selectedProfissionalId}
+                onChange={(e) => setSelectedProfissionalId(e.target.value)}
+                className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
+              >
+                <option value="todos">Todos os Profissionais</option>
+                {clinicalProfessionals.map(p => (
+                  <option key={p.id} value={p.id}>{p.nome}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* View mode switcher */}
           <div className="flex bg-slate-200/80 p-0.5 rounded-lg text-xs font-semibold">
             <button
               onClick={() => setViewMode('semana')}
@@ -155,7 +190,7 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
           </div>
 
           <button
-            onClick={onOpenNewAppointment}
+            onClick={() => onOpenNewAppointment()}
             className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -224,13 +259,19 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
                               const isConfirmed = ag.status === 'confirmado';
                               const isDone = ag.status === 'concluido';
                               const isPending = ag.status === 'pendente';
+                              const isWaiting = ag.status === 'em_espera';
+                              const isInRoom = ag.status === 'em_atendimento';
 
                               return (
                                 <div
                                   key={ag.id}
                                   onClick={() => onSelectAgendamento(ag)}
                                   className={`p-2 rounded-lg text-xs cursor-pointer border shadow-2xs transition-transform hover:scale-[1.02] ${
-                                    isConfirmed 
+                                    isInRoom
+                                      ? 'bg-indigo-100 text-indigo-900 border-indigo-300 font-bold'
+                                      : isWaiting
+                                      ? 'bg-amber-100 text-amber-900 border-amber-300 font-semibold'
+                                      : isConfirmed 
                                       ? 'bg-emerald-50 text-emerald-900 border-emerald-200' 
                                       : isDone 
                                       ? 'bg-slate-100 text-slate-700 border-slate-200' 
@@ -241,10 +282,10 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
                                 >
                                   <div className="flex items-center justify-between gap-1 mb-0.5">
                                     <span className="font-bold truncate text-[11px]">
-                                      {patient?.nome || 'Paciente'}
+                                      {patient?.nome || ag.paciente?.nome || 'Paciente'}
                                     </span>
                                     <span className="text-[9px] px-1 py-0.2 rounded font-semibold capitalize shrink-0 bg-white/80">
-                                      {ag.status}
+                                      {ag.status === 'em_espera' ? 'Na Recepção' : ag.status === 'em_atendimento' ? 'Em Sala' : ag.status}
                                     </span>
                                   </div>
 
@@ -252,11 +293,17 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
                                     {ag.procedimento}
                                   </p>
 
-                                  {ag.valor_estimado && (
-                                    <p className="text-[10px] font-mono font-bold mt-1 text-slate-800">
-                                      R$ {ag.valor_estimado}
+                                  {ag.profissional_nome && (
+                                    <p className="text-[9px] text-indigo-700 truncate font-bold mt-0.5">
+                                      • {ag.profissional_nome}
                                     </p>
                                   )}
+
+                                  {ag.valor_estimado ? (
+                                    <p className="text-[10px] font-mono font-bold mt-0.5 text-slate-800">
+                                      R$ {ag.valor_estimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </p>
+                                  ) : null}
                                 </div>
                               );
                             })}
@@ -265,7 +312,13 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
                           <button
                             onClick={() => {
                               const dStr = day.toISOString().split('T')[0];
-                              onOpenNewAppointment({ data_hora: `${dStr}T${hour}:00` });
+                              const defaultProf = selectedProfissionalId !== 'todos' ? selectedProfissionalId : undefined;
+                              const profObj = defaultProf ? profissionais.find(p => p.id === defaultProf) : undefined;
+                              onOpenNewAppointment({ 
+                                data_hora: `${dStr}T${hour}:00`,
+                                profissional_id: defaultProf,
+                                profissional_nome: profObj?.nome
+                              });
                             }}
                             className="w-full h-full opacity-0 group-hover:opacity-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 rounded text-[11px] font-medium transition-opacity cursor-pointer"
                           >
@@ -312,7 +365,13 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
                         <button
                           onClick={() => {
                             const dStr = selectedDate.toISOString().split('T')[0];
-                            onOpenNewAppointment({ data_hora: `${dStr}T${hour}:00` });
+                            const defaultProf = selectedProfissionalId !== 'todos' ? selectedProfissionalId : undefined;
+                            const profObj = defaultProf ? profissionais.find(p => p.id === defaultProf) : undefined;
+                            onOpenNewAppointment({ 
+                              data_hora: `${dStr}T${hour}:00`,
+                              profissional_id: defaultProf,
+                              profissional_nome: profObj?.nome
+                            });
                           }}
                           className="text-indigo-600 hover:text-indigo-700 font-semibold cursor-pointer"
                         >
@@ -331,14 +390,14 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
                               <div>
                                 <div className="flex items-center gap-2">
                                   <span className="font-bold text-sm text-slate-900">
-                                    {patient?.nome}
+                                    {patient?.nome || ag.paciente?.nome || 'Cliente'}
                                   </span>
                                   <span className="text-[10px] px-2 py-0.5 rounded-full font-medium capitalize bg-slate-100 text-slate-700 border border-slate-200">
-                                    {ag.status}
+                                    {ag.status === 'em_espera' ? 'Na Recepção' : ag.status === 'em_atendimento' ? 'Em Sala' : ag.status}
                                   </span>
                                 </div>
                                 <p className="text-xs text-slate-600 mt-0.5 font-medium">
-                                  {ag.procedimento} • Duração: {ag.duracao_minutos || 45} min
+                                  {ag.procedimento} • Profissional: <strong className="text-indigo-700">{ag.profissional_nome || 'Equipe Geral'}</strong> • Duração: {ag.duracao_minutos || 45} min
                                 </p>
                               </div>
 
@@ -376,3 +435,4 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
     </div>
   );
 };
+

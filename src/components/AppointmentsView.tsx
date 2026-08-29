@@ -615,6 +615,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
         <CalendarGridView
           agendamentos={filtered}
           pacientes={pacientes}
+          profissionais={profissionais}
           onOpenNewAppointment={onOpenNewAppointment}
           onSelectAgendamento={(ag) => handleConcludeClick(ag)}
           onViewPatient={onViewPatient}
