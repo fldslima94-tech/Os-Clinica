@@ -19,8 +19,8 @@ const firebaseConfig = {
 // Initialize Firebase App instance
 export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Cloud Firestore with specified database ID, auto-detect long polling and persistent offline cache with (default)
-const configuredDbId = '(default)';
+// Initialize Cloud Firestore with specified database ID, auto-detect long polling and persistent offline cache
+const configuredDbId = (config as any).firestoreDatabaseId || '(default)';
 
 function initFirestoreInstance(): Firestore {
   try {
@@ -35,18 +35,19 @@ function initFirestoreInstance(): Firestore {
       configuredDbId
     );
   } catch (err) {
-    console.warn(`[Firestore] Falha ao inicializar com cache persistente, aplicando inicialização direta para "(default)":`, err);
+    console.warn(`[Firestore] Tentativa com DB '${configuredDbId}' falhou ou já inicializada. Tentando fallback:`, err);
     try {
-      return initializeFirestore(
-        app,
-        {
-          experimentalAutoDetectLongPolling: true,
-        },
-        '(default)'
-      );
+      if (configuredDbId !== '(default)') {
+        return initializeFirestore(
+          app,
+          { experimentalAutoDetectLongPolling: true },
+          configuredDbId
+        );
+      }
     } catch {
-      return getFirestore(app);
+      // Ignore
     }
+    return getFirestore(app);
   }
 }
 
