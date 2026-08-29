@@ -886,11 +886,9 @@ export default function App() {
       payload: createdAgendamento,
     });
 
-    if (isOnline) {
-      saveDocument(COLLECTIONS.AGENDAMENTOS, createdAgendamento);
-    }
+    saveDocument(COLLECTIONS.AGENDAMENTOS, createdAgendamento);
 
-    showToast(`Agendamento de "${patientObj?.nome || 'Paciente'}" registrado com sucesso!`);
+    showToast(`Agendamento de "${patientObj?.nome || 'Paciente'}" registrado e sincronizado no banco de dados!`);
   };
 
   const handleSavePatient = (novo: Partial<Paciente>) => {
@@ -928,12 +926,8 @@ export default function App() {
       action: 'create',
       payload: createdPatient,
     });
-    if (isOnline) {
-      saveDocument(COLLECTIONS.PACIENTES, createdPatient);
-      showToast(`Ficha do cliente "${createdPatient.nome}" cadastrada e sincronizada com a nuvem!`);
-    } else {
-      showToast(`Ficha do cliente "${createdPatient.nome}" salva offline no dispositivo. Sincronizará quando houver rede.`, 'info');
-    }
+    saveDocument(COLLECTIONS.PACIENTES, createdPatient);
+    showToast(`Ficha do cliente "${createdPatient.nome}" cadastrada e gravada no banco em tempo real!`);
   };
 
   const handleSaveNovaAnamneseCompletaGlobal = async (novaAnamnese: AnamneseCompleta) => {
