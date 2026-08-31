@@ -91,7 +91,7 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
           if (!matchProf) return false;
         }
 
-        const rawDate = ag.data_hora || ag.data_horario;
+        const rawDate = ag.data_hora;
         if (!rawDate) return false;
         const agDate = new Date(rawDate);
         if (isNaN(agDate.getTime())) return false;

@@ -401,7 +401,7 @@ export const GeminiChatbotView: React.FC<GeminiChatbotViewProps> = ({ currentUse
             type="text"
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
-            placeholder={`Pergunte algo sobre ${currentRoleInfo.label.toLowerCase()}...`}
+            placeholder={`Pergunte algo sobre ${(currentRoleInfo?.label || 'a clínica').toLowerCase()}...`}
             disabled={isLoading}
             className="flex-1 px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs md:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all disabled:opacity-60"
           />

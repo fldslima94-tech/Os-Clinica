@@ -17,7 +17,8 @@ import {
   Terminal,
   Wifi,
   WifiOff,
-  RefreshCw
+  RefreshCw,
+  Tv
 } from 'lucide-react';
 import { TabType, UsuarioEquipe, UserRole } from '../types';
 import { 
@@ -39,6 +40,7 @@ interface HeaderProps {
   onOpenSqlGuide: () => void;
   onOpenGlobalSearch?: () => void;
   onOpenNoticeBoard?: () => void;
+  onOpenSecondScreenModal?: () => void;
   unreadNoticesCount?: number;
   lowStockCount: number;
   manutencaoAlertCount?: number;
@@ -57,6 +59,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSqlGuide,
   onOpenGlobalSearch,
   onOpenNoticeBoard,
+  onOpenSecondScreenModal,
   unreadNoticesCount = 0,
   lowStockCount,
   manutencaoAlertCount = 0,
@@ -198,6 +201,28 @@ export const Header: React.FC<HeaderProps> = ({
           
           {/* Botão de Ativação do Modo Edição Master */}
           <MasterEditToggle />
+
+          {/* Quick TV Reception / Second Screen Button */}
+          <button
+            type="button"
+            onClick={() => {
+              if (onOpenSecondScreenModal) {
+                onOpenSecondScreenModal();
+              } else {
+                setActiveTab('balcao_tv');
+              }
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-2xs ${
+              activeTab === 'balcao_tv'
+                ? 'bg-purple-600 border-purple-700 text-white'
+                : 'bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-800'
+            }`}
+            title="Abrir TV da Recepção / Segunda Tela (Espelhamento do Balcão do Dia por Turnos)"
+          >
+            <Tv className="w-3.5 h-3.5 text-purple-600" />
+            <span className="hidden xl:inline">TV Recepção</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-purple-200 text-purple-900 font-extrabold">2ª Tela</span>
+          </button>
 
           {/* Quick Aura Copilot AI Button */}
           <button

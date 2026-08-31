@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   DollarSign, 
   TrendingUp, 
@@ -122,39 +122,59 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
   const [editObs, setEditObs] = useState('');
   const [despesaToDelete, setDespesaToDelete] = useState<DespesaRecorrente | null>(null);
 
-  // Filter Active (Non-deleted) vs Soft-deleted Transactions
-  const activeTransacoes = transacoes.filter(t => !t.excluido);
-  const deletedTransacoes = transacoes.filter(t => t.excluido);
+  // Filter Active (Non-deleted) vs Soft-deleted Transactions with useMemo
+  const { activeTransacoes, deletedTransacoes } = useMemo(() => {
+    return {
+      activeTransacoes: transacoes.filter(t => !t.excluido),
+      deletedTransacoes: transacoes.filter(t => t.excluido)
+    };
+  }, [transacoes]);
 
   // KPI Calculations (Only Non-Deleted & Paid count)
-  const entradas = activeTransacoes.filter(t => (t.tipo === 'entrada' || t.tipo === 'receita') && t.status === 'pago');
-  const totalEntradas = entradas.reduce((acc, t) => acc + t.valor, 0);
+  const { entradas, totalEntradas, saidas, totalSaidas, saldoLiquidoCaixa, totalRecorrenteMensal } = useMemo(() => {
+    const ent = activeTransacoes.filter(t => (t.tipo === 'entrada' || t.tipo === 'receita') && t.status === 'pago');
+    const totEnt = ent.reduce((acc, t) => acc + (Number(t.valor) || 0), 0);
 
-  const saidas = activeTransacoes.filter(t => (t.tipo === 'saida' || t.tipo === 'despesa') && t.status === 'pago');
-  const totalSaidas = saidas.reduce((acc, t) => acc + t.valor, 0);
+    const sai = activeTransacoes.filter(t => (t.tipo === 'saida' || t.tipo === 'despesa') && t.status === 'pago');
+    const totSai = sai.reduce((acc, t) => acc + (Number(t.valor) || 0), 0);
 
-  const saldoLiquidoCaixa = totalEntradas - totalSaidas;
+    const totRec = despesasRecorrentes
+      .filter(d => d.status === 'ativo')
+      .reduce((acc, d) => acc + (Number(d.valor) || 0), 0);
 
-  const totalRecorrenteMensal = despesasRecorrentes
-    .filter(d => d.status === 'ativo')
-    .reduce((acc, d) => acc + d.valor, 0);
+    return {
+      entradas: ent,
+      totalEntradas: totEnt,
+      saidas: sai,
+      totalSaidas: totSai,
+      saldoLiquidoCaixa: totEnt - totSai,
+      totalRecorrenteMensal: totRec
+    };
+  }, [activeTransacoes, despesasRecorrentes]);
 
   // Filtered List based on Current Tab and Search
-  const displayList = (showAuditDeleted ? transacoes : activeTransacoes).filter(t => {
-    const isEntrada = t.tipo === 'entrada' || t.tipo === 'receita';
-    const isSaida = t.tipo === 'saida' || t.tipo === 'despesa';
-
-    const matchesTab = activeFinTab === 'entradas' ? isEntrada : activeFinTab === 'saidas' ? isSaida : true;
+  const displayList = useMemo(() => {
+    const sourceList = showAuditDeleted ? transacoes : activeTransacoes;
     const q = search.toLowerCase().trim();
-    const matchesSearch = !q || 
-      (t.paciente_nome || '').toLowerCase().includes(q) || 
-      (t.procedimento || '').toLowerCase().includes(q) ||
-      (t.profissional_nome || '').toLowerCase().includes(q) ||
-      (t.categoria || '').toLowerCase().includes(q) ||
-      (t.forma_pagamento || '').toLowerCase().includes(q);
 
-    return matchesTab && matchesSearch;
-  });
+    return sourceList.filter(t => {
+      const isEntrada = t.tipo === 'entrada' || t.tipo === 'receita';
+      const isSaida = t.tipo === 'saida' || t.tipo === 'despesa';
+
+      const matchesTab = activeFinTab === 'entradas' ? isEntrada : activeFinTab === 'saidas' ? isSaida : true;
+      if (!matchesTab) return false;
+      if (!q) return true;
+
+      const matchesSearch = 
+        (t.paciente_nome || '').toLowerCase().includes(q) || 
+        (t.procedimento || '').toLowerCase().includes(q) ||
+        (t.profissional_nome || '').toLowerCase().includes(q) ||
+        (t.categoria || '').toLowerCase().includes(q) ||
+        (t.forma_pagamento || '').toLowerCase().includes(q);
+
+      return matchesSearch;
+    });
+  }, [showAuditDeleted, transacoes, activeTransacoes, activeFinTab, search]);
 
   const handleSaveTransaction = (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,6 +213,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
       recorrencia: 'mensal',
       status: 'ativo',
       forma_pagamento_preferencial: recForma,
+      criado_em: new Date().toISOString(),
     });
 
     setIsNewRecorrenteModalOpen(false);
@@ -602,7 +623,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
                 </p>
                 {onAddDespesaRecorrente && (
                   <button
-                    onClick={onAddDespesaRecorrente}
+                    onClick={() => setIsNewRecorrenteModalOpen(true)}
                     className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-semibold hover:bg-rose-700 transition-colors cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />

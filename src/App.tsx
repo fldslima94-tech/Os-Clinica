@@ -77,6 +77,7 @@ import { CompleteProcedureModal } from './components/CompleteProcedureModal';
 import { CheckInPaymentAndReturnModal } from './components/CheckInPaymentAndReturnModal';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { DatabaseMasterView } from './components/DatabaseMasterView';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { TreatmentPackagesModal } from './components/TreatmentPackagesModal';
 import { ClinicSettingsModal } from './components/ClinicSettingsModal';
 import { UserProfileAvatarModal } from './components/UserProfileAvatarModal';
@@ -84,8 +85,17 @@ import { NewAssetModal } from './components/NewAssetModal';
 import { ConflictResolutionModal } from './components/ConflictResolutionModal';
 import { MasterEditProvider } from './contexts/MasterEditModeContext';
 import { MasterEditModal } from './components/MasterEditModal';
+import { AppContentSkeleton } from './components/AppContentSkeleton';
+import { ReceptionTVView } from './components/ReceptionTVView';
+import { SecondScreenModal } from './components/SecondScreenModal';
 import { useConnectionStatus } from './contexts/ConnectionStatusContext';
-import { CheckCircle2, AlertCircle, Cloud } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Cloud, Sparkles, Loader2 } from 'lucide-react';
+import { 
+  loadLocalAgendamentos, 
+  loadLocalTransacoes, 
+  loadLocalPacientes, 
+  loadLocalCollection 
+} from './services/localPersistenceService';
 import { 
   seedInitialFirestoreData, 
   subscribeToCollection, 
@@ -112,6 +122,7 @@ const STORAGE_TAB_KEY = 'aura_active_tab';
 function getInitialTab(userRole?: string): TabType {
   if (typeof window !== 'undefined') {
     const params = new URLSearchParams(window.location.search);
+    if (params.get('mode') === 'tv') return 'balcao_tv';
     const tabFromUrl = params.get('tab') as TabType;
     if (tabFromUrl) return tabFromUrl;
 
@@ -206,6 +217,19 @@ export default function App() {
     camposOcultos: [],
     camposObrigatorios: [],
   });
+
+  // State to track initial Firestore subscription synchronization
+  const [loadedCollections, setLoadedCollections] = useState<Set<string>>(() => new Set());
+  const [isInitialDataLoading, setIsInitialDataLoading] = useState<boolean>(true);
+
+  const markCollectionReady = (colName: string) => {
+    setLoadedCollections(prev => {
+      if (prev.has(colName)) return prev;
+      const next = new Set(prev);
+      next.add(colName);
+      return next;
+    });
+  };
   
   // Persistent Auth & Navigation State
   const [currentUser, setCurrentUser] = useState<UsuarioEquipe>(getInitialUser);
@@ -273,6 +297,7 @@ export default function App() {
   const [assetToEdit, setAssetToEdit] = useState<BemAtivo | null>(null);
   const [isSqlModalOpen, setIsSqlModalOpen] = useState(false);
   const [isAnamneseModalOpen, setIsAnamneseModalOpen] = useState(false);
+  const [isSecondScreenModalOpen, setIsSecondScreenModalOpen] = useState(false);
   const [selectedPatientForAnamnese, setSelectedPatientForAnamnese] = useState<Paciente | null>(null);
   const [selectedPatientForDetails, setSelectedPatientForDetails] = useState<Paciente | null>(null);
   const [appointmentToComplete, setAppointmentToComplete] = useState<Agendamento | null>(null);
@@ -302,6 +327,62 @@ export default function App() {
     }
   }, [currentUser.role, activeTab]);
 
+  // Instant Local Persistence (IndexedDB): Hydrates appointments, transactions, patients and inventory immediately on boot
+  useEffect(() => {
+    let isMounted = true;
+    async function hydrateFromLocalIndexedDB() {
+      try {
+        const [
+          cachedAgendamentos,
+          cachedTransacoes,
+          cachedPacientes,
+          cachedEstoque,
+          cachedProcedimentos
+        ] = await Promise.all([
+          loadLocalAgendamentos(),
+          loadLocalTransacoes(),
+          loadLocalPacientes(),
+          loadLocalCollection<EstoqueInsumo>(COLLECTIONS.ESTOQUE),
+          loadLocalCollection<ProcedimentoClinico>(COLLECTIONS.PROCEDIMENTOS)
+        ]);
+
+        if (!isMounted) return;
+
+        if (cachedAgendamentos && cachedAgendamentos.length > 0) {
+          setAgendamentos(prev => prev.length === 0 ? cachedAgendamentos : prev);
+        }
+        if (cachedTransacoes && cachedTransacoes.length > 0) {
+          setTransacoes(prev => prev.length === 0 ? cachedTransacoes : prev);
+        }
+        if (cachedPacientes && cachedPacientes.length > 0) {
+          setPacientes(prev => prev.length === 0 ? cachedPacientes : prev);
+        }
+        if (cachedEstoque && cachedEstoque.length > 0) {
+          setEstoque(prev => prev.length === 0 ? cachedEstoque : prev);
+        }
+        if (cachedProcedimentos && cachedProcedimentos.length > 0) {
+          setProcedimentos(prev => prev.length === 0 ? cachedProcedimentos : prev);
+        }
+
+        // Release initial skeleton if local cached records are available instantly
+        if (
+          (cachedAgendamentos && cachedAgendamentos.length > 0) ||
+          (cachedTransacoes && cachedTransacoes.length > 0) ||
+          (cachedPacientes && cachedPacientes.length > 0)
+        ) {
+          setIsInitialDataLoading(false);
+        }
+      } catch (err) {
+        console.warn('[IndexedDB Hydration] Aviso ao restaurar cache local:', err);
+      }
+    }
+
+    hydrateFromLocalIndexedDB();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Firebase Cloud Firestore Real-Time Synchronizations (onSnapshot)
   useEffect(() => {
     // Auto-heal super admin master credentials in Firestore
@@ -314,61 +395,89 @@ export default function App() {
         if (data && data.length > 0) {
           setClinicaConfig(data[0]);
         }
+        markCollectionReady(COLLECTIONS.CLINICA_CONFIG);
       },
       [MOCK_CLINICA_CONFIG]
     );
 
     const unsubPacientes = subscribeToCollection<Paciente>(
       COLLECTIONS.PACIENTES, 
-      (data) => setPacientes(data), 
+      (data) => {
+        setPacientes(data);
+        markCollectionReady(COLLECTIONS.PACIENTES);
+      }, 
       []
     );
 
     const unsubFornecedores = subscribeToCollection<Fornecedor>(
       COLLECTIONS.FORNECEDORES, 
-      (data) => setFornecedores(data), 
+      (data) => {
+        setFornecedores(data);
+        markCollectionReady(COLLECTIONS.FORNECEDORES);
+      }, 
       []
     );
 
     const unsubAgendamentos = subscribeToCollection<Agendamento>(
       COLLECTIONS.AGENDAMENTOS, 
-      (data) => setAgendamentos(data), 
+      (data) => {
+        setAgendamentos(data);
+        markCollectionReady(COLLECTIONS.AGENDAMENTOS);
+      }, 
       []
     );
 
     const unsubEstoque = subscribeToCollection<EstoqueInsumo>(
       COLLECTIONS.ESTOQUE, 
-      (data) => setEstoque(data), 
+      (data) => {
+        setEstoque(data);
+        markCollectionReady(COLLECTIONS.ESTOQUE);
+      }, 
       []
     );
 
     const unsubBens = subscribeToCollection<BemPatrimonial>(
       COLLECTIONS.BENS, 
-      (data) => setBensPatrimoniais(data), 
+      (data) => {
+        setBensPatrimoniais(data);
+        markCollectionReady(COLLECTIONS.BENS);
+      }, 
       []
     );
 
     const unsubProcedimentos = subscribeToCollection<ProcedimentoClinico>(
       COLLECTIONS.PROCEDIMENTOS, 
-      (data) => setProcedimentos(data), 
+      (data) => {
+        setProcedimentos(data);
+        markCollectionReady(COLLECTIONS.PROCEDIMENTOS);
+      }, 
       []
     );
 
     const unsubOrcamentos = subscribeToCollection<SolicitacaoOrcamento>(
       COLLECTIONS.ORCAMENTOS, 
-      (data) => setOrcamentos(data), 
+      (data) => {
+        setOrcamentos(data);
+        markCollectionReady(COLLECTIONS.ORCAMENTOS);
+      }, 
       []
     );
 
     const unsubTransacoes = subscribeToCollection<TransacaoFinanceira>(
       COLLECTIONS.TRANSACOES, 
-      (data) => setTransacoes(data), 
+      (data) => {
+        setTransacoes(data);
+        markCollectionReady(COLLECTIONS.TRANSACOES);
+      }, 
       []
     );
 
     const unsubDespesas = subscribeToCollection<DespesaRecorrente>(
       COLLECTIONS.DESPESAS_RECORRENTES, 
-      (data) => setDespesasRecorrentes(data), 
+      (data) => {
+        setDespesasRecorrentes(data);
+        markCollectionReady(COLLECTIONS.DESPESAS_RECORRENTES);
+      }, 
       []
     );
 
@@ -377,6 +486,7 @@ export default function App() {
       (data) => {
         if (!data || data.length === 0) {
           setUsuarios([MOCK_USUARIOS[0], MOCK_USUARIOS[1]]);
+          markCollectionReady(COLLECTIONS.USUARIOS);
           return;
         }
 
@@ -423,6 +533,7 @@ export default function App() {
         const hasSuper = sanitized.some(u => isUserAdminTotal(u) || u.id === 'user-super-admin');
         const finalList = hasSuper ? sanitized : [MOCK_USUARIOS[0], ...sanitized];
         setUsuarios(finalList);
+        markCollectionReady(COLLECTIONS.USUARIOS);
 
         // Keep active currentUser in sync with real-time updates from database
         setCurrentUser(prevUser => {
@@ -447,13 +558,19 @@ export default function App() {
 
     const unsubAvisos = subscribeToCollection<AvisoQuadro>(
       COLLECTIONS.AVISOS, 
-      (data) => setAvisos(data), 
+      (data) => {
+        setAvisos(data);
+        markCollectionReady(COLLECTIONS.AVISOS);
+      }, 
       []
     );
 
     const unsubAlertas = subscribeToCollection<AlertaRetornoPos>(
       COLLECTIONS.ALERTAS_RETORNO, 
-      (data) => setAlertasRetorno(data), 
+      (data) => {
+        setAlertasRetorno(data);
+        markCollectionReady(COLLECTIONS.ALERTAS_RETORNO);
+      }, 
       []
     );
 
@@ -463,6 +580,7 @@ export default function App() {
         if (data && data.length > 0) {
           setConfiguracaoCampos(data[0]);
         }
+        markCollectionReady(COLLECTIONS.CONFIGURACOES_CAMPOS);
       },
       [{ clinicaId: 'config_matriz', camposOcultos: [], camposObrigatorios: [] }]
     );
@@ -483,6 +601,30 @@ export default function App() {
       unsubAlertas();
       unsubConfigCampos();
     };
+  }, []);
+
+  // Monitor loading progress of essential collections
+  useEffect(() => {
+    const essential = [
+      COLLECTIONS.PACIENTES,
+      COLLECTIONS.AGENDAMENTOS,
+      COLLECTIONS.ESTOQUE,
+      COLLECTIONS.PROCEDIMENTOS,
+      COLLECTIONS.TRANSACOES,
+      COLLECTIONS.USUARIOS
+    ];
+    const isReady = essential.every(col => loadedCollections.has(col));
+    if (isReady) {
+      setIsInitialDataLoading(false);
+    }
+  }, [loadedCollections]);
+
+  // Safety fallback timeout: never block UI indefinitely if network is sluggish
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitialDataLoading(false);
+    }, 2500);
+    return () => clearTimeout(timer);
   }, []);
 
   // Listen to browser popstate (Back/Forward history buttons) and sync active tab & deep links
@@ -608,14 +750,55 @@ export default function App() {
     setIsPopupModalOpen(true);
   };
 
-  const handleUpdateStatus = (agendamentoId: string, novoStatus: StatusAgendamento) => {
+  const handleUpdateStatus = async (agendamentoId: string, novoStatus: StatusAgendamento) => {
     const ag = agendamentos.find(a => a.id === agendamentoId);
-    if (ag) {
-      const updated = { ...ag, status: novoStatus };
+    if (!ag) return;
+
+    if (novoStatus === 'concluido') {
+      const patient = pacientes.find(p => p.id === ag.paciente_id) || ag.paciente;
+      const jaLancadoNoCheckIn = Boolean(ag.pagamento_registrado_no_caixa === true);
+      const valor = Number(ag.valor_estimado) || 0;
+      const shouldGenerateTx = !jaLancadoNoCheckIn && valor > 0;
+
+      const updated: Agendamento = {
+        ...ag,
+        status: 'concluido',
+        concluido_em: new Date().toISOString(),
+        pagamento_registrado_no_caixa: jaLancadoNoCheckIn || shouldGenerateTx,
+      };
+
       setAgendamentos(prev => prev.map(a => (a.id === agendamentoId ? updated : a)));
-      saveDocument(COLLECTIONS.AGENDAMENTOS, updated);
-      showToast(`Status atualizado para: ${novoStatus.replace('_', ' ').toUpperCase()}`);
+      await saveDocument(COLLECTIONS.AGENDAMENTOS, updated);
+
+      if (shouldGenerateTx) {
+        const newTx: TransacaoFinanceira = {
+          id: `tx-${Date.now()}`,
+          agendamento_id: ag.id,
+          paciente_id: ag.paciente_id,
+          paciente_nome: patient?.nome || 'Cliente',
+          procedimento: ag.procedimento || 'Procedimento Estético',
+          valor: valor,
+          tipo: 'entrada',
+          categoria: 'atendimento',
+          forma_pagamento: ag.forma_pagamento || 'pix',
+          status: 'pago',
+          data: new Date().toISOString(),
+          profissional_nome: ag.profissional_nome || currentUser.nome,
+          observacao: 'Recebido na finalização do atendimento (Balcão do Dia)',
+          excluido: false,
+        };
+        setTransacoes(prev => [newTx, ...prev.filter(t => t.id !== newTx.id)]);
+        await saveDocument(COLLECTIONS.TRANSACOES, newTx);
+      }
+
+      showToast(`Atendimento de ${patient?.nome || 'cliente'} concluído e registrado no caixa!`);
+      return;
     }
+
+    const updated = { ...ag, status: novoStatus };
+    setAgendamentos(prev => prev.map(a => (a.id === agendamentoId ? updated : a)));
+    await saveDocument(COLLECTIONS.AGENDAMENTOS, updated);
+    showToast(`Status atualizado para: ${novoStatus.replace('_', ' ').toUpperCase()}`);
   };
 
   // Procedure completion with Atomic Inventory debit and Financial creation
@@ -636,10 +819,11 @@ export default function App() {
 
     // Se já foi pago e liquidado no Check-In, NÃO gera nova receita duplicada no caixa
     const jaLancadoNoCheckIn = Boolean(targetAgendamento.pagamento_registrado_no_caixa === true);
-    const valorALancar = jaLancadoNoCheckIn ? 0 : (Number(pagamento.valor) || Number(targetAgendamento.valor_estimado) || 0);
+    const valorCobrado = typeof pagamento.valor === 'number' && !isNaN(pagamento.valor) ? pagamento.valor : (Number(targetAgendamento.valor_estimado) || 0);
+    const valorALancar = jaLancadoNoCheckIn ? 0 : valorCobrado;
 
     // Normalize supplies array with both quantidade and quantidade_utilizada
-    const normalizedSupplies: InsumoConsumido[] = insumosUsados.map(i => ({
+    const normalizedSupplies: InsumoConsumido[] = (insumosUsados || []).map(i => ({
       ...i,
       quantidade: i.quantidade || i.quantidade_utilizada || 1,
       quantidade_utilizada: i.quantidade_utilizada || i.quantidade || 1,
@@ -648,59 +832,77 @@ export default function App() {
     const updatedCompletedAgendamento: Agendamento = {
       ...targetAgendamento,
       status: 'concluido' as StatusAgendamento,
-      valor_estimado: pagamento.valor || targetAgendamento.valor_estimado,
-      forma_pagamento: pagamento.forma,
-      status_pagamento: pagamento.status,
+      valor_estimado: valorCobrado > 0 ? valorCobrado : targetAgendamento.valor_estimado,
+      forma_pagamento: pagamento.forma || targetAgendamento.forma_pagamento || 'pix',
+      status_pagamento: pagamento.status || 'pago',
       insumos_utilizados: normalizedSupplies,
       insumos_consumidos: normalizedSupplies,
       concluido_em: new Date().toISOString(),
+      pagamento_registrado_no_caixa: valorALancar > 0 || jaLancadoNoCheckIn,
       observacoes: pagamento.observacao 
         ? `${targetAgendamento.observacoes ? targetAgendamento.observacoes + ' | ' : ''}Checkout: ${pagamento.observacao}`
         : targetAgendamento.observacoes,
     };
 
-    // 1. Atualização otimista no estado
+    // 1. Atualização no estado local
     setAgendamentos(prev =>
       prev.map(a => (a.id === targetAgendamento.id ? updatedCompletedAgendamento : a))
     );
 
-    // 2. Débito otimista de estoque
+    // 2. Débito no estoque local e lista para sincronização
+    const updatedEstoqueItems: EstoqueInsumo[] = [];
     setEstoque(prev =>
       prev.map(item => {
-        const consumed = normalizedSupplies.find(c => c.insumo_id === item.id);
+        const consumed = normalizedSupplies.find(c => c.insumo_id === item.id || c.nome_item === item.nome_item);
         if (consumed) {
           const qtyToDeduct = consumed.quantidade_utilizada || consumed.quantidade || 0;
-          return {
+          const updatedItem = {
             ...item,
             quantidade: Math.max(0, item.quantidade - qtyToDeduct),
           };
+          updatedEstoqueItems.push(updatedItem);
+          return updatedItem;
         }
         return item;
       })
     );
 
-    // 3. Se valorALancar > 0, atualiza transações localmente
+    // 3. Se valorALancar > 0, cria e registra no fluxo financeiro (Caixa)
+    let newTx: TransacaoFinanceira | null = null;
     if (valorALancar > 0) {
-      const newTx: TransacaoFinanceira = {
+      newTx = {
         id: `tx-${Date.now()}`,
         agendamento_id: targetAgendamento.id,
         paciente_id: targetAgendamento.paciente_id,
         paciente_nome: patient?.nome || 'Cliente',
-        procedimento: targetAgendamento.procedimento,
+        procedimento: targetAgendamento.procedimento || 'Procedimento Estético',
         valor: valorALancar,
         tipo: 'entrada',
         categoria: 'atendimento',
-        forma_pagamento: pagamento.forma,
-        status: pagamento.status,
+        forma_pagamento: pagamento.forma || 'pix',
+        status: pagamento.status || 'pago',
         data: new Date().toISOString(),
         profissional_nome: targetAgendamento.profissional_nome || currentUser.nome,
-        observacao: pagamento.observacao || 'Recebido na finalização do procedimento',
+        observacao: pagamento.observacao || 'Recebido na finalização do procedimento (Balcão)',
         excluido: false,
       };
-      setTransacoes(prev => [newTx, ...prev]);
+      setTransacoes(prev => [newTx!, ...prev.filter(t => t.id !== newTx!.id)]);
     }
 
-    // 4. Executa checkout atômico no Firestore
+    // 4. Gravações diretas e imediatas no Firestore / Armazenamento Offline
+    try {
+      await saveDocument(COLLECTIONS.AGENDAMENTOS, updatedCompletedAgendamento);
+      if (newTx) {
+        await saveDocument(COLLECTIONS.TRANSACOES, newTx);
+      }
+      for (const st of updatedEstoqueItems) {
+        await saveDocument(COLLECTIONS.ESTOQUE, st);
+      }
+    } catch (saveErr) {
+      console.warn('[Direct Save in handleSaveProcedureCompletion]', saveErr);
+    }
+
+    // 5. Executa transação atômica adicional no Firestore (opcional/auxiliar)
     try {
       await executeAtomicCheckout({
         agendamentoId: targetAgendamento.id,
@@ -714,19 +916,7 @@ export default function App() {
         statusPagamento: pagamento.status,
         insumosConsumidos: normalizedSupplies,
         observacoes: pagamento.observacao,
-        transacao: valorALancar > 0 ? {
-          agendamento_id: targetAgendamento.id,
-          paciente_id: targetAgendamento.paciente_id,
-          paciente_nome: patient?.nome || 'Cliente',
-          procedimento: targetAgendamento.procedimento,
-          valor: valorALancar,
-          tipo: 'entrada',
-          categoria: 'atendimento',
-          forma_pagamento: pagamento.forma,
-          status: pagamento.status,
-          profissional_nome: targetAgendamento.profissional_nome || currentUser.nome,
-          observacao: pagamento.observacao || 'Recebido na finalização do procedimento',
-        } : undefined
+        transacao: newTx || undefined
       });
     } catch (err) {
       console.warn('[executeAtomicCheckout error in handleSaveProcedureCompletion]', err);
@@ -868,6 +1058,7 @@ export default function App() {
         id: novo.paciente_id,
         nome: 'Paciente',
         telefone: '',
+        data_nascimento: '',
         historico_clinico: '',
         criado_em: new Date().toISOString(),
       },
@@ -1483,7 +1674,7 @@ export default function App() {
     }
   };
 
-  const handleConverterOrcamentoEmAgendamento = (orcamento: SolicitacaoOrcamento, dataHora: string) => {
+  const handleConverterOrcamentoEmAgendamento = (orcamento: SolicitacaoOrcamento, dataHora: string = new Date().toISOString()) => {
     let patient = pacientes.find(p => p.telefone === orcamento.paciente_telefone);
     if (!patient) {
       patient = {
@@ -1810,6 +2001,7 @@ export default function App() {
         onOpenSqlGuide={() => setIsSqlModalOpen(true)}
         onOpenGlobalSearch={() => setIsGlobalSearchOpen(true)}
         onOpenNoticeBoard={() => setActiveTab('quadro_avisos')}
+        onOpenSecondScreenModal={() => setIsSecondScreenModalOpen(true)}
         unreadNoticesCount={unreadNoticesCount}
         lowStockCount={lowStockCount}
         manutencaoAlertCount={manutencaoAlertCount}
@@ -1852,8 +2044,15 @@ export default function App() {
 
         {/* Content Area */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-7xl pb-24 lg:pb-8">
-          
-          {activeTab === 'dashboard' && currentUser.role !== 'cliente' && (
+          {isInitialDataLoading ? (
+            <AppContentSkeleton 
+              activeTab={activeTab} 
+              loadedCount={loadedCollections.size} 
+              totalCount={7} 
+            />
+          ) : (
+            <>
+              {activeTab === 'dashboard' && currentUser.role !== 'cliente' && (
             <DashboardView
               agendamentos={agendamentos}
               estoque={estoque}
@@ -1862,6 +2061,7 @@ export default function App() {
               profissionais={usuarios}
               transacoes={transacoes}
               despesasRecorrentes={despesasRecorrentes}
+              currentUser={currentUser}
               onOpenNewAppointment={() => {
                 setAppointmentInitialData(null);
                 setIsNewAppointmentOpen(true);
@@ -1875,7 +2075,18 @@ export default function App() {
               onGoToFinancial={() => setActiveTab('financeiro')}
               onOpenCompleteModal={(ag) => setAppointmentToComplete(ag)}
               onOpenCheckInModal={(ag) => setAppointmentToCheckIn(ag)}
+              onOpenSecondScreenModal={() => setIsSecondScreenModalOpen(true)}
               searchQuery={searchQuery}
+            />
+          )}
+
+          {activeTab === 'balcao_tv' && (
+            <ReceptionTVView
+              agendamentos={agendamentos}
+              pacientes={pacientes}
+              profissionais={usuarios}
+              clinicaConfig={clinicaConfig}
+              onCloseTvMode={() => setActiveTab('dashboard')}
             />
           )}
 
@@ -1973,7 +2184,7 @@ export default function App() {
               orçamentos={orcamentos}
               onCriarOrcamento={handleCriarOrcamento}
               onAtualizarStatusOrcamento={handleAtualizarStatusOrcamento}
-              onConverterEmAgendamento={handleConverterOrcamentoEmAgendamento}
+              onConverterEmAgendamento={(orc) => handleConverterOrcamentoEmAgendamento(orc)}
               onDeleteOrcamento={handleDeleteOrcamento}
               currentUser={currentUser}
             />
@@ -2054,7 +2265,7 @@ export default function App() {
             />
           )}
 
-          {(activeTab === 'usuarios' || activeTab === 'equipe') && (isUserAdminLocalOrTotal(currentUser)) && (
+          {activeTab === 'usuarios' && (isUserAdminLocalOrTotal(currentUser)) && (
             <UsersManagementView
               usuarios={usuarios}
               currentUser={currentUser}
@@ -2068,25 +2279,27 @@ export default function App() {
           )}
 
           {activeTab === 'banco_dados' && (isUserAdminTotal(currentUser)) && (
-            <DatabaseMasterView
-              currentUser={currentUser}
-              pacientes={pacientes}
-              agendamentos={agendamentos}
-              procedimentos={procedimentos}
-              estoque={estoque}
-              financeiro={transacoes}
-              fornecedores={fornecedores}
-              ativos={bensPatrimoniais}
-              avisos={avisos}
-              usuarios={usuarios}
-              clinicaConfig={clinicaConfig}
-              onRefreshData={() => {
-                showToast('Dados sincronizados com o banco com sucesso!');
-              }}
-              onUpdatePaciente={(updatedP) => {
-                setPacientes(prev => prev.map(p => p.id === updatedP.id ? updatedP : p));
-              }}
-            />
+            <ErrorBoundary fallbackTitle="Painel Master: Banco de Dados">
+              <DatabaseMasterView
+                currentUser={currentUser}
+                pacientes={pacientes}
+                agendamentos={agendamentos}
+                procedimentos={procedimentos}
+                estoque={estoque}
+                financeiro={transacoes}
+                fornecedores={fornecedores}
+                ativos={bensPatrimoniais}
+                avisos={avisos}
+                usuarios={usuarios}
+                clinicaConfig={clinicaConfig}
+                onRefreshData={() => {
+                  showToast('Dados sincronizados com o banco com sucesso!');
+                }}
+                onUpdatePaciente={(updatedP) => {
+                  setPacientes(prev => prev.map(p => p.id === updatedP.id ? updatedP : p));
+                }}
+              />
+            </ErrorBoundary>
           )}
 
           {activeTab === 'permissoes' && (isUserAdminTotal(currentUser)) && (
@@ -2132,6 +2345,8 @@ export default function App() {
           {activeTab === 'supabase_guide' && (currentUser.role === 'admin_total' || currentUser.role === 'admin_local' || currentUser.role === 'admin' || currentUser.role === 'gestor') && (
             <SupabaseGuideView />
           )}
+          </>
+        )}
         </main>
 
       </div>
@@ -2178,11 +2393,11 @@ export default function App() {
         agendamentos={agendamentos}
         pacientes={pacientes}
         estoque={estoque}
-        procedimentos={procedimentos}
-        orcamentos={orcamentos}
-        transacoes={transacoes}
-        onNavigate={(tab) => setActiveTab(tab)}
-        onSelectPatient={(p) => handleOpenPatientDetails(p)}
+        setActiveTab={(tab) => setActiveTab(tab)}
+        onViewPatient={(p) => handleOpenPatientDetails(p)}
+        onOpenNewAppointment={() => setIsNewAppointmentOpen(true)}
+        onOpenNewPatient={() => setIsNewPatientOpen(true)}
+        onOpenNewInventory={() => setIsNewInventoryOpen(true)}
       />
 
       <NewAppointmentModal
@@ -2340,6 +2555,18 @@ export default function App() {
       <ConflictResolutionModal
         conflict={selectedConflict}
         onClose={() => setSelectedConflict(null)}
+      />
+
+      {/* Modal de Transmissão / Segunda Tela da Recepção */}
+      <SecondScreenModal
+        isOpen={isSecondScreenModalOpen}
+        onClose={() => setIsSecondScreenModalOpen(false)}
+        onOpenInsideApp={() => {
+          setIsSecondScreenModalOpen(false);
+          setActiveTab('balcao_tv');
+        }}
+        clinicaConfig={clinicaConfig}
+        currentUser={currentUser}
       />
 
       {/* Modal Dinâmico Universal de Edição Master */}

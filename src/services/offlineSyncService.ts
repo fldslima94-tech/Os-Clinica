@@ -478,7 +478,7 @@ async function processSyncItemToCloud(
   const docRef = doc(db, collectionName, item.entityId);
   const remoteSnap = await getDoc(docRef);
 
-  if (remoteSnap.exists() && !options?.forceOverwrite) {
+  if (remoteSnap.exists() && !options?.forceOverwrite && item.action !== 'create') {
     const remoteData = convertTimestampsToISO(remoteSnap.data());
     const remoteTimestamp = remoteData.atualizadoEm || remoteData.atualizado_em || remoteData.criado_em || remoteData.criadoEm;
     const localBaseTimestamp = item.baseVersionTimestamp;

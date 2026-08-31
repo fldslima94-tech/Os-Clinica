@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { AlertTriangle, Trash2, X, ShieldAlert, FileText } from 'lucide-react';
 
-interface DeleteConfirmModalProps {
+export interface DeleteConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (reason?: string) => void;
   title: string;
-  itemName: string;
-  itemType: string;
+  itemName?: string;
+  itemType?: string;
+  itemCategory?: string;
   description?: string;
+  message?: string;
   requireReason?: boolean;
   reasonPlaceholder?: string;
 }
@@ -18,9 +20,11 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
   onClose,
   onConfirm,
   title,
-  itemName,
-  itemType,
+  itemName = '',
+  itemType = 'Registro',
+  itemCategory,
   description,
+  message,
   requireReason = false,
   reasonPlaceholder = 'Ex: Lançamento duplicado, erro de digitação, estorno autorizado...',
 }) => {
@@ -29,15 +33,23 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
 
   if (!isOpen) return null;
 
+  const displayDescription = description || message;
+  const displayItemType = itemType || itemCategory || 'Registro';
+
   const handleConfirm = () => {
     if (requireReason && !reason.trim()) {
       setError(true);
       return;
     }
-    onConfirm(reason.trim());
+    const cleanReason = reason.trim();
     setReason('');
     setError(false);
     onClose();
+    try {
+      onConfirm(cleanReason);
+    } catch (err) {
+      console.error('[DeleteConfirmModal] Erro ao executar onConfirm:', err);
+    }
   };
 
   return (

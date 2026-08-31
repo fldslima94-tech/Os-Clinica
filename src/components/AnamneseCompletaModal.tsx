@@ -35,6 +35,7 @@ import { CameraCaptureModal } from './CameraCaptureModal';
 import { calcularIdade, formatarTelefone, formatarCPF, anamneseCompletaSchema } from '../utils/anamneseValidation';
 import { useConnectionStatus } from '../contexts/ConnectionStatusContext';
 import { Wifi, WifiOff, Database, CloudCheck } from 'lucide-react';
+import { compressImageFile } from '../lib/image-utils';
 
 interface AnamneseCompletaModalProps {
   isOpen: boolean;
@@ -1758,16 +1759,27 @@ export const AnamneseCompletaModal: React.FC<AnamneseCompletaModalProps> = ({
           type="file"
           accept="image/*"
           capture="user"
-          onChange={(e) => {
+          onChange={async (e) => {
             const file = e.target.files?.[0];
             if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (event) => {
-              if (event.target?.result) {
-                setFotoPacienteUrl(event.target.result as string);
-              }
-            };
-            reader.readAsDataURL(file);
+            try {
+              const compressed = await compressImageFile(file, {
+                maxWidth: 800,
+                maxHeight: 800,
+                quality: 0.7,
+                mimeType: 'image/jpeg',
+                targetMaxKB: 40
+              });
+              setFotoPacienteUrl(compressed);
+            } catch {
+              const reader = new FileReader();
+              reader.onload = (event) => {
+                if (event.target?.result) {
+                  setFotoPacienteUrl(event.target.result as string);
+                }
+              };
+              reader.readAsDataURL(file);
+            }
           }}
           className="hidden"
         />

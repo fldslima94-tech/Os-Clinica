@@ -17,6 +17,12 @@ import {
   Timestamp
 } from 'firebase/firestore';
 import { 
+  saveLocalSingleItem, 
+  deleteLocalSingleItem, 
+  saveLocalCollection, 
+  clearAllLocalPersistence 
+} from './localPersistenceService';
+import { 
   signInWithPopup, 
   signOut, 
   onAuthStateChanged, 
@@ -139,21 +145,44 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   console.warn(`[Firestore Info - ${operationType}] em ${path}:`, errInfo.error);
 }
 
-// Helper to remove undefined properties recursively for Firestore compatibility
+// Helper to remove undefined properties and sanitize objects recursively for Firestore compatibility
 export function sanitizeForFirestore<T>(data: T): T {
   if (data === null || data === undefined) {
     return data;
+  }
+  if (typeof data === 'function') {
+    return undefined as unknown as T;
+  }
+  if (data instanceof Date) {
+    return data;
+  }
+  // Preserve Firestore FieldValue and Timestamp instances
+  if (typeof data === 'object' && data !== null) {
+    const constructorName = (data as any).constructor?.name;
+    if (
+      constructorName === 'FieldValue' ||
+      constructorName === 'Timestamp' ||
+      constructorName === 'ServerTimestampTransform' ||
+      (data as any)._methodName ||
+      typeof (data as any).toMillis === 'function' ||
+      typeof (data as any).isEqual === 'function'
+    ) {
+      return data;
+    }
   }
   if (Array.isArray(data)) {
     return data
       .filter(item => item !== undefined)
       .map(item => sanitizeForFirestore(item)) as unknown as T;
   }
-  if (typeof data === 'object' && !(data instanceof Date)) {
+  if (typeof data === 'object') {
     const cleaned: Record<string, any> = {};
     for (const [key, value] of Object.entries(data)) {
       if (value !== undefined) {
-        cleaned[key] = sanitizeForFirestore(value);
+        const sanitizedVal = sanitizeForFirestore(value);
+        if (sanitizedVal !== undefined) {
+          cleaned[key] = sanitizedVal;
+        }
       }
     }
     return cleaned as T;
@@ -264,20 +293,31 @@ export function printWriteAttemptsToConsole(): void {
   console.groupEnd();
 }
 
-// Firestore generic save/update helper
+// Firestore generic save/update helper with timeout resilience and instant local persistence
 export async function saveDocument<T extends { id: string }>(
   collectionName: string, 
   item: T
 ): Promise<{ success: boolean; error?: string }> {
+  // 1. Optimistic instant write to local IndexedDB
+  saveLocalSingleItem(collectionName, item).catch(() => {});
+
   const docPath = `${collectionName}/${item.id}`;
   const startTime = Date.now();
   try {
     const docRef = doc(db, collectionName, item.id);
     const sanitized = sanitizeForFirestore(item);
-    await setDoc(docRef, {
+    
+    // Set with timeout to avoid freezing UI on network jitter
+    const savePromise = setDoc(docRef, {
       ...sanitized,
       atualizadoEm: serverTimestamp()
     }, { merge: true });
+
+    const timeoutPromise = new Promise<{ timeout: true }>((resolve) => 
+      setTimeout(() => resolve({ timeout: true }), 4000)
+    );
+
+    const result = await Promise.race([savePromise, timeoutPromise]);
     
     const duration = Date.now() - startTime;
     recordWriteAttempt({
@@ -295,7 +335,7 @@ export async function saveDocument<T extends { id: string }>(
   } catch (error: any) {
     const duration = Date.now() - startTime;
     handleFirestoreError(error, OperationType.WRITE, docPath);
-    console.error(`[Firestore Save Error] em ${collectionName}/${item.id}:`, error);
+    console.warn(`[Firestore Save Info] em ${collectionName}/${item.id}:`, error?.message || error);
 
     recordWriteAttempt({
       timestamp: new Date(),
@@ -356,6 +396,9 @@ export async function softDeleteTransacao(
 
 // Firestore hard delete helper
 export async function removeDocument(collectionName: string, id: string): Promise<void> {
+  // 1. Optimistic instant delete from local IndexedDB
+  deleteLocalSingleItem(collectionName, id).catch(() => {});
+
   const docPath = `${collectionName}/${id}`;
   const startTime = Date.now();
   try {
@@ -407,7 +450,7 @@ export async function executeAtomicCheckout(params: {
   transacao?: Partial<TransacaoFinanceira>;
   observacoes?: string;
 }): Promise<{ success: boolean; transacaoId?: string }> {
-  const newTransacaoId = `tx-${Date.now()}`;
+  const newTransacaoId = params.transacao?.id || `tx-${Date.now()}`;
   const supplies = params.insumosUsados || params.insumosConsumidos || [];
   const clinicaId = params.clinicaId || 'clinica-matriz';
   const forma = params.formaPagamento || params.transacao?.forma_pagamento || 'pix';
@@ -470,16 +513,23 @@ export async function executeAtomicCheckout(params: {
 
       // Execute Writes in Transaction:
       // A. Update appointment status strictly to 'concluido'
-      transaction.set(agRef, {
+      const agUpdateData: Record<string, any> = {
         status: 'concluido',
-        valor_estimado: (valorFinal > 0 ? valorFinal : existingValor) || undefined,
         forma_pagamento: forma,
         status_pagamento: status,
         insumos_consumidos: supplies,
         insumos_utilizados: supplies,
         concluido_em: new Date().toISOString(),
+        pagamento_registrado_no_caixa: valorFinal > 0 || alreadyPaidAtCheckin,
         observacoes: agObs
-      }, { merge: true });
+      };
+
+      const finalEstimatedValue = valorFinal > 0 ? valorFinal : existingValor;
+      if (typeof finalEstimatedValue === 'number' && !isNaN(finalEstimatedValue) && finalEstimatedValue > 0) {
+        agUpdateData.valor_estimado = finalEstimatedValue;
+      }
+
+      transaction.set(agRef, sanitizeForFirestore(agUpdateData), { merge: true });
 
       // B. Debit Inventory
       for (const update of inventoryUpdates) {
@@ -495,9 +545,9 @@ export async function executeAtomicCheckout(params: {
           id: newTransacaoId,
           clinica_id: clinicaId,
           agendamento_id: params.agendamentoId,
-          paciente_id: params.pacienteId || params.transacao?.paciente_id,
+          paciente_id: params.pacienteId || params.transacao?.paciente_id || '',
           paciente_nome: pacienteNome,
-          profissional_id: params.profissionalId || params.transacao?.profissional_id,
+          profissional_id: params.profissionalId || params.transacao?.profissional_id || '',
           profissional_nome: profNome,
           procedimento: procedimentoNome,
           valor: valorFinal,
@@ -510,7 +560,7 @@ export async function executeAtomicCheckout(params: {
           observacao: params.observacoes || params.transacao?.observacao || `Atendimento concluído - ${procedimentoNome}`,
           excluido: false
         };
-        transaction.set(txRef, newTx);
+        transaction.set(txRef, sanitizeForFirestore(newTx));
         transactionCreated = true;
       }
     });
@@ -521,22 +571,33 @@ export async function executeAtomicCheckout(params: {
     // Direct Fallback Persistence to ensure status 'concluido' is ALWAYS applied
     try {
       const valor = params.valorPago ?? params.transacao?.valor ?? 0;
-      await saveDocument(COLLECTIONS.AGENDAMENTOS, {
+      const fallbackAgData: { id: string } & Record<string, any> = {
         id: params.agendamentoId,
         status: 'concluido',
         forma_pagamento: forma,
         status_pagamento: status,
         insumos_consumidos: supplies,
         insumos_utilizados: supplies,
-        concluido_em: new Date().toISOString()
-      });
+        concluido_em: new Date().toISOString(),
+        pagamento_registrado_no_caixa: valor > 0 || params.transacao !== undefined,
+        paciente_id: params.pacienteId || params.transacao?.paciente_id || '',
+        procedimento: procedimentoNome,
+        profissional_id: params.profissionalId || params.transacao?.profissional_id || '',
+        profissional_nome: profNome,
+      };
+      if (typeof valor === 'number' && !isNaN(valor) && valor > 0) {
+        fallbackAgData.valor_estimado = valor;
+      }
+      await saveDocument(COLLECTIONS.AGENDAMENTOS, fallbackAgData);
       if (valor > 0) {
         await saveDocument(COLLECTIONS.TRANSACOES, {
           id: newTransacaoId,
           clinica_id: clinicaId,
           agendamento_id: params.agendamentoId,
+          paciente_id: params.pacienteId || params.transacao?.paciente_id || '',
           paciente_nome: pacienteNome,
           procedimento: procedimentoNome,
+          profissional_id: params.profissionalId || params.transacao?.profissional_id || '',
           profissional_nome: profNome,
           valor: valor,
           forma_pagamento: forma,
@@ -670,11 +731,16 @@ export async function wipeDatabaseAndResetToProduction(): Promise<{ success: boo
       try {
         const snap = await getDocs(collection(db, colName));
         if (!snap.empty) {
-          const batch = writeBatch(db);
-          snap.docs.forEach((docSnap) => {
-            batch.delete(docSnap.ref);
-          });
-          await batch.commit();
+          const docs = snap.docs;
+          const CHUNK_SIZE = 200;
+          for (let i = 0; i < docs.length; i += CHUNK_SIZE) {
+            const chunk = docs.slice(i, i + CHUNK_SIZE);
+            const batch = writeBatch(db);
+            chunk.forEach((docSnap) => {
+              batch.delete(docSnap.ref);
+            });
+            await batch.commit();
+          }
         }
       } catch (err) {
         console.warn(`[Firestore Wipe] Aviso ao limpar coleção ${colName}:`, err);
@@ -685,30 +751,37 @@ export async function wipeDatabaseAndResetToProduction(): Promise<{ success: boo
     try {
       const userSnap = await getDocs(collection(db, COLLECTIONS.USUARIOS));
       if (!userSnap.empty) {
-        const batchUsers = writeBatch(db);
-        userSnap.docs.forEach((d) => {
+        const userDocs = userSnap.docs.filter((d) => {
           const u = d.data() as UsuarioEquipe;
-          if (
+          return (
             d.id !== 'user-super-admin' &&
             d.id !== 'user-super-admin-alt' &&
             u.email !== 'fldslima94@gmail.com' &&
             u.email !== 'fabio@teste.com'
-          ) {
-            batchUsers.delete(d.ref);
-          }
+          );
         });
-        await batchUsers.commit();
+
+        const CHUNK_SIZE = 200;
+        for (let i = 0; i < userDocs.length; i += CHUNK_SIZE) {
+          const chunk = userDocs.slice(i, i + CHUNK_SIZE);
+          const batchUsers = writeBatch(db);
+          chunk.forEach((d) => batchUsers.delete(d.ref));
+          await batchUsers.commit();
+        }
       }
 
       const perfilSnap = await getDocs(collection(db, COLLECTIONS.PERFIS));
       if (!perfilSnap.empty) {
-        const batchPerfis = writeBatch(db);
-        perfilSnap.docs.forEach((d) => {
-          if (d.id !== 'user-super-admin' && d.id !== 'user-super-admin-alt') {
-            batchPerfis.delete(d.ref);
-          }
-        });
-        await batchPerfis.commit();
+        const perfilDocs = perfilSnap.docs.filter((d) => 
+          d.id !== 'user-super-admin' && d.id !== 'user-super-admin-alt'
+        );
+        const CHUNK_SIZE = 200;
+        for (let i = 0; i < perfilDocs.length; i += CHUNK_SIZE) {
+          const chunk = perfilDocs.slice(i, i + CHUNK_SIZE);
+          const batchPerfis = writeBatch(db);
+          chunk.forEach((d) => batchPerfis.delete(d.ref));
+          await batchPerfis.commit();
+        }
       }
     } catch (err) {
       console.warn('[Firestore Wipe] Aviso ao limpar usuários secundários:', err);
@@ -723,6 +796,7 @@ export async function wipeDatabaseAndResetToProduction(): Promise<{ success: boo
         if (window.indexedDB && window.indexedDB.deleteDatabase) {
           window.indexedDB.deleteDatabase('AuraEsteticaSyncDB');
         }
+        await clearAllLocalPersistence();
         localStorage.removeItem('aura_offline_mutations_v2');
         localStorage.removeItem('aura_sync_pending_v1');
       } catch (cacheErr) {
@@ -743,8 +817,8 @@ export async function wipeDatabaseAndResetToProduction(): Promise<{ success: boo
   }
 }
 
-// Real-time listener subscription helper with optional clinicaId filtering
-export function subscribeToCollection<T>(
+// Real-time listener subscription helper with optional clinicaId filtering and local cache warming
+export function subscribeToCollection<T extends { id?: string }>(
   collectionName: string, 
   onData: (data: T[]) => void,
   fallbackData: T[] = [],
@@ -759,6 +833,8 @@ export function subscribeToCollection<T>(
         // Envia os documentos da coleção diretamente (array vazio [] se não houver documentos)
         const items = snapshot.docs.map(d => ({ ...d.data(), id: d.id }) as T);
         onData(items);
+        // Salva silenciosamente no cache local IndexedDB para carregamento instantâneo nas próximas sessões
+        saveLocalCollection(collectionName, items).catch(() => {});
       },
       (error) => {
         console.error(`[Firestore Subscription Error] Erro ao sincronizar coleção "${collectionName}":`, error);
@@ -938,11 +1014,11 @@ export async function updateUserAvatarAndName(usuarioId: string, avatarUrl: stri
     const userRef = doc(db, COLLECTIONS.USUARIOS, usuarioId);
     const perfilRef = doc(db, COLLECTIONS.PERFIS, usuarioId);
     
-    const updateData: Record<string, any> = { 
+    const updateData: Record<string, any> = sanitizeForFirestore({ 
       avatar_url: avatarUrl,
       avatarUrl: avatarUrl,
       ...(nome ? { nome, nomeCompleto: nome } : {})
-    };
+    });
 
     await setDoc(userRef, updateData, { merge: true });
     await setDoc(perfilRef, updateData, { merge: true });
@@ -964,13 +1040,13 @@ export async function atualizarDadosPerfil(
       });
     }
 
-    const payload: Record<string, any> = {
+    const payload: Record<string, any> = sanitizeForFirestore({
       atualizadoEm: serverTimestamp(),
       ...(dados.nomeCompleto ? { nome: dados.nomeCompleto, nomeCompleto: dados.nomeCompleto } : {}),
       ...(dados.profissao !== undefined ? { profissao: dados.profissao, cargo: dados.profissao } : {}),
       ...(dados.avatarUrl ? { avatar_url: dados.avatarUrl, avatarUrl: dados.avatarUrl } : {}),
       ...(dados.telefone ? { telefone: dados.telefone } : {})
-    };
+    });
 
     const userRef = doc(db, COLLECTIONS.USUARIOS, usuarioId);
     const perfilRef = doc(db, COLLECTIONS.PERFIS, usuarioId);
@@ -1031,11 +1107,11 @@ export async function salvarConfiguracaoCampos(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const configDocRef = doc(db, COLLECTIONS.CONFIGURACOES_CAMPOS, clinicaId || 'config_matriz');
-    await setDoc(configDocRef, {
+    await setDoc(configDocRef, sanitizeForFirestore({
       ...configuracao,
       clinicaId: clinicaId || 'config_matriz',
       atualizadoEm: serverTimestamp()
-    }, { merge: true });
+    }), { merge: true });
     return { success: true };
   } catch (error: any) {
     handleFirestoreError(error, OperationType.UPDATE, `${COLLECTIONS.CONFIGURACOES_CAMPOS}/${clinicaId}`);
@@ -1053,11 +1129,11 @@ export async function salvarPermissoesUsuario(
     const userRef = doc(db, COLLECTIONS.USUARIOS, usuarioId);
     const perfilRef = doc(db, COLLECTIONS.PERFIS, usuarioId);
 
-    const updateData: Record<string, any> = {
+    const updateData: Record<string, any> = sanitizeForFirestore({
       permissoesCustomizadas: permissoes,
       ...(role ? { role, cargo: role } : {}),
       atualizadoEm: serverTimestamp()
-    };
+    });
 
     await setDoc(userRef, updateData, { merge: true });
     await setDoc(perfilRef, updateData, { merge: true });
@@ -1132,12 +1208,24 @@ export function isUserAdminLocalOrTotal(user?: UsuarioEquipe | null): boolean {
   const userRole = (user.role || '').toLowerCase().trim();
   const userCargo = (user.cargo || '').toLowerCase().trim();
   return (
+    userRole === 'admin_master' ||
+    userRole === 'admin_total' ||
     userRole === 'admin_local' || 
     userRole === 'gestor' ||
+    userRole === 'admin' ||
     userCargo.includes('admin local') ||
     userCargo.includes('gerente') ||
-    userCargo.includes('gestor')
+    userCargo.includes('gestor') ||
+    userCargo.includes('administrador')
   );
+}
+
+/**
+ * Validação estrita de acesso a dados financeiros (receita, lucro, despesas, margens, metas)
+ * Permitido apenas para Admin Local e Admin Master (Total).
+ */
+export function canAccessFinancials(user?: UsuarioEquipe | null): boolean {
+  return isUserAdminLocalOrTotal(user);
 }
 
 /**
@@ -1183,8 +1271,8 @@ export async function ensureSuperAdminInFirestore(): Promise<void> {
     const userRef = doc(db, COLLECTIONS.USUARIOS, 'user-super-admin');
     const perfilRef = doc(db, COLLECTIONS.PERFIS, 'user-super-admin');
 
-    await setDoc(userRef, superAdminData, { merge: true });
-    await setDoc(perfilRef, superAdminData, { merge: true });
+    await setDoc(userRef, sanitizeForFirestore(superAdminData), { merge: true });
+    await setDoc(perfilRef, sanitizeForFirestore(superAdminData), { merge: true });
 
     // Also auto-heal alternate super admin login (fabio@teste.com)
     const superAdminAltData: UsuarioEquipe = {
@@ -1197,8 +1285,8 @@ export async function ensureSuperAdminInFirestore(): Promise<void> {
     };
     const userAltRef = doc(db, COLLECTIONS.USUARIOS, 'user-super-admin-alt');
     const perfilAltRef = doc(db, COLLECTIONS.PERFIS, 'user-super-admin-alt');
-    await setDoc(userAltRef, superAdminAltData, { merge: true });
-    await setDoc(perfilAltRef, superAdminAltData, { merge: true });
+    await setDoc(userAltRef, sanitizeForFirestore(superAdminAltData), { merge: true });
+    await setDoc(perfilAltRef, sanitizeForFirestore(superAdminAltData), { merge: true });
   } catch (err) {
     console.warn('[ensureSuperAdminInFirestore] Aviso ao sincronizar Super Admin:', err);
   }
@@ -1228,10 +1316,10 @@ export function checkUserCustomPermission(
 
   // 4. Fallback defaults based on role & hierarchy
   if (modulo === 'financeiro') {
-    if (acao === 'excluir') return false; // Only explicitly granted or admin_master can delete
-    if (user.role === 'admin_local' || user.role === 'gestor') return true;
-    if (acao === 'verEntradas' && (user.role === 'recepcao' || user.role === 'usuario')) return true;
-    return Boolean(user.permissoes?.ver_financeiro_completo);
+    // Valores de receita, lucro, margens, despesas e metas restritos estritamente ao admin_local e admin_total
+    if (!isUserAdminLocalOrTotal(user)) return false;
+    if (acao === 'excluir') return isUserAdminTotal(user) || Boolean(user.permissoesCustomizadas?.financeiro?.excluir);
+    return true;
   }
 
   if (modulo === 'clientes') {
@@ -1546,6 +1634,10 @@ export function usePermissions(currentUser?: UsuarioEquipe | null) {
  */
 export async function deleteRecordMaster(collectionName: string, docId: string): Promise<boolean> {
   try {
+    // 1. Instant local persistence removal
+    deleteLocalSingleItem(collectionName, docId).catch(() => {});
+    
+    // 2. Remove from Firestore
     const docRef = doc(db, collectionName, docId);
     await deleteDoc(docRef);
     return true;

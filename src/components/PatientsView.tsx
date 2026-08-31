@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Users, 
   Plus, 
@@ -64,26 +64,31 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
   const [search, setSearch] = useState('');
   const [patientToDelete, setPatientToDelete] = useState<Paciente | null>(null);
 
-  // Blindagem contra documentos nulos ou corrompidos
-  const safePacientes = (pacientes || []).filter(p => Boolean(p && (p.nome || p.telefone)));
+  // Blindagem contra documentos nulos ou corrompidos com useMemo
+  const safePacientes = useMemo(() => {
+    return (pacientes || []).filter(p => Boolean(p && (p.nome || p.telefone)));
+  }, [pacientes]);
 
-  const filteredPacientes = safePacientes.filter(p => {
+  const filteredPacientes = useMemo(() => {
     const q = search.toLowerCase().trim();
-    const nome = (p.nome || '').toLowerCase();
-    const telefone = (p.telefone || '');
-    const email = (p.email || '').toLowerCase();
-    const cpf = (p.cpf || '');
-    const historico = (p.historico_clinico || '').toLowerCase();
+    if (!q) return safePacientes;
 
-    return (
-      !q ||
-      nome.includes(q) ||
-      telefone.includes(q) ||
-      email.includes(q) ||
-      cpf.includes(q) ||
-      historico.includes(q)
-    );
-  });
+    return safePacientes.filter(p => {
+      const nome = (p.nome || '').toLowerCase();
+      const telefone = (p.telefone || '');
+      const email = (p.email || '').toLowerCase();
+      const cpf = (p.cpf || '');
+      const historico = (p.historico_clinico || '').toLowerCase();
+
+      return (
+        nome.includes(q) ||
+        telefone.includes(q) ||
+        email.includes(q) ||
+        cpf.includes(q) ||
+        historico.includes(q)
+      );
+    });
+  }, [safePacientes, search]);
 
   const formatDate = (dateValue?: any) => {
     if (!dateValue) return '-';
@@ -164,7 +169,7 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredPacientes.map((paciente) => {
             const age = paciente.data_nascimento ? calcularIdade(paciente.data_nascimento) : '';
-            const totalFotos = (paciente.fotos_antes_depois?.length || 0) + (paciente.galeria_clinica?.length || 0);
+            const totalFotos = (paciente.fotos_antes_depois?.length || 0) + (paciente.galeria_fotos_evolucao?.length || 0);
             const totalEvolucoes = paciente.evolucoes_retornos?.length || 0;
             const totalAnamneses = paciente.anamneses_completas?.length || 0;
             const nomeExibicao = paciente.nome || 'Cliente';

@@ -166,35 +166,39 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
   // Categorias únicas por coleção
   const procedureCategories = useMemo(() => {
     const cats = new Set<string>();
-    procedimentos.forEach(p => { if (p.categoria) cats.add(p.categoria); });
+    (procedimentos || []).forEach(p => { if (p && p.categoria) cats.add(p.categoria); });
     return Array.from(cats);
   }, [procedimentos]);
 
   const estoqueCategories = useMemo(() => {
     const cats = new Set<string>();
-    estoque.forEach(e => { if (e.categoria) cats.add(e.categoria); });
+    (estoque || []).forEach(e => { if (e && e.categoria) cats.add(e.categoria); });
     return Array.from(cats);
   }, [estoque]);
 
   const financialCategories = useMemo(() => {
     const cats = new Set<string>();
-    financeiro.forEach(f => { if (f.categoria) cats.add(f.categoria); });
+    (financeiro || []).forEach(f => { if (f && f.categoria) cats.add(f.categoria); });
     return Array.from(cats);
   }, [financeiro]);
 
   // Paciente selecionado para inspeção e exclusão de históricos
   const currentPatient = useMemo(() => {
-    return pacientes.find(p => p.id === selectedPatientId) || pacientes[0];
+    return (pacientes || []).find(p => p && p.id === selectedPatientId) || (pacientes && pacientes[0]) || null;
   }, [pacientes, selectedPatientId]);
 
   // Filtragem de Agendamentos
   const filteredAgendamentos = useMemo(() => {
-    return agendamentos.filter(a => {
+    const term = (searchTerm || '').toLowerCase().trim();
+    return (agendamentos || []).filter(a => {
+      if (!a) return false;
+      const pacName = a.paciente?.nome || (a as any).paciente_nome || '';
       const matchSearch =
-        a.paciente_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        a.procedimento?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        a.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        a.profissional_nome?.toLowerCase().includes(searchTerm.toLowerCase());
+        !term ||
+        pacName.toLowerCase().includes(term) ||
+        (a.procedimento || '').toLowerCase().includes(term) ||
+        (a.id || '').toLowerCase().includes(term) ||
+        (a.profissional_nome || '').toLowerCase().includes(term);
       const matchCat = selectedCategoryFilter === 'ALL' || a.status === selectedCategoryFilter;
       return matchSearch && matchCat;
     });
@@ -202,11 +206,14 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
 
   // Filtragem de Procedimentos
   const filteredProcedimentos = useMemo(() => {
-    return procedimentos.filter(p => {
+    const term = (searchTerm || '').toLowerCase().trim();
+    return (procedimentos || []).filter(p => {
+      if (!p) return false;
       const matchSearch =
-        p.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.categoria?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.id?.toLowerCase().includes(searchTerm.toLowerCase());
+        !term ||
+        (p.nome || '').toLowerCase().includes(term) ||
+        (p.categoria || '').toLowerCase().includes(term) ||
+        (p.id || '').toLowerCase().includes(term);
       const matchCat = selectedCategoryFilter === 'ALL' || p.categoria === selectedCategoryFilter;
       return matchSearch && matchCat;
     });
@@ -214,11 +221,14 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
 
   // Filtragem de Estoque
   const filteredEstoque = useMemo(() => {
-    return estoque.filter(e => {
+    const term = (searchTerm || '').toLowerCase().trim();
+    return (estoque || []).filter((e: any) => {
+      if (!e) return false;
       const matchSearch =
-        e.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        e.categoria?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        e.id?.toLowerCase().includes(searchTerm.toLowerCase());
+        !term ||
+        (e.nome || e.nome_item || '').toLowerCase().includes(term) ||
+        (e.categoria || '').toLowerCase().includes(term) ||
+        (e.id || '').toLowerCase().includes(term);
       const matchCat = selectedCategoryFilter === 'ALL' || e.categoria === selectedCategoryFilter;
       return matchSearch && matchCat;
     });
@@ -226,13 +236,13 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
 
   // Filtragem de Financeiro
   const filteredFinanceiro = useMemo(() => {
-    return financeiro.filter((f: any) => {
+    return (financeiro || []).filter((f: any) => {
       if (!f) return false;
       const desc = (f.descricao || f.procedimento || f.motivo || f.observacao || '').toLowerCase();
       const cat = (f.categoria || '').toLowerCase();
       const pac = (f.paciente_nome || f.paciente || f.nome_paciente || f.fornecedor || '').toLowerCase();
       const id = (f.id || '').toLowerCase();
-      const query = (searchTerm || '').toLowerCase();
+      const query = (searchTerm || '').toLowerCase().trim();
 
       const matchSearch = !query || desc.includes(query) || cat.includes(query) || pac.includes(query) || id.includes(query);
       const matchCat = selectedCategoryFilter === 'ALL' || f.categoria === selectedCategoryFilter;
@@ -251,14 +261,20 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
       subtitle: `Coleção: ${collectionName.toUpperCase()} | ID: ${id}`,
       onConfirm: async () => {
         setIsProcessing(true);
-        const ok = await deleteRecordMaster(collectionName, id);
-        setIsProcessing(false);
-        setDeleteConfirm(null);
-        if (ok) {
-          showStatus('success', `Registro [${title}] apagado com sucesso do banco de dados.`);
-          if (onRefreshData) onRefreshData();
-        } else {
-          showStatus('error', `Falha ao apagar registro [${title}]. Verifique as permissões de gravação.`);
+        try {
+          const ok = await deleteRecordMaster(collectionName, id);
+          if (ok) {
+            showStatus('success', `Registro [${title}] apagado com sucesso do banco de dados.`);
+            if (onRefreshData) onRefreshData();
+          } else {
+            showStatus('error', `Falha ao apagar registro [${title}]. Verifique as permissões de gravação.`);
+          }
+        } catch (err: any) {
+          console.error('[DatabaseMasterView] Erro ao excluir registro:', err);
+          showStatus('error', `Erro ao apagar registro: ${err?.message || 'Falha na exclusão'}`);
+        } finally {
+          setIsProcessing(false);
+          setDeleteConfirm(null);
         }
       }
     });
@@ -278,15 +294,21 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
       subtitle: `Paciente: ${patient.nome} (${patient.cpf || patient.telefone || 'Sem doc'})`,
       onConfirm: async () => {
         setIsProcessing(true);
-        const updated = await deletePatientClinicalHistoryItem(patient, itemType, itemId);
-        setIsProcessing(false);
-        setDeleteConfirm(null);
-        if (updated) {
-          showStatus('success', `Histórico [${itemTitle}] excluído com sucesso do prontuário.`);
-          if (onUpdatePaciente) onUpdatePaciente(updated);
-          if (onRefreshData) onRefreshData();
-        } else {
-          showStatus('error', `Erro ao remover histórico do prontuário.`);
+        try {
+          const updated = await deletePatientClinicalHistoryItem(patient, itemType, itemId);
+          if (updated) {
+            showStatus('success', `Histórico [${itemTitle}] excluído com sucesso do prontuário.`);
+            if (onUpdatePaciente) onUpdatePaciente(updated);
+            if (onRefreshData) onRefreshData();
+          } else {
+            showStatus('error', `Erro ao remover histórico do prontuário.`);
+          }
+        } catch (err: any) {
+          console.error('[DatabaseMasterView] Erro ao excluir histórico:', err);
+          showStatus('error', `Erro ao remover histórico: ${err?.message || 'Falha na exclusão'}`);
+        } finally {
+          setIsProcessing(false);
+          setDeleteConfirm(null);
         }
       }
     });
@@ -450,14 +472,14 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
       {/* NAVEGAÇÃO DE ABAS MASTER */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-200">
         {[
-          { id: 'agendamentos', label: 'Agendamentos', icon: Calendar, count: agendamentos.length },
-          { id: 'procedimentos', label: 'Procedimentos & Preços', icon: Sparkles, count: procedimentos.length },
+          { id: 'agendamentos', label: 'Agendamentos', icon: Calendar, count: (agendamentos || []).length },
+          { id: 'procedimentos', label: 'Procedimentos & Preços', icon: Sparkles, count: (procedimentos || []).length },
           { id: 'categorias', label: 'Gestão de Categorias', icon: FolderTree, count: procedureCategories.length + estoqueCategories.length },
-          { id: 'historicos_clinicos', label: 'Históricos & Prontuários', icon: History, count: pacientes.length },
-          { id: 'estoque', label: 'Insumos & Estoque', icon: Package, count: estoque.length },
-          { id: 'financeiro', label: 'Tabela Financeira', icon: DollarSign, count: financeiro.length },
-          { id: 'pacientes', label: 'Tabela Pacientes', icon: Users, count: pacientes.length },
-          { id: 'usuarios', label: 'Tabela Usuários/Equipe', icon: ShieldCheck, count: usuarios.length },
+          { id: 'historicos_clinicos', label: 'Históricos & Prontuários', icon: History, count: (pacientes || []).length },
+          { id: 'estoque', label: 'Insumos & Estoque', icon: Package, count: (estoque || []).length },
+          { id: 'financeiro', label: 'Tabela Financeira', icon: DollarSign, count: (financeiro || []).length },
+          { id: 'pacientes', label: 'Tabela Pacientes', icon: Users, count: (pacientes || []).length },
+          { id: 'usuarios', label: 'Tabela Usuários/Equipe', icon: ShieldCheck, count: (usuarios || []).length },
         ].map(tab => {
           const Icon = tab.icon;
           const isActive = activeCollection === tab.id;
@@ -568,11 +590,11 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
                         </div>
                       </td>
                       <td className="py-3 px-4 font-bold text-slate-900">
-                        {ag.paciente_nome}
+                        {ag.paciente?.nome || (ag as any).paciente_nome || 'Paciente'}
                       </td>
                       <td className="py-3 px-4">
-                        <span className="font-medium text-slate-800">{ag.procedimento}</span>
-                        {(ag.procedimento.toLowerCase().includes('retorno') || ag.procedimento.toLowerCase().includes('revisão')) && (
+                        <span className="font-medium text-slate-800">{ag.procedimento || 'Procedimento'}</span>
+                        {((ag.procedimento || '').toLowerCase().includes('retorno') || (ag.procedimento || '').toLowerCase().includes('revisão')) && (
                           <span className="ml-1.5 px-1.5 py-0.2 rounded text-[9px] bg-purple-100 text-purple-800 font-extrabold">
                             Retorno
                           </span>
@@ -598,7 +620,7 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={() => handleDeleteRecord(COLLECTIONS.AGENDAMENTOS, ag.id, `Agendamento de ${ag.paciente_nome} (${ag.procedimento})`)}
+                          onClick={() => handleDeleteRecord(COLLECTIONS.AGENDAMENTOS, ag.id, `Agendamento de ${ag.paciente?.nome || (ag as any).paciente_nome || 'Paciente'} (${ag.procedimento})`)}
                           className="p-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition"
                           title="Apagar Agendamento do Banco"
                         >
@@ -692,7 +714,7 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
                         </span>
                       </td>
                       <td className="py-3 px-4 font-mono font-bold text-emerald-700">
-                        R$ {(proc.preco || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        R$ {(proc.valor_tabela || proc.preco_sugerido || (proc as any).preco || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </td>
                       <td className="py-3 px-4 text-slate-600">
                         {proc.duracao_minutos} min
@@ -857,7 +879,7 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
                 onChange={e => setSelectedPatientId(e.target.value)}
                 className="text-xs font-bold py-2 px-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white max-w-xs"
               >
-                {pacientes.map(p => (
+                {(pacientes || []).map(p => (
                   <option key={p.id} value={p.id}>
                     {p.nome} ({p.cpf || p.telefone || 'Sem doc'})
                   </option>
@@ -929,10 +951,10 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
               <div className="space-y-3">
                 <h4 className="text-xs font-bold uppercase text-slate-700 tracking-wider flex items-center gap-2">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  Fichas de Anamnese & Termos ({currentPatient.anamneses_completas?.length || (currentPatient.ficha_anamnese ? 1 : 0)})
+                  Fichas de Anamnese & Termos ({currentPatient.anamneses_completas?.length || (currentPatient.fichas_anamnese ? currentPatient.fichas_anamnese.length : 0)})
                 </h4>
 
-                {(!currentPatient.anamneses_completas || currentPatient.anamneses_completas.length === 0) && !currentPatient.ficha_anamnese ? (
+                {(!currentPatient.anamneses_completas || currentPatient.anamneses_completas.length === 0) && (!currentPatient.fichas_anamnese || currentPatient.fichas_anamnese.length === 0) ? (
                   <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center text-xs text-slate-400">
                     Nenhuma ficha de anamnese arquivada para este paciente.
                   </div>
@@ -1054,17 +1076,17 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
               <tbody className="divide-y divide-slate-100">
                 {filteredEstoque.map(item => (
                   <tr key={item.id} className="hover:bg-slate-50/80 transition">
-                    <td className="py-3 px-4 font-bold text-slate-900">{item.nome}</td>
+                    <td className="py-3 px-4 font-bold text-slate-900">{item.nome_item || (item as any).nome}</td>
                     <td className="py-3 px-4">
                       <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-bold text-[10px]">
                         {item.categoria}
                       </span>
                     </td>
                     <td className="py-3 px-4 font-mono font-bold text-slate-800">
-                      {item.quantidade_atual} {item.unidade_medida}
+                      {item.quantidade} {item.unidade_medida}
                     </td>
                     <td className="py-3 px-4 text-slate-500">
-                      {item.quantidade_minima} {item.unidade_medida}
+                      {item.alerta_minimo} {item.unidade_medida}
                     </td>
                     <td className="py-3 px-4 font-mono font-bold text-emerald-700">
                       R$ {(item.custo_unitario || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -1077,7 +1099,7 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
                         <Edit3 className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => handleDeleteRecord(COLLECTIONS.ESTOQUE, item.id, `Insumo: ${item.nome}`)}
+                        onClick={() => handleDeleteRecord(COLLECTIONS.ESTOQUE, item.id, `Insumo: ${item.nome_item || (item as any).nome}`)}
                         className="p-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -1256,7 +1278,7 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {pacientes.filter(p => p.nome.toLowerCase().includes(searchTerm.toLowerCase())).map(p => (
+                {pacientes.filter(p => (p?.nome || '').toLowerCase().includes((searchTerm || '').toLowerCase().trim())).map(p => (
                   <tr key={p.id} className="hover:bg-slate-50/80 transition">
                     <td className="py-3 px-4 font-bold text-slate-900">{p.nome}</td>
                     <td className="py-3 px-4 font-mono text-slate-700">{p.cpf || '-'}</td>
@@ -1303,20 +1325,20 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {usuarios.map(u => (
+                {(usuarios || []).map(u => (
                   <tr key={u.id} className="hover:bg-slate-50/80 transition">
-                    <td className="py-3 px-4 font-bold text-slate-900">{u.nome}</td>
-                    <td className="py-3 px-4 font-mono">{u.email}</td>
+                    <td className="py-3 px-4 font-bold text-slate-900">{u.nome || 'Usuário'}</td>
+                    <td className="py-3 px-4 font-mono">{u.email || '-'}</td>
                     <td className="py-3 px-4">
                       <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-bold text-[10px]">
-                        {u.perfil}
+                        {u.cargo || u.role || 'Operador'}
                       </span>
                     </td>
                     <td className="py-3 px-4">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        u.ativo ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                        u.status === 'ativo' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
                       }`}>
-                        {u.ativo ? 'ATIVO' : 'INATIVO'}
+                        {u.status === 'ativo' ? 'ATIVO' : 'INATIVO'}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-right space-x-1 whitespace-nowrap">
@@ -1512,18 +1534,35 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
 
             <div className="flex items-center justify-center gap-2 pt-2">
               <button
+                type="button"
                 onClick={() => setDeleteConfirm(null)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition"
+                disabled={isProcessing}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
-                onClick={deleteConfirm.onConfirm}
+                type="button"
+                onClick={async () => {
+                  if (deleteConfirm?.onConfirm) {
+                    await deleteConfirm.onConfirm();
+                  }
+                  setDeleteConfirm(null);
+                }}
                 disabled={isProcessing}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition shadow-sm"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-bold transition shadow-sm cursor-pointer disabled:opacity-50"
               >
-                <Trash2 className="w-3.5 h-3.5" />
-                Sim, Apagar Definitivamente
+                {isProcessing ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Apagando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Sim, Apagar Definitivamente</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

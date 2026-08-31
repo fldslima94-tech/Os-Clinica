@@ -250,8 +250,10 @@ export const PermissionsManagementView: React.FC<PermissionsManagementViewProps>
 
   const activeModuleFields = getOrderedFieldsForModule(selectedModule);
   const filteredModuleFields = activeModuleFields.filter(f => {
-    const label = labelsCustomizados[f.id] || f.defaultLabel;
-    return label.toLowerCase().includes(searchTerm.toLowerCase()) || f.id.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!f) return false;
+    const label = labelsCustomizados[f.id] || f.defaultLabel || '';
+    const term = (searchTerm || '').toLowerCase().trim();
+    return !term || label.toLowerCase().includes(term) || (f.id || '').toLowerCase().includes(term);
   });
 
   // Reorder field up

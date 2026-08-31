@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Plus, 
   Search, 
@@ -97,39 +97,47 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
     }
   };
 
-  const allBalcaoToday = agendamentos
-    .filter(ag => isToday(ag.data_hora || ag.data_horario))
-    .sort((a, b) => new Date(a.data_hora || a.data_horario || '').getTime() - new Date(b.data_hora || b.data_horario || '').getTime());
+  const allBalcaoToday = useMemo(() => {
+    return agendamentos
+      .filter(ag => isToday(ag.data_hora))
+      .sort((a, b) => new Date(a.data_hora || '').getTime() - new Date(b.data_hora || '').getTime());
+  }, [agendamentos]);
 
   const countTotalToday = allBalcaoToday.length;
-  const countEspera = allBalcaoToday.filter(a => a.status === 'em_espera').length;
-  const countEmAtendimento = allBalcaoToday.filter(a => a.status === 'em_atendimento').length;
-  const countConcluido = allBalcaoToday.filter(a => a.status === 'concluido').length;
-  const countAgendados = allBalcaoToday.filter(a => a.status === 'confirmado' || a.status === 'pendente').length;
+  const countEspera = useMemo(() => allBalcaoToday.filter(a => a.status === 'em_espera').length, [allBalcaoToday]);
+  const countEmAtendimento = useMemo(() => allBalcaoToday.filter(a => a.status === 'em_atendimento').length, [allBalcaoToday]);
+  const countConcluido = useMemo(() => allBalcaoToday.filter(a => a.status === 'concluido').length, [allBalcaoToday]);
+  const countAgendados = useMemo(() => allBalcaoToday.filter(a => a.status === 'confirmado' || a.status === 'pendente').length, [allBalcaoToday]);
 
-  const balcaoAgendamentos = allBalcaoToday.filter(ag => {
-    if (balcaoFilterStatus === 'todos') return true;
-    if (balcaoFilterStatus === 'em_espera') return ag.status === 'em_espera';
-    if (balcaoFilterStatus === 'em_atendimento') return ag.status === 'em_atendimento';
-    if (balcaoFilterStatus === 'concluido') return ag.status === 'concluido';
-    if (balcaoFilterStatus === 'agendados') return ag.status === 'confirmado' || ag.status === 'pendente';
-    return true;
-  });
+  const balcaoAgendamentos = useMemo(() => {
+    return allBalcaoToday.filter(ag => {
+      if (balcaoFilterStatus === 'todos') return true;
+      if (balcaoFilterStatus === 'em_espera') return ag.status === 'em_espera';
+      if (balcaoFilterStatus === 'em_atendimento') return ag.status === 'em_atendimento';
+      if (balcaoFilterStatus === 'concluido') return ag.status === 'concluido';
+      if (balcaoFilterStatus === 'agendados') return ag.status === 'confirmado' || ag.status === 'pendente';
+      return true;
+    });
+  }, [allBalcaoToday, balcaoFilterStatus]);
 
   // Filter appointments for standard views
-  const filtered = agendamentos.filter(ag => {
-    const matchesStatus = filterStatus === 'todos' || ag.status === filterStatus;
-    const matchesProfissional = filterProfissional === 'todos' || 
-      ag.profissional_id === filterProfissional || 
-      ag.profissional_nome === filterProfissional;
-    
-    const q = (search || '').toLowerCase();
-    const patientName = (ag.paciente?.nome || '').toLowerCase();
-    const proc = (ag.procedimento || '').toLowerCase();
-    const profName = (ag.profissional_nome || '').toLowerCase();
-    
-    return matchesStatus && matchesProfissional && (patientName.includes(q) || proc.includes(q) || profName.includes(q));
-  });
+  const filtered = useMemo(() => {
+    return agendamentos.filter(ag => {
+      const matchesStatus = filterStatus === 'todos' || ag.status === filterStatus;
+      const matchesProfissional = filterProfissional === 'todos' || 
+        ag.profissional_id === filterProfissional || 
+        ag.profissional_nome === filterProfissional;
+      
+      const q = (search || '').toLowerCase().trim();
+      if (!q) return matchesStatus && matchesProfissional;
+
+      const patientName = (ag.paciente?.nome || '').toLowerCase();
+      const proc = (ag.procedimento || '').toLowerCase();
+      const profName = (ag.profissional_nome || '').toLowerCase();
+      
+      return matchesStatus && matchesProfissional && (patientName.includes(q) || proc.includes(q) || profName.includes(q));
+    });
+  }, [agendamentos, filterStatus, filterProfissional, search]);
 
   const handleConcludeClick = (ag: Agendamento) => {
     if (onOpenCompleteModal) {
@@ -277,7 +285,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
           </div>
 
           <button
-            onClick={onOpenNewAppointment}
+            onClick={() => onOpenNewAppointment?.()}
             className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-lg text-sm font-semibold transition-colors cursor-pointer shadow-sm"
           >
             <Plus className="w-4 h-4" />
@@ -310,7 +318,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
 
             <div className="flex items-center gap-2">
               <button
-                onClick={onOpenNewAppointment}
+                onClick={() => onOpenNewAppointment?.()}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
@@ -393,7 +401,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
               </p>
               {countTotalToday === 0 ? (
                 <button
-                  onClick={onOpenNewAppointment}
+                  onClick={() => onOpenNewAppointment?.()}
                   className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
@@ -424,7 +432,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-xs">
                     {balcaoAgendamentos.map((ag) => {
-                      const dt = formatDateTime(ag.data_hora || ag.data_horario);
+                      const dt = formatDateTime(ag.data_hora);
                       const patient = pacientes.find(p => p.id === ag.paciente_id) || ag.paciente;
                       const patientName = patient?.nome || ag.paciente?.nome || 'Cliente';
 
@@ -521,7 +529,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                                 </>
                               )}
 
-                              {/* 2. SE NA ESPERA (Chamar para Sala) */}
+                              {/* 2. SE NA ESPERA (Chamar para Sala ou Finalizar) */}
                               {ag.status === 'em_espera' && (
                                 <>
                                   <button
@@ -531,6 +539,14 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                                   >
                                     <DoorOpen className="w-3.5 h-3.5" />
                                     <span>Chamar Sala</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleConcludeClick(ag)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
+                                    title="Finalizar atendimento diretamente e registrar no caixa"
+                                  >
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    <span>Finalizar</span>
                                   </button>
                                   <button
                                     onClick={() => onUpdateStatus(ag.id, 'confirmado')}
@@ -689,7 +705,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                       <div className="text-center py-8 px-4 bg-white rounded-lg border border-dashed border-slate-200 text-slate-400 text-xs">
                         Nenhum agendamento para este profissional.
                         <button
-                          onClick={onOpenNewAppointment}
+                          onClick={() => onOpenNewAppointment?.()}
                           className="block mx-auto mt-2 text-indigo-600 font-semibold hover:underline cursor-pointer"
                         >
                           + Agendar Horário
@@ -869,7 +885,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                 Não há consultas ou procedimentos agendados para os filtros selecionados.
               </p>
               <button
-                onClick={onOpenNewAppointment}
+                onClick={() => onOpenNewAppointment?.()}
                 className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />

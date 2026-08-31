@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Calendar, 
   Clock, 
@@ -37,9 +37,15 @@ import {
   Flame,
   CalendarClock,
   Receipt,
-  AlertOctagon
+  AlertOctagon,
+  Tv,
+  Users,
+  Activity,
+  Layers,
+  Sparkle
 } from 'lucide-react';
 import { Agendamento, EstoqueInsumo, Paciente, StatusAgendamento, UsuarioEquipe, BemAtivo, TransacaoFinanceira, DespesaRecorrente } from '../types';
+import { isUserAdminLocalOrTotal } from '../services/firebaseService';
 
 interface DashboardViewProps {
   agendamentos: Agendamento[];
@@ -49,6 +55,7 @@ interface DashboardViewProps {
   profissionais?: UsuarioEquipe[];
   transacoes?: TransacaoFinanceira[];
   despesasRecorrentes?: DespesaRecorrente[];
+  currentUser?: UsuarioEquipe;
   onOpenNewAppointment: () => void;
   onOpenNewPatient: () => void;
   onOpenNewInventory: () => void;
@@ -59,6 +66,7 @@ interface DashboardViewProps {
   onGoToFinancial?: () => void;
   onOpenCompleteModal?: (agendamento: Agendamento) => void;
   onOpenCheckInModal?: (agendamento: Agendamento) => void;
+  onOpenSecondScreenModal?: () => void;
   searchQuery: string;
 }
 
@@ -70,6 +78,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   profissionais = [],
   transacoes = [],
   despesasRecorrentes = [],
+  currentUser,
   onOpenNewAppointment,
   onOpenNewPatient,
   onOpenNewInventory,
@@ -80,8 +89,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onGoToFinancial,
   onOpenCompleteModal,
   onOpenCheckInModal,
+  onOpenSecondScreenModal,
   searchQuery,
 }) => {
+  const canViewFinancials = isUserAdminLocalOrTotal(currentUser);
   const [statusFilter, setStatusFilter] = useState<'todos' | StatusAgendamento>('todos');
   const [selectedProfissional, setSelectedProfissional] = useState<string>('todos');
   const [modoDetalhado, setModoDetalhado] = useState<boolean>(false);
@@ -204,91 +215,109 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   };
 
   // Filter ONLY appointments of the CURRENT DAY (00:00 to 23:59)
-  const todayDateStr = new Date().toISOString().slice(0, 10);
+  const todayDateStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
   
-  const todayAppointments = agendamentos.filter(ag => {
-    try {
-      const agDateStr = new Date(ag.data_hora).toISOString().slice(0, 10);
-      return agDateStr === todayDateStr;
-    } catch {
-      return false;
-    }
-  });
+  const todayAppointments = useMemo(() => {
+    return agendamentos.filter(ag => {
+      try {
+        const agDateStr = new Date(ag.data_hora).toISOString().slice(0, 10);
+        return agDateStr === todayDateStr;
+      } catch {
+        return false;
+      }
+    });
+  }, [agendamentos, todayDateStr]);
 
   // Filter by search, status, and professional
-  const filteredTodayAgendamentos = todayAppointments.filter(ag => {
-    const matchesStatus = statusFilter === 'todos' || ag.status === statusFilter;
-    const matchesProf = selectedProfissional === 'todos' || 
-      ag.profissional_id === selectedProfissional || 
-      ag.profissional_nome === selectedProfissional;
+  const filteredTodayAgendamentos = useMemo(() => {
+    return todayAppointments.filter(ag => {
+      const matchesStatus = statusFilter === 'todos' || ag.status === statusFilter;
+      const matchesProf = selectedProfissional === 'todos' || 
+        ag.profissional_id === selectedProfissional || 
+        ag.profissional_nome === selectedProfissional;
 
-    const query = searchQuery.toLowerCase().trim();
-    if (!query) return matchesStatus && matchesProf;
+      const query = searchQuery.toLowerCase().trim();
+      if (!query) return matchesStatus && matchesProf;
 
-    const patient = pacientes.find(p => p.id === ag.paciente_id) || ag.paciente;
-    const patientName = (patient?.nome || '').toLowerCase();
-    const profName = (ag.profissional_nome || '').toLowerCase();
+      const patient = pacientes.find(p => p.id === ag.paciente_id) || ag.paciente;
+      const patientName = (patient?.nome || '').toLowerCase();
+      const profName = (ag.profissional_nome || '').toLowerCase();
 
-    return matchesStatus && matchesProf && (patientName.includes(query) || profName.includes(query));
-  });
+      return matchesStatus && matchesProf && (patientName.includes(query) || profName.includes(query));
+    });
+  }, [todayAppointments, statusFilter, selectedProfissional, searchQuery, pacientes]);
 
   // KPI Metrics for Today
   const totalToday = todayAppointments.length;
-  const inWaitingRoom = todayAppointments.filter(a => a.status === 'em_espera').length;
-  const inProcedure = todayAppointments.filter(a => a.status === 'em_atendimento').length;
-  const confirmedCount = todayAppointments.filter(a => a.status === 'confirmado').length;
-  const completedToday = todayAppointments.filter(a => a.status === 'concluido').length;
+  const inWaitingRoom = useMemo(() => todayAppointments.filter(a => a.status === 'em_espera').length, [todayAppointments]);
+  const inProcedure = useMemo(() => todayAppointments.filter(a => a.status === 'em_atendimento').length, [todayAppointments]);
+  const confirmedCount = useMemo(() => todayAppointments.filter(a => a.status === 'confirmado').length, [todayAppointments]);
+  const completedToday = useMemo(() => todayAppointments.filter(a => a.status === 'concluido').length, [todayAppointments]);
 
-  const lowStockItems = estoque.filter(item => item.quantidade <= item.alerta_minimo);
+  const lowStockItems = useMemo(() => estoque.filter(item => item.quantidade <= item.alerta_minimo), [estoque]);
 
   // Alertas de Manutenção Preventiva de Equipamentos
-  const hojeDashboardStr = new Date().toISOString().slice(0, 10);
-  const limite15d = new Date();
-  limite15d.setDate(limite15d.getDate() + 15);
-  const limite15dStr = limite15d.toISOString().slice(0, 10);
+  const { equipamentosManutVencida, equipamentosManutProxima, equipamentosEmManutencao, totalAlertasManutencao } = useMemo(() => {
+    const hojeDashboardStr = new Date().toISOString().slice(0, 10);
+    const limite15d = new Date();
+    limite15d.setDate(limite15d.getDate() + 15);
+    const limite15dStr = limite15d.toISOString().slice(0, 10);
 
-  const equipamentosManutVencida = bens.filter(b => 
-    b.requerManutencao && 
-    b.dataProximaManutencao && 
-    b.dataProximaManutencao < hojeDashboardStr &&
-    b.estado_conservacao !== 'manutencao'
-  );
+    const vencida = bens.filter(b => 
+      b.requerManutencao && 
+      b.dataProximaManutencao && 
+      b.dataProximaManutencao < hojeDashboardStr &&
+      b.estado_conservacao !== 'manutencao'
+    );
 
-  const equipamentosManutProxima = bens.filter(b => 
-    b.requerManutencao && 
-    b.dataProximaManutencao && 
-    b.dataProximaManutencao >= hojeDashboardStr && 
-    b.dataProximaManutencao <= limite15dStr &&
-    b.estado_conservacao !== 'manutencao'
-  );
+    const proxima = bens.filter(b => 
+      b.requerManutencao && 
+      b.dataProximaManutencao && 
+      b.dataProximaManutencao >= hojeDashboardStr && 
+      b.dataProximaManutencao <= limite15dStr &&
+      b.estado_conservacao !== 'manutencao'
+    );
 
-  const equipamentosEmManutencao = bens.filter(b => 
-    b.estado_conservacao === 'manutencao' || b.statusManutencao === 'em_manutencao'
-  );
+    const emManut = bens.filter(b => 
+      b.estado_conservacao === 'manutencao' || b.statusManutencao === 'em_manutencao'
+    );
 
-  const totalAlertasManutencao = equipamentosManutVencida.length + equipamentosManutProxima.length + equipamentosEmManutencao.length;
+    return {
+      equipamentosManutVencida: vencida,
+      equipamentosManutProxima: proxima,
+      equipamentosEmManutencao: emManut,
+      totalAlertasManutencao: vencida.length + proxima.length + emManut.length
+    };
+  }, [bens]);
 
   // Resumo Financeiro do Período Selecionado (Receitas x Despesas)
-  const transacoesPeriodo = transacoes.filter(t => {
-    if (t.excluido) return false;
-    try {
-      const d = new Date(t.data);
-      return d.getFullYear() === selectedYear && d.getMonth() === selectedMonth;
-    } catch {
-      return false;
-    }
-  });
+  const { transacoesPeriodo, receitasPeriodo, despesasPeriodo, saldoLiquidoPeriodo, qtdTransacoesPeriodo } = useMemo(() => {
+    const periodTxs = transacoes.filter(t => {
+      if (t.excluido) return false;
+      try {
+        const d = new Date(t.data);
+        return d.getFullYear() === selectedYear && d.getMonth() === selectedMonth;
+      } catch {
+        return false;
+      }
+    });
 
-  const receitasPeriodo = transacoesPeriodo
-    .filter(t => (t.tipo === 'entrada' || t.tipo === 'receita') && t.status === 'pago')
-    .reduce((acc, t) => acc + (Number(t.valor) || 0), 0);
+    const rec = periodTxs
+      .filter(t => (t.tipo === 'entrada' || t.tipo === 'receita') && t.status === 'pago')
+      .reduce((acc, t) => acc + (Number(t.valor) || 0), 0);
 
-  const despesasPeriodo = transacoesPeriodo
-    .filter(t => (t.tipo === 'saida' || t.tipo === 'despesa') && t.status === 'pago')
-    .reduce((acc, t) => acc + (Number(t.valor) || 0), 0);
+    const desp = periodTxs
+      .filter(t => (t.tipo === 'saida' || t.tipo === 'despesa') && t.status === 'pago')
+      .reduce((acc, t) => acc + (Number(t.valor) || 0), 0);
 
-  const saldoLiquidoPeriodo = receitasPeriodo - despesasPeriodo;
-  const qtdTransacoesPeriodo = transacoesPeriodo.filter(t => t.status === 'pago').length;
+    return {
+      transacoesPeriodo: periodTxs,
+      receitasPeriodo: rec,
+      despesasPeriodo: desp,
+      saldoLiquidoPeriodo: rec - desp,
+      qtdTransacoesPeriodo: periodTxs.filter(t => t.status === 'pago').length
+    };
+  }, [transacoes, selectedYear, selectedMonth]);
 
   // Métricas de Meta de Faturamento do Período
   const percentualAtingido = metaFaturamento > 0 
@@ -298,9 +327,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const metaAtingida = receitasPeriodo >= metaFaturamento && metaFaturamento > 0;
 
   // Alertas de Contas a Pagar (Para o mês atual: próximos 7 dias; Para outros meses: lançamentos do mês selecionado)
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-
   interface ContaPagarProxima {
     id: string;
     origem: 'transacao' | 'recorrente';
@@ -313,26 +339,43 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     formaPagamento?: string;
   }
 
-  const contasAPagarProximas: ContaPagarProxima[] = [];
+  const { contasAPagarProximas, totalValorContasProximas } = useMemo(() => {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const lista: ContaPagarProxima[] = [];
 
-  // 1. Transações com status 'pendente' do tipo despesa / saída
-  transacoes.forEach(t => {
-    if (t.excluido) return;
-    const isDespesa = t.tipo === 'saida' || t.tipo === 'despesa';
-    const isPendente = t.status === 'pendente';
-    if (isDespesa && isPendente) {
-      try {
-        const dVenc = new Date(t.data);
-        dVenc.setHours(0, 0, 0, 0);
-        const inSelectedPeriod = dVenc.getFullYear() === selectedYear && dVenc.getMonth() === selectedMonth;
+    // 1. Transações com status 'pendente' do tipo despesa / saída
+    transacoes.forEach(t => {
+      if (t.excluido) return;
+      const isDespesa = t.tipo === 'saida' || t.tipo === 'despesa';
+      const isPendente = t.status === 'pendente';
+      if (isDespesa && isPendente) {
+        try {
+          const dVenc = new Date(t.data);
+          dVenc.setHours(0, 0, 0, 0);
+          const inSelectedPeriod = dVenc.getFullYear() === selectedYear && dVenc.getMonth() === selectedMonth;
 
-        if (isCurrentMonth) {
-          const diffTime = dVenc.getTime() - hoje.getTime();
-          const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+          if (isCurrentMonth) {
+            const diffTime = dVenc.getTime() - hoje.getTime();
+            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
-          // Consideramos contas com vencimento nos próximos 7 dias (inclusive até 3 dias em atraso para alertar o gestor)
-          if (diffDays >= -3 && diffDays <= 7) {
-            contasAPagarProximas.push({
+            if (diffDays >= -3 && diffDays <= 7) {
+              lista.push({
+                id: `tx-${t.id}`,
+                origem: 'transacao',
+                descricao: t.procedimento || t.paciente_nome || 'Despesa Programada',
+                categoria: t.categoria || 'Despesa',
+                valor: Number(t.valor) || 0,
+                dataVencimento: dVenc,
+                diasRestantes: diffDays,
+                status: diffDays < 0 ? 'atrasado' : diffDays === 0 ? 'hoje' : diffDays === 1 ? 'amanha' : 'em_breve',
+                formaPagamento: t.forma_pagamento,
+              });
+            }
+          } else if (inSelectedPeriod) {
+            const diffTime = dVenc.getTime() - hoje.getTime();
+            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+            lista.push({
               id: `tx-${t.id}`,
               origem: 'transacao',
               descricao: t.procedimento || t.paciente_nome || 'Despesa Programada',
@@ -340,47 +383,47 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               valor: Number(t.valor) || 0,
               dataVencimento: dVenc,
               diasRestantes: diffDays,
-              status: diffDays < 0 ? 'atrasado' : diffDays === 0 ? 'hoje' : diffDays === 1 ? 'amanha' : 'em_breve',
+              status: 'periodo',
               formaPagamento: t.forma_pagamento,
             });
           }
-        } else if (inSelectedPeriod) {
-          const diffTime = dVenc.getTime() - hoje.getTime();
-          const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-          contasAPagarProximas.push({
-            id: `tx-${t.id}`,
-            origem: 'transacao',
-            descricao: t.procedimento || t.paciente_nome || 'Despesa Programada',
-            categoria: t.categoria || 'Despesa',
-            valor: Number(t.valor) || 0,
-            dataVencimento: dVenc,
-            diasRestantes: diffDays,
-            status: 'periodo',
-            formaPagamento: t.forma_pagamento,
-          });
+        } catch {
+          // ignore date error
         }
-      } catch {
-        // ignore date error
       }
-    }
-  });
+    });
 
-  // 2. Despesas Recorrentes ativas com dia_vencimento
-  despesasRecorrentes.forEach(d => {
-    if (d.status === 'ativo') {
-      const diaVenc = d.dia_vencimento;
-      const dVencPeriodo = new Date(selectedYear, selectedMonth, diaVenc);
-      dVencPeriodo.setHours(0, 0, 0, 0);
+    // 2. Despesas Recorrentes ativas com dia_vencimento
+    despesasRecorrentes.forEach(d => {
+      if (d.status === 'ativo') {
+        const diaVenc = d.dia_vencimento;
+        const dVencPeriodo = new Date(selectedYear, selectedMonth, diaVenc);
+        dVencPeriodo.setHours(0, 0, 0, 0);
 
-      const mesKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
-      const jaPago = d.ultimo_pagamento_mes === mesKey;
+        const mesKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
+        const jaPago = d.ultimo_pagamento_mes === mesKey;
 
-      if (!jaPago) {
-        if (isCurrentMonth) {
-          const diffTime = dVencPeriodo.getTime() - hoje.getTime();
-          const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-          if (diffDays >= 0 && diffDays <= 7) {
-            contasAPagarProximas.push({
+        if (!jaPago) {
+          if (isCurrentMonth) {
+            const diffTime = dVencPeriodo.getTime() - hoje.getTime();
+            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+            if (diffDays >= 0 && diffDays <= 7) {
+              lista.push({
+                id: `rec-${d.id}`,
+                origem: 'recorrente',
+                descricao: d.descricao,
+                categoria: d.categoria,
+                valor: Number(d.valor) || 0,
+                dataVencimento: dVencPeriodo,
+                diasRestantes: diffDays,
+                status: diffDays === 0 ? 'hoje' : diffDays === 1 ? 'amanha' : 'em_breve',
+                formaPagamento: d.forma_pagamento_preferencial,
+              });
+            }
+          } else {
+            const diffTime = dVencPeriodo.getTime() - hoje.getTime();
+            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+            lista.push({
               id: `rec-${d.id}`,
               origem: 'recorrente',
               descricao: d.descricao,
@@ -388,33 +431,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               valor: Number(d.valor) || 0,
               dataVencimento: dVencPeriodo,
               diasRestantes: diffDays,
-              status: diffDays === 0 ? 'hoje' : diffDays === 1 ? 'amanha' : 'em_breve',
+              status: 'periodo',
               formaPagamento: d.forma_pagamento_preferencial,
             });
           }
-        } else {
-          const diffTime = dVencPeriodo.getTime() - hoje.getTime();
-          const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-          contasAPagarProximas.push({
-            id: `rec-${d.id}`,
-            origem: 'recorrente',
-            descricao: d.descricao,
-            categoria: d.categoria,
-            valor: Number(d.valor) || 0,
-            dataVencimento: dVencPeriodo,
-            diasRestantes: diffDays,
-            status: 'periodo',
-            formaPagamento: d.forma_pagamento_preferencial,
-          });
         }
       }
-    }
-  });
+    });
 
-  // Ordenar por data de vencimento mais próxima
-  contasAPagarProximas.sort((a, b) => a.diasRestantes - b.diasRestantes);
+    // Ordenar por data de vencimento mais próxima
+    lista.sort((a, b) => a.diasRestantes - b.diasRestantes);
 
-  const totalValorContasProximas = contasAPagarProximas.reduce((acc, c) => acc + c.valor, 0);
+    return {
+      contasAPagarProximas: lista,
+      totalValorContasProximas: lista.reduce((acc, c) => acc + c.valor, 0)
+    };
+  }, [transacoes, despesasRecorrentes, selectedYear, selectedMonth, isCurrentMonth]);
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
@@ -537,8 +569,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       )}
 
-      {/* Card de Visão Financeira Rápida com Seletor de Período */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+      {/* Card de Visão Financeira Rápida com Seletor de Período (Restrito estritamente a Admin Local e Master) */}
+      {canViewFinancials ? (
+        <>
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
         {/* Header com Seletor de Mês/Ano e Navegação Rápida */}
         <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -989,6 +1023,69 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           )}
         </div>
       </div>
+    </>
+  ) : (
+    /* Painel Operacional do Balcão e Recepção (Para profissionais e recepcionistas sem acesso financeiro) */
+    <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+      <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shrink-0">
+            <Tv className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-base sm:text-lg font-bold text-white tracking-tight font-display">
+                Painel Operacional do Balcão
+              </h3>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                Recepção Ativa
+              </span>
+            </div>
+            <p className="text-xs text-indigo-200 font-medium mt-0.5">
+              Acompanhe a fila de chegada, salas de atendimento e espelhe o balcão do dia para a TV da recepção.
+            </p>
+          </div>
+        </div>
+
+        {onOpenSecondScreenModal && (
+          <button
+            type="button"
+            onClick={onOpenSecondScreenModal}
+            className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-bold flex items-center gap-2 transition cursor-pointer shadow-md"
+          >
+            <Tv className="w-4 h-4" />
+            <span>Transmitir para TV Recepção (2ª Tela)</span>
+          </button>
+        )}
+      </div>
+
+      <div className="p-5 grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="p-4 rounded-xl bg-indigo-50/50 border border-indigo-100">
+          <span className="text-[11px] font-bold text-indigo-900 block">Total Agendados Hoje</span>
+          <span className="text-2xl font-black text-indigo-700 mt-1 block font-mono">{totalToday}</span>
+          <span className="text-[10px] text-indigo-600/80">Pacientes na grade</span>
+        </div>
+
+        <div className="p-4 rounded-xl bg-amber-50/60 border border-amber-200">
+          <span className="text-[11px] font-bold text-amber-900 block">Na Recepção (Espera)</span>
+          <span className="text-2xl font-black text-amber-700 mt-1 block font-mono">{inWaitingRoom}</span>
+          <span className="text-[10px] text-amber-600/80">Aguardando chamada</span>
+        </div>
+
+        <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-200">
+          <span className="text-[11px] font-bold text-emerald-900 block">Em Procedimento</span>
+          <span className="text-2xl font-black text-emerald-700 mt-1 block font-mono">{inProcedure}</span>
+          <span className="text-[10px] text-emerald-600/80">Atendendo em sala</span>
+        </div>
+
+        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+          <span className="text-[11px] font-bold text-slate-700 block">Concluídos Hoje</span>
+          <span className="text-2xl font-black text-slate-800 mt-1 block font-mono">{completedToday}</span>
+          <span className="text-[10px] text-slate-500">Atendimentos finalizados</span>
+        </div>
+      </div>
+    </div>
+  )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1216,6 +1313,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                               >
                                 <DoorOpen className="w-3.5 h-3.5" />
                                 <span>Chamar Sala</span>
+                              </button>
+
+                              <button
+                                onClick={() => onOpenCompleteModal ? onOpenCompleteModal(ag) : onUpdateStatus(ag.id, 'concluido')}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center gap-1"
+                                title="Finalizar atendimento e registrar no caixa"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Finalizar</span>
                               </button>
 
                               <button

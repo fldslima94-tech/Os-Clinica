@@ -55,6 +55,7 @@ import { CameraCaptureModal } from './CameraCaptureModal';
 import { calcularIdade } from '../utils/anamneseValidation';
 import { useConnectionStatus } from '../contexts/ConnectionStatusContext';
 import { Wifi, WifiOff, Database, RefreshCw, CloudCheck } from 'lucide-react';
+import { compressImageFile } from '../lib/image-utils';
 
 const parseDate = (d: any): Date => {
   if (!d) return new Date();
@@ -398,24 +399,41 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
   };
 
   // File upload helper for local image file to base64 DataURL
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, target: 'antes' | 'depois' | 'update-depois') => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, target: 'antes' | 'depois' | 'update-depois') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      if (ev.target?.result) {
-        const dataUrl = ev.target.result as string;
-        if (target === 'antes') {
-          setNovaFotoAntes(dataUrl);
-        } else if (target === 'depois') {
-          setNovaFotoDepois(dataUrl);
-        } else if (target === 'update-depois' && selectedPhotoIdForUpdate) {
-          handleUpdateDepoisPhoto(selectedPhotoIdForUpdate, dataUrl);
-        }
+    try {
+      const dataUrl = await compressImageFile(file, {
+        maxWidth: 800,
+        maxHeight: 800,
+        quality: 0.7,
+        mimeType: 'image/jpeg',
+        targetMaxKB: 45
+      });
+      if (target === 'antes') {
+        setNovaFotoAntes(dataUrl);
+      } else if (target === 'depois') {
+        setNovaFotoDepois(dataUrl);
+      } else if (target === 'update-depois' && selectedPhotoIdForUpdate) {
+        handleUpdateDepoisPhoto(selectedPhotoIdForUpdate, dataUrl);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        if (ev.target?.result) {
+          const dataUrl = ev.target.result as string;
+          if (target === 'antes') {
+            setNovaFotoAntes(dataUrl);
+          } else if (target === 'depois') {
+            setNovaFotoDepois(dataUrl);
+          } else if (target === 'update-depois' && selectedPhotoIdForUpdate) {
+            handleUpdateDepoisPhoto(selectedPhotoIdForUpdate, dataUrl);
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    }
     e.target.value = '';
   };
 

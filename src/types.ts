@@ -680,6 +680,7 @@ export interface Fornecedor {
 export type TabType = 
   | 'dashboard' 
   | 'agendamentos' 
+  | 'balcao_tv' // Modo TV Recepção / Segunda Tela (Balcão do Dia por Turnos)
   | 'pacientes' // Fichas de Clientes
   | 'fornecedores' // Gestão de Fornecedores e Parceiros
   | 'estoque' 

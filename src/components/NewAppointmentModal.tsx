@@ -110,7 +110,7 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
     // 4. Procedimento
     if (initialData?.procedimento) {
       const foundProc = adminProcedures.find(
-        p => p.nome.toLowerCase() === initialData.procedimento?.toLowerCase() ||
+        p => (p.nome || '').toLowerCase() === (initialData.procedimento || '').toLowerCase() ||
              p.id === initialData.procedimento
       );
       if (foundProc) {

@@ -20,7 +20,8 @@ import {
   Database,
   Bot,
   Wand2,
-  MapPin
+  MapPin,
+  Tv
 } from 'lucide-react';
 import { TabType, UsuarioEquipe, ClinicaConfig } from '../types';
 import { isUserAdminTotal } from '../services/firebaseService';
@@ -108,6 +109,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             icon: LayoutDashboard,
             badge: pendingCount > 0 ? `${pendingCount} hoje` : undefined,
             badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+          },
+          {
+            id: 'balcao_tv' as TabType,
+            label: 'TV Recepção (2ª Tela)',
+            icon: Tv,
+            badge: 'TV',
+            badgeColor: 'bg-purple-100 text-purple-800 border-purple-200 font-bold',
           },
           {
             id: 'agendamentos' as TabType,
@@ -207,18 +215,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
           },
         ]
       },
-      {
-        title: 'Financeiro & Caixa',
-        items: [
-          {
-            id: 'financeiro' as TabType,
-            label: 'Fluxo de Caixa & Recorrentes',
-            icon: DollarSign,
-            badge: isGestor ? 'Gestão' : 'Recibos',
-            badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-          },
-        ]
-      },
+      // Módulo Financeiro: EXCLUSIVO para Admin Local e Admin Master
+      ...(isGestor ? [
+        {
+          title: 'Financeiro & Caixa (Admin)',
+          items: [
+            {
+              id: 'financeiro' as TabType,
+              label: 'Fluxo de Caixa & Recorrentes',
+              icon: DollarSign,
+              badge: isAdminTotal ? 'Master' : 'Gestor',
+              badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200 font-bold',
+            },
+          ]
+        }
+      ] : []),
       {
         title: 'Gestão & Segurança',
         items: [
