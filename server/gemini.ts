@@ -143,22 +143,39 @@ Estruture o resultado com:
 3. Principais produtos ou serviços atendidos
 4. Recomendações práticas e logística de acesso.`;
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: prompt,
-    config: {
-      tools: [{ googleMaps: {} }],
-    },
-  });
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        tools: [{ googleMaps: {} }],
+      },
+    });
 
-  const candidate = response.candidates?.[0];
-  const groundingMetadata = candidate?.groundingMetadata;
+    const candidate = response.candidates?.[0];
+    const groundingMetadata = candidate?.groundingMetadata;
 
-  return {
-    text: response.text || "Nenhuma informação localizada para o local especificado.",
-    groundingMetadata,
-    model: 'gemini-2.5-flash'
-  };
+    return {
+      text: response.text || "Nenhuma informação localizada para o local especificado.",
+      groundingMetadata,
+      model: 'gemini-2.5-flash'
+    };
+  } catch (err: any) {
+    console.warn("Maps grounding com ferramenta googleMaps falhou, tentando fallback com gemini-2.5-flash:", err?.message);
+    const fallbackResponse = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        temperature: 0.5,
+      }
+    });
+
+    return {
+      text: fallbackResponse.text || "Informações de fornecedores e clínicas na região solicitada.",
+      groundingMetadata: undefined,
+      model: 'gemini-2.5-flash'
+    };
+  }
 }
 
 export async function handleGenerateImage(params: {

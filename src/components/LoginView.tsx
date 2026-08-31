@@ -68,7 +68,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
     }, 500);
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleLogin = async (isClientPortalDirect: boolean = false) => {
     setIsLoading(true);
     setErrorMessage(null);
     try {
@@ -89,32 +89,35 @@ export const LoginView: React.FC<LoginViewProps> = ({
       const isSuper = SUPER_ADMIN_EMAILS.includes(cleanEmail) || cleanEmail.includes('fabio');
 
       if (!userFound) {
+        // Se for acesso direto pelo portal do paciente ou usuário não cadastrado na equipe
+        const isClientRole = isClientPortalDirect || (!isSuper && !cleanEmail.includes('admin') && !cleanEmail.includes('clinica'));
+        
         userFound = {
           id: fbUser.uid || `user-${Date.now()}`,
-          nome: fbUser.displayName || (isSuper ? 'Fabio Lima' : 'Usuário Google'),
-          nomeCompleto: fbUser.displayName || (isSuper ? 'Fabio Lima' : 'Usuário Google'),
+          nome: fbUser.displayName || (isSuper ? 'Fabio Lima' : isClientRole ? 'Paciente Google' : 'Usuário Google'),
+          nomeCompleto: fbUser.displayName || (isSuper ? 'Fabio Lima' : isClientRole ? 'Paciente Google' : 'Usuário Google'),
           email: cleanEmail,
-          cargo: isSuper ? 'Super Admin (Master)' : 'Usuário da Equipe',
-          profissao: isSuper ? 'Proprietário & Administrador Geral' : 'Especialista',
-          role: isSuper ? 'admin_total' : 'profissional',
+          cargo: isSuper ? 'Super Admin (Master)' : isClientRole ? 'Paciente / Cliente' : 'Usuário da Equipe',
+          profissao: isSuper ? 'Proprietário & Administrador Geral' : isClientRole ? 'Cliente' : 'Especialista',
+          role: isSuper ? 'admin_total' : isClientRole ? 'cliente' : 'profissional',
           status: 'ativo',
           avatar_url: fbUser.photoURL || undefined,
           permissoes: {
-            ver_financeiro_completo: true,
-            emitir_recibo: true,
-            editar_prontuario_clinico: true,
-            gerenciar_estoque_custos: true,
-            configuracoes_sistema: true,
-            visualizar_bens_ativos: true,
+            ver_financeiro_completo: isSuper,
+            emitir_recibo: !isClientRole,
+            editar_prontuario_clinico: !isClientRole,
+            gerenciar_estoque_custos: isSuper,
+            configuracoes_sistema: isSuper,
+            visualizar_bens_ativos: isSuper,
           },
           permissoesCustomizadas: {
-            financeiro: { verEntradas: true, verSaidas: true, verRecorrentes: true, excluir: true, verRelatorios: true },
-            clientes: { criar: true, editar: true, excluir: true, verHistorico: true, preencherAnamnese: true },
-            agenda: { verTodos: true, verPropria: true, criar: true, cancelar: true, finalizar: true },
-            procedimentos: { verCustos: true, verMargem: true, criar: true, excluir: true, ajustarEstoque: true },
-            bens: { visualizar: true, cadastrar: true, editar: true, gerenciar: true, excluir: true, manutencao: true },
-            estoque: { ajustar: true, excluir: true },
-            orcamentos: { verTodos: true, responder: true, verEmails: true }
+            financeiro: { verEntradas: isSuper, verSaidas: isSuper, verRecorrentes: isSuper, excluir: isSuper, verRelatorios: isSuper },
+            clientes: { criar: isSuper, editar: isSuper, excluir: isSuper, verHistorico: true, preencherAnamnese: true },
+            agenda: { verTodos: isSuper, verPropria: true, criar: true, cancelar: true, finalizar: isSuper },
+            procedimentos: { verCustos: isSuper, verMargem: isSuper, criar: isSuper, excluir: isSuper, ajustarEstoque: isSuper },
+            bens: { visualizar: isSuper, cadastrar: isSuper, editar: isSuper, gerenciar: isSuper, excluir: isSuper, manutencao: isSuper },
+            estoque: { ajustar: isSuper, excluir: isSuper },
+            orcamentos: { verTodos: !isClientRole, responder: !isClientRole, verEmails: !isClientRole }
           }
         };
       } else if (isSuper) {
@@ -378,11 +381,11 @@ export const LoginView: React.FC<LoginViewProps> = ({
           {/* Google Sign-in Button */}
           <button
             type="button"
-            onClick={handleGoogleLogin}
+            onClick={() => handleGoogleLogin(false)}
             disabled={isLoading}
-            className="w-full mb-4 py-2.5 px-4 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold rounded-xl shadow-xs transition-all flex items-center justify-center gap-3 cursor-pointer text-xs disabled:opacity-60"
+            className="w-full mb-3 py-2.5 px-4 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold rounded-xl shadow-xs transition-all flex items-center justify-center gap-3 cursor-pointer text-xs disabled:opacity-60"
           >
-            <svg className="w-4 h-4" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
               <path
                 fill="#4285F4"
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -400,12 +403,28 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
               />
             </svg>
-            <span>Entrar com Google (Firebase Auth)</span>
+            <span>Entrar com a Conta Google</span>
           </button>
 
-          <div className="relative flex py-2 items-center mb-4">
+          {/* Dedicated Patient / Client Portal Quick Button */}
+          <div className="mb-4 p-3 bg-linear-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-100/80 flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <span className="text-[11px] font-bold text-indigo-900 block">É Paciente ou Cliente?</span>
+              <span className="text-[10px] text-indigo-700/80 leading-tight block">Simule orçamentos e solicite agendamentos.</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleGoogleLogin(true)}
+              disabled={isLoading}
+              className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-lg text-[11px] font-bold shrink-0 transition-colors cursor-pointer shadow-xs"
+            >
+              Área do Paciente
+            </button>
+          </div>
+
+          <div className="relative flex py-1 items-center mb-4">
             <div className="grow border-t border-slate-200"></div>
-            <span className="shrink mx-3 text-[11px] font-medium text-slate-400 uppercase tracking-wider">ou com e-mail</span>
+            <span className="shrink mx-3 text-[11px] font-medium text-slate-400 uppercase tracking-wider">ou acesso por e-mail</span>
             <div className="grow border-t border-slate-200"></div>
           </div>
 

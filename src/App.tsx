@@ -1883,18 +1883,18 @@ export default function App() {
   const handleOpenPatientDetails = (paciente: Paciente, pushHistory = true) => {
     setSelectedPatientForDetails(paciente);
     if (typeof window !== 'undefined') {
-      const url = new URL(window.location.href);
-      url.searchParams.set('tab', 'pacientes');
-      url.searchParams.set('pacienteId', paciente.id);
-      if (pushHistory) {
-        window.history.pushState({ tab: 'pacientes', pacienteId: paciente.id }, '', url.toString());
-      } else {
-        window.history.replaceState({ tab: 'pacientes', pacienteId: paciente.id }, '', url.toString());
-      }
       try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('tab', 'pacientes');
+        url.searchParams.set('pacienteId', paciente.id);
+        if (pushHistory) {
+          window.history.pushState({ tab: 'pacientes', pacienteId: paciente.id }, '', url.toString());
+        } else {
+          window.history.replaceState({ tab: 'pacientes', pacienteId: paciente.id }, '', url.toString());
+        }
         localStorage.setItem(STORAGE_TAB_KEY, 'pacientes');
       } catch (e) {
-        // ignore
+        console.warn('[Router] History navigation omitted:', e);
       }
     }
   };
@@ -1902,12 +1902,16 @@ export default function App() {
   const handleClosePatientDetails = (pushHistory = false) => {
     setSelectedPatientForDetails(null);
     if (typeof window !== 'undefined') {
-      const url = new URL(window.location.href);
-      url.searchParams.delete('pacienteId');
-      if (pushHistory) {
-        window.history.pushState({ tab: activeTab }, '', url.toString());
-      } else {
-        window.history.replaceState({ tab: activeTab }, '', url.toString());
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('pacienteId');
+        if (pushHistory) {
+          window.history.pushState({ tab: activeTab }, '', url.toString());
+        } else {
+          window.history.replaceState({ tab: activeTab }, '', url.toString());
+        }
+      } catch (e) {
+        console.warn('[Router] History close omitted:', e);
       }
     }
   };
@@ -2254,7 +2258,36 @@ export default function App() {
               onAtualizarStatusOrcamento={handleAtualizarStatusOrcamento}
               onConverterEmAgendamento={(orc) => handleConverterOrcamentoEmAgendamento(orc)}
               onDeleteOrcamento={handleDeleteOrcamento}
+              onCriarAgendamento={(novoAg) => {
+                const createdAg: Agendamento = {
+                  id: `ag-portal-${Date.now()}`,
+                  paciente_id: novoAg.pacienteId || `pac-${Date.now()}`,
+                  data_hora: `${novoAg.data}T${novoAg.hora || '09:00'}:00`,
+                  procedimento: novoAg.procedimentoNome,
+                  status: 'pendente',
+                  criado_em: new Date().toISOString(),
+                  duracao_minutos: novoAg.duracaoMinutos || 45,
+                  valor_estimado: novoAg.valor || 0,
+                  profissional_id: novoAg.profissionalId,
+                  profissional_nome: novoAg.profissionalNome,
+                  observacoes: novoAg.observacoes,
+                  paciente: {
+                    id: novoAg.pacienteId || `pac-${Date.now()}`,
+                    nome: novoAg.pacienteNome,
+                    telefone: novoAg.pacienteTelefone,
+                    email: novoAg.pacienteEmail,
+                    data_nascimento: '1995-01-01',
+                    historico_clinico: novoAg.observacoes || 'Cadastro gerado via solicitação no Portal do Paciente Google.',
+                    criado_em: new Date().toISOString(),
+                  }
+                };
+                setAgendamentos(prev => [createdAg, ...prev]);
+                saveDocument(COLLECTIONS.AGENDAMENTOS, createdAg);
+                showToast(`Solicitação de agendamento de ${novoAg.pacienteNome} recebida com sucesso!`);
+              }}
               currentUser={currentUser}
+              clinicaConfig={clinicaConfig}
+              profissionais={usuarios}
             />
           )}
 
@@ -2554,17 +2587,19 @@ export default function App() {
         onSaveUser={handleUpdateUser}
       />
 
-      <PatientDetailsModal
-        isOpen={!!selectedPatientForDetails}
-        onClose={() => handleClosePatientDetails()}
-        paciente={selectedPatientForDetails}
-        agendamentos={agendamentos}
-        profissionais={usuarios}
-        clinicaConfig={clinicaConfig}
-        onUpdatePatientHistory={handleUpdatePatientHistory}
-        onDeletePatient={handleDeletePatient}
-        currentUser={currentUser}
-      />
+      <ErrorBoundary fallbackTitle="Prontuário e Ficha Clínica do Paciente">
+        <PatientDetailsModal
+          isOpen={!!selectedPatientForDetails}
+          onClose={() => handleClosePatientDetails()}
+          paciente={selectedPatientForDetails}
+          agendamentos={agendamentos}
+          profissionais={usuarios}
+          clinicaConfig={clinicaConfig}
+          onUpdatePatientHistory={handleUpdatePatientHistory}
+          onDeletePatient={handleDeletePatient}
+          currentUser={currentUser}
+        />
+      </ErrorBoundary>
 
       <TreatmentPackagesModal
         isOpen={!!patientForPackages}

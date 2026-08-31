@@ -282,43 +282,44 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
   const allAvailablePhotos: PhotoItem[] = useMemo(() => {
     const list: PhotoItem[] = [];
 
-    fotosList.forEach((foto) => {
+    (fotosList || []).forEach((foto) => {
+      if (!foto) return;
       const urlAntes = foto.foto_antes_url || foto.foto_antes;
       const urlDepois = foto.foto_depois_url || foto.foto_depois;
       const proc = foto.procedimento_nome || foto.procedimento || foto.titulo || 'Procedimento Clínico';
-      const dt = foto.data ? new Date(foto.data).toLocaleDateString('pt-BR') : '';
+      const dt = foto.data ? parseDate(foto.data).toLocaleDateString('pt-BR') : '';
 
       if (urlAntes) {
         list.push({
-          id: `${foto.id}-antes`,
+          id: `${foto.id || Math.random()}-antes`,
           url: urlAntes,
           label: 'Antes',
           date: dt,
           procedure: proc,
-          notes: foto.observacoes || foto.legenda,
+          notes: foto.observacoes || (foto as any).legenda,
         });
       }
 
       if (urlDepois) {
         list.push({
-          id: `${foto.id}-depois`,
+          id: `${foto.id || Math.random()}-depois`,
           url: urlDepois,
           label: 'Depois',
           date: dt,
           procedure: proc,
-          notes: foto.observacoes || foto.legenda,
+          notes: foto.observacoes || (foto as any).legenda,
         });
       }
     });
 
     // Anamneses photos
-    anamnesesCompletas.forEach((anamnese) => {
+    (anamnesesCompletas || []).forEach((anamnese) => {
       if (anamnese?.fotoPacienteUrl) {
         list.push({
-          id: `anamnese-${anamnese.id}`,
+          id: `anamnese-${anamnese.id || Math.random()}`,
           url: anamnese.fotoPacienteUrl,
           label: 'Anamnese',
-          date: anamnese.criadoEm ? new Date(anamnese.criadoEm).toLocaleDateString('pt-BR') : '',
+          date: anamnese.criadoEm ? parseDate(anamnese.criadoEm).toLocaleDateString('pt-BR') : '',
           procedure: anamnese.procedimentoNome || 'Avaliação Inicial',
           notes: 'Foto registrada no termo de anamnese',
         });
@@ -340,23 +341,26 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
 
   // Filtered photos based on search query
   const filteredFotosList = useMemo(() => {
-    if (!fotoSearchQuery.trim()) return fotosList;
+    if (!fotoSearchQuery.trim()) return fotosList || [];
     const query = fotoSearchQuery.toLowerCase();
-    return fotosList.filter(f => 
-      (f.procedimento_nome && f.procedimento_nome.toLowerCase().includes(query)) ||
-      (f.procedimento && f.procedimento.toLowerCase().includes(query)) ||
-      (f.titulo && f.titulo.toLowerCase().includes(query)) ||
-      (f.observacoes && f.observacoes.toLowerCase().includes(query)) ||
-      (f.data && f.data.includes(query))
+    return (fotosList || []).filter(f => 
+      f && (
+        (f.procedimento_nome && f.procedimento_nome.toLowerCase().includes(query)) ||
+        (f.procedimento && f.procedimento.toLowerCase().includes(query)) ||
+        (f.titulo && f.titulo.toLowerCase().includes(query)) ||
+        (f.observacoes && f.observacoes.toLowerCase().includes(query)) ||
+        (f.data && String(f.data).includes(query))
+      )
     );
   }, [fotosList, fotoSearchQuery]);
 
   // Open comparison for a specific pair
   const handleOpenComparePair = (foto: FotoAntesDepois) => {
+    if (!foto) return;
     const urlAntes = foto.foto_antes_url || foto.foto_antes;
     const urlDepois = foto.foto_depois_url || foto.foto_depois;
     const proc = foto.procedimento_nome || foto.procedimento || foto.titulo || 'Procedimento Clínico';
-    const dt = foto.data ? new Date(foto.data).toLocaleDateString('pt-BR') : '';
+    const dt = foto.data ? parseDate(foto.data).toLocaleDateString('pt-BR') : '';
 
     if (!urlAntes) return;
 

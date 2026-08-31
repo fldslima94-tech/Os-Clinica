@@ -222,106 +222,142 @@ export const MapsGroundingView: React.FC<MapsGroundingViewProps> = ({ currentUse
 
       {/* Results Section */}
       {result && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Main AI Summary & Analysis */}
-          <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-blue-600" />
-                <h3 className="text-sm font-bold text-slate-900">Relatório de Estabelecimentos & Logística</h3>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Main AI Summary & Analysis */}
+            <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-blue-600" />
+                  <h3 className="text-sm font-bold text-slate-900">Relatório de Estabelecimentos & Logística</h3>
+                </div>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                  Grounding com Google Maps
+                </span>
               </div>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                Grounding com Google Maps
-              </span>
+
+              <div className="text-xs md:text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                {result.text}
+              </div>
             </div>
 
-            <div className="text-xs md:text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-              {result.text}
+            {/* Sidebar with Grounded Place Chunks */}
+            <div className="lg:col-span-4 space-y-4">
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                  Locais Ancorados ({groundingChunks.length})
+                </h4>
+
+                {groundingChunks.length === 0 ? (
+                  <div className="text-xs text-slate-500 py-4 text-center">
+                    Os detalhes de localização foram incorporados diretamente no relatório ao lado.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {groundingChunks.map((chunk, idx) => {
+                      const place = chunk.maps || chunk.web;
+                      const isMaps = Boolean(chunk.maps);
+                      const title = place?.title || `Local ${idx + 1}`;
+                      const address = (place as any)?.address;
+                      const rating = (place as any)?.rating;
+                      const uri = place?.uri;
+
+                      return (
+                        <div
+                          key={idx}
+                          className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-white hover:border-blue-300 hover:shadow-xs transition-all text-xs"
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <h5 className="font-bold text-slate-800 text-xs">{title}</h5>
+                            {uri && (
+                              <a
+                                href={uri}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-blue-600 hover:text-blue-800 p-1 hover:bg-blue-50 rounded-md transition-all shrink-0"
+                                title="Abrir no Google Maps"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            )}
+                          </div>
+
+                          {address && (
+                            <p className="text-[11px] text-slate-500 mb-2 leading-tight">
+                              {address}
+                            </p>
+                          )}
+
+                          {rating && (
+                            <div className="flex items-center gap-1 text-[11px] font-semibold text-amber-600 mb-2">
+                              <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                              <span>{rating.toFixed(1)} estrelas</span>
+                            </div>
+                          )}
+
+                          {onAddFornecedor && (
+                            <button
+                              onClick={() => handleQuickAddSupplier(title, address, uri)}
+                              className={`w-full mt-1 py-1 px-2.5 rounded-lg font-semibold text-[11px] transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                                addedSupplierId === title
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                  : 'bg-white hover:bg-blue-50 text-blue-700 border border-slate-200 hover:border-blue-200'
+                              }`}
+                            >
+                              {addedSupplierId === title ? (
+                                <>
+                                  <Check className="w-3 h-3" />
+                                  <span>Cadastrado em Fornecedores!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Plus className="w-3 h-3" />
+                                  <span>Vincular como Fornecedor</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Sidebar with Grounded Place Chunks */}
-          <div className="lg:col-span-4 space-y-4">
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
-              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-blue-600" />
-                Locais Ancorados ({groundingChunks.length})
-              </h4>
+          {/* Interactive Google Map Preview */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-blue-600" />
+                <h4 className="text-sm font-bold text-slate-900">
+                  Visualização do Mapa ({location || 'Brasil'})
+                </h4>
+              </div>
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${searchQuery} ${location}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-blue-600 hover:underline font-semibold flex items-center gap-1"
+              >
+                <span>Abrir Pesquisa no Google Maps</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
 
-              {groundingChunks.length === 0 ? (
-                <div className="text-xs text-slate-500 py-4 text-center">
-                  Os detalhes de localização foram incorporados diretamente no relatório ao lado.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {groundingChunks.map((chunk, idx) => {
-                    const place = chunk.maps || chunk.web;
-                    const isMaps = Boolean(chunk.maps);
-                    const title = place?.title || `Local ${idx + 1}`;
-                    const address = (place as any)?.address;
-                    const rating = (place as any)?.rating;
-                    const uri = place?.uri;
-
-                    return (
-                      <div
-                        key={idx}
-                        className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-white hover:border-blue-300 hover:shadow-xs transition-all text-xs"
-                      >
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <h5 className="font-bold text-slate-800 text-xs">{title}</h5>
-                          {uri && (
-                            <a
-                              href={uri}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-blue-600 hover:text-blue-800 p-1 hover:bg-blue-50 rounded-md transition-all shrink-0"
-                              title="Abrir no Google Maps"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </a>
-                          )}
-                        </div>
-
-                        {address && (
-                          <p className="text-[11px] text-slate-500 mb-2 leading-tight">
-                            {address}
-                          </p>
-                        )}
-
-                        {rating && (
-                          <div className="flex items-center gap-1 text-[11px] font-semibold text-amber-600 mb-2">
-                            <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
-                            <span>{rating.toFixed(1)} estrelas</span>
-                          </div>
-                        )}
-
-                        {onAddFornecedor && (
-                          <button
-                            onClick={() => handleQuickAddSupplier(title, address, uri)}
-                            className={`w-full mt-1 py-1 px-2.5 rounded-lg font-semibold text-[11px] transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                              addedSupplierId === title
-                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                : 'bg-white hover:bg-blue-50 text-blue-700 border border-slate-200 hover:border-blue-200'
-                            }`}
-                          >
-                            {addedSupplierId === title ? (
-                              <>
-                                <Check className="w-3 h-3" />
-                                <span>Cadastrado em Fornecedores!</span>
-                              </>
-                            ) : (
-                              <>
-                                <Plus className="w-3 h-3" />
-                                <span>Vincular como Fornecedor</span>
-                              </>
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+            <div className="w-full h-80 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 relative">
+              <iframe
+                title="Google Maps Pesquisa"
+                src={`https://maps.google.com/maps?q=${encodeURIComponent(`${searchQuery} ${location}`)}&t=&z=13&ie=UTF8&iwloc=&output=embed`}
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                allowFullScreen
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
             </div>
           </div>
         </div>

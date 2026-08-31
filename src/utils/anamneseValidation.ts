@@ -1,21 +1,35 @@
 import { z } from 'zod';
 
 /**
- * Calcula a idade com precisão a partir da data de nascimento ISO (AAAA-MM-DD).
+ * Calcula a idade com precisão a partir da data de nascimento ISO (AAAA-MM-DD), Date ou Timestamp.
  */
-export function calcularIdade(dataNascimento: string): number | '' {
+export function calcularIdade(dataNascimento: any): number | '' {
   if (!dataNascimento) return '';
-  const hoje = new Date();
-  const nascimento = new Date(dataNascimento);
-  
-  if (isNaN(nascimento.getTime())) return '';
-  
-  let idade = hoje.getFullYear() - nascimento.getFullYear();
-  const mes = hoje.getMonth() - nascimento.getMonth();
-  if (mes < 0 || (mes === 0 && hoje.getDate() < nascimento.getDate())) {
-    idade--;
+  try {
+    const hoje = new Date();
+    let nascimento: Date;
+
+    if (typeof dataNascimento?.toDate === 'function') {
+      nascimento = dataNascimento.toDate();
+    } else if (dataNascimento instanceof Date) {
+      nascimento = dataNascimento;
+    } else if (typeof dataNascimento === 'string' || typeof dataNascimento === 'number') {
+      nascimento = new Date(dataNascimento);
+    } else {
+      return '';
+    }
+
+    if (isNaN(nascimento.getTime())) return '';
+
+    let idade = hoje.getFullYear() - nascimento.getFullYear();
+    const mes = hoje.getMonth() - nascimento.getMonth();
+    if (mes < 0 || (mes === 0 && hoje.getDate() < nascimento.getDate())) {
+      idade--;
+    }
+    return idade >= 0 ? idade : '';
+  } catch {
+    return '';
   }
-  return idade >= 0 ? idade : '';
 }
 
 /**
