@@ -27,7 +27,8 @@ import {
   Upload,
   Trash2,
   Image as ImageIcon,
-  RotateCcw
+  RotateCcw,
+  CreditCard
 } from 'lucide-react';
 import { AnamneseCompleta, Paciente, UsuarioEquipe, ClinicaConfig } from '../types';
 import { CanvasAssinatura } from './CanvasAssinatura';
@@ -281,6 +282,15 @@ export const AnamneseCompletaModal: React.FC<AnamneseCompletaModalProps> = ({
         setErrosValidacao({ telefone: 'Telefone/WhatsApp com DDD é obrigatório.' });
         return;
       }
+      const cleanCpf = (cpf || '').replace(/\D/g, '');
+      if (!cleanCpf || cleanCpf.length !== 11) {
+        setErrosValidacao({ cpf: 'CPF é obrigatório e deve conter 11 dígitos.' });
+        return;
+      }
+      if (!endereco.trim() || endereco.trim().length < 5) {
+        setErrosValidacao({ endereco: 'Endereço de residência completo é obrigatório (rua, número, bairro, cidade).' });
+        return;
+      }
     }
 
     if (etapaAtual === 2) {
@@ -335,6 +345,7 @@ export const AnamneseCompletaModal: React.FC<AnamneseCompletaModalProps> = ({
         dataNascimento,
         idade: typeof idadeCalculada === 'number' ? idadeCalculada : 0,
         telefone: telefone.trim(),
+        cpf: cpf.trim() || undefined,
         email: email.trim() || undefined,
         endereco: endereco.trim() || undefined,
         profissao: profissao.trim() || undefined,
@@ -769,6 +780,28 @@ export const AnamneseCompletaModal: React.FC<AnamneseCompletaModalProps> = ({
                   )}
                 </div>
 
+                {/* CPF do Cliente */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    CPF do Cliente *
+                  </label>
+                  <div className="relative">
+                    <CreditCard className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      disabled={isVisualizacao}
+                      value={cpf}
+                      onChange={(e) => setCpf(formatarCPF(e.target.value))}
+                      placeholder="000.000.000-00"
+                      maxLength={14}
+                      className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all disabled:bg-slate-100 font-mono"
+                    />
+                  </div>
+                  {errosValidacao.cpf && (
+                    <span className="text-[11px] text-rose-600 font-semibold mt-1 block">{errosValidacao.cpf}</span>
+                  )}
+                </div>
+
                 {/* E-mail */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -808,7 +841,7 @@ export const AnamneseCompletaModal: React.FC<AnamneseCompletaModalProps> = ({
                 {/* Endereço Completo */}
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Endereço Completo (Rua, Número, Bairro, Cidade)
+                    Endereço de Residência Completo (Rua, Número, Bairro, Cidade) *
                   </label>
                   <div className="relative">
                     <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -821,6 +854,9 @@ export const AnamneseCompletaModal: React.FC<AnamneseCompletaModalProps> = ({
                       className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all disabled:bg-slate-100"
                     />
                   </div>
+                  {errosValidacao.endereco && (
+                    <span className="text-[11px] text-rose-600 font-semibold mt-1 block">{errosValidacao.endereco}</span>
+                  )}
                 </div>
 
                 {/* Bloco de Contato de Emergência */}

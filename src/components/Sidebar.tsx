@@ -136,7 +136,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         items: [
           {
             id: 'pacientes' as TabType,
-            label: 'Fichas de Clientes',
+            label: 'Ficha de Cadastro',
             icon: Users,
           },
           {

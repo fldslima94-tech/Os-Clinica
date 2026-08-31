@@ -81,13 +81,32 @@ export const CompleteProcedureModal: React.FC<CompleteProcedureModalProps> = ({
   const [diasAcompanhamento, setDiasAcompanhamento] = useState<number>(15);
   const [motivoAcompanhamento, setMotivoAcompanhamento] = useState('');
 
+  const jaPagouNoCheckIn = Boolean(
+    agendamento?.pagamento_registrado_no_caixa === true ||
+    agendamento?.pago_no_checkin === true ||
+    (agendamento?.status_pagamento === 'pago' && (agendamento?.valor_estimado || 0) > 0)
+  );
+
+  const jaAgendouRetornoNoCheckIn = Boolean(
+    agendamento?.retorno_agendado_no_checkin === true
+  );
+
   useEffect(() => {
     if (agendamento) {
+      const isJaPago = Boolean(
+        agendamento.pagamento_registrado_no_caixa === true ||
+        agendamento.pago_no_checkin === true ||
+        (agendamento.status_pagamento === 'pago' && (agendamento.valor_estimado || 0) > 0)
+      );
+      const isJaRetorno = Boolean(
+        agendamento.retorno_agendado_no_checkin === true
+      );
+
       setValorFinal(agendamento.valor_estimado || 0);
       setFormaPagamento(agendamento.forma_pagamento || 'pix');
       setStatusPagamento(agendamento.status_pagamento || 'pago');
-      setObservacaoPagamento('');
-      setGerarAcompanhamento(true);
+      setObservacaoPagamento(isJaPago ? 'Liquidado previamente no check-in da recepção.' : '');
+      setGerarAcompanhamento(!isJaRetorno);
       setTipoAcompanhamento('retorno');
       setDiasAcompanhamento(15);
       setMotivoAcompanhamento(`Revisão de 15 dias de ${agendamento.procedimento}`);
@@ -180,16 +199,21 @@ export const CompleteProcedureModal: React.FC<CompleteProcedureModalProps> = ({
     e.preventDefault();
     if (!agendamento) return;
 
-    const paymentData = {
+    const paymentData = jaPagouNoCheckIn ? {
+      valor: 0,
+      forma: agendamento.forma_pagamento || formaPagamento,
+      status: agendamento.status_pagamento || 'pago',
+      observacao: agendamento.observacoes || 'Pagamento confirmado no check-in da recepção.',
+    } : {
       valor: valorFinal,
       forma: formaPagamento,
       status: statusPagamento,
-      observacao: observacaoPagamento,
+      observacao: observacaoPagamento.trim() || undefined,
     };
 
     // Calculate ideal return/post-sale date
     let dataIdealStr: string | undefined = undefined;
-    if (gerarAcompanhamento) {
+    if (!jaAgendouRetornoNoCheckIn && gerarAcompanhamento) {
       const targetDate = new Date();
       targetDate.setDate(targetDate.getDate() + Number(diasAcompanhamento));
       dataIdealStr = targetDate.toISOString();
@@ -397,201 +421,243 @@ export const CompleteProcedureModal: React.FC<CompleteProcedureModalProps> = ({
           </div>
 
           {/* Section 2: Registro Financeiro */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 font-bold text-slate-900 text-sm border-b border-slate-100 pb-2">
-              <CreditCard className="w-4 h-4 text-emerald-600" />
-              <span>2. Registro Financeiro & Meio de Pagamento</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Valor Cobrado (R$)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-semibold text-xs">
-                    R$
-                  </span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={valorFinal}
-                    onChange={(e) => setValorFinal(parseFloat(e.target.value) || 0)}
-                    required
-                    className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono font-bold text-slate-900"
-                  />
+          {jaPagouNoCheckIn ? (
+            <div className="p-4 bg-emerald-50/90 border border-emerald-200 rounded-xl flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-600 text-white rounded-lg shrink-0 shadow-xs">
+                  <CheckCircle2 className="w-4 h-4" />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Forma de Pagamento
-                </label>
-                <select
-                  value={formaPagamento}
-                  onChange={(e) => setFormaPagamento(e.target.value as FormaPagamento)}
-                  className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 font-medium"
-                >
-                  <option value="pix">Pix (Transferência Instantânea)</option>
-                  <option value="cartao_credito">Cartão de Crédito</option>
-                  <option value="cartao_debito">Cartão de Débito</option>
-                  <option value="dinheiro">Dinheiro em Espécie</option>
-                  <option value="transferencia">Transferência / TED</option>
-                  <option value="boleto">Boleto Bancário</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Status do Pagamento
-                </label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setStatusPagamento('pago')}
-                    className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
-                      statusPagamento === 'pago'
-                        ? 'bg-green-50 text-green-700 border-green-300 shadow-2xs font-bold'
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    Pago / Liquidado
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStatusPagamento('pendente')}
-                    className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
-                      statusPagamento === 'pendente'
-                        ? 'bg-amber-50 text-amber-700 border-amber-300 shadow-2xs font-bold'
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    Pendente / A Cobrar
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Observação do Recibo (Opcional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ex: 3x sem juros, comprovante anexo..."
-                  value={observacaoPagamento}
-                  onChange={(e) => setObservacaoPagamento(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Section 3: Acompanhamento (Retorno Clínico vs Pós-Venda) */}
-          <div className="space-y-3 bg-gradient-to-br from-indigo-50/50 via-slate-50 to-purple-50/50 p-4 rounded-xl border border-indigo-100">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
-                <HeartHandshake className="w-4 h-4 text-indigo-600" />
-                <span>3. Configurar Acompanhamento (Retorno / Pós-Venda)</span>
-              </div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={gerarAcompanhamento}
-                  onChange={(e) => setGerarAcompanhamento(e.target.checked)}
-                  className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
-                />
-                <span className="text-xs font-semibold text-slate-700">Ativar Lembrete</span>
-              </label>
-            </div>
-
-            {gerarAcompanhamento && (
-              <div className="space-y-3 pt-2">
-                {/* Switch Retorno Clínico vs Pós-Venda */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Caso do Acompanhamento:
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleTipoChange('retorno')}
-                      className={`p-2.5 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
-                        tipoAcompanhamento === 'retorno'
-                          ? 'bg-blue-50 border-blue-300 text-blue-900 shadow-2xs'
-                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className={`p-1.5 rounded-lg ${tipoAcompanhamento === 'retorno' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                        <Calendar className="w-3.5 h-3.5" />
-                      </div>
-                      <div>
-                        <span className="block font-bold text-xs">🔵 Retorno Clínico</span>
-                        <span className="block text-[11px] text-slate-500 mt-0.5">Revisão, retoque ou avaliação de procedimento</span>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleTipoChange('pos_venda')}
-                      className={`p-2.5 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
-                        tipoAcompanhamento === 'pos_venda'
-                          ? 'bg-purple-50 border-purple-300 text-purple-900 shadow-2xs'
-                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className={`p-1.5 rounded-lg ${tipoAcompanhamento === 'pos_venda' ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                        <Sparkles className="w-3.5 h-3.5" />
-                      </div>
-                      <div>
-                        <span className="block font-bold text-xs">🟣 Pós-Venda</span>
-                        <span className="block text-[11px] text-slate-500 mt-0.5">Fidelização, satisfação e acompanhamento de home care</span>
-                      </div>
-                    </button>
-                  </div>
+                  <h4 className="text-xs font-bold text-emerald-950">
+                    2. Pagamento Já Liquidado no Check-in (Recepção)
+                  </h4>
+                  <p className="text-[11px] text-emerald-800 mt-0.5">
+                    Valor de <strong>R$ {(agendamento.valor_estimado || valorFinal || 0).toFixed(2)}</strong> via <strong>{(agendamento.forma_pagamento || formaPagamento).toUpperCase()}</strong> registrado com sucesso. Não é necessária nova cobrança no caixa.
+                  </p>
                 </div>
+              </div>
+              <span className="px-2.5 py-1 bg-emerald-200 text-emerald-900 rounded-lg text-[10px] font-extrabold uppercase shrink-0">
+                Liquidado
+              </span>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 font-bold text-slate-900 text-sm border-b border-slate-100 pb-2">
+                <CreditCard className="w-4 h-4 text-emerald-600" />
+                <span>2. Registro Financeiro & Meio de Pagamento</span>
+              </div>
 
-                {/* Prazo em dias */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Prazo do Acompanhamento:
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {[7, 15, 21, 30, 45, 60].map((dias) => (
-                      <button
-                        key={dias}
-                        type="button"
-                        onClick={() => handleDiasChange(dias)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                          diasAcompanhamento === dias
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
-                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                        }`}
-                      >
-                        {dias} dias
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Motivo */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Motivo / Mensagem do Lembrete
+                    Valor Cobrado (R$)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-semibold text-xs">
+                      R$
+                    </span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={valorFinal}
+                      onChange={(e) => setValorFinal(parseFloat(e.target.value) || 0)}
+                      required
+                      className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono font-bold text-slate-900"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Forma de Pagamento
+                  </label>
+                  <select
+                    value={formaPagamento}
+                    onChange={(e) => setFormaPagamento(e.target.value as FormaPagamento)}
+                    className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 font-medium"
+                  >
+                    <option value="pix">Pix (Transferência Instantânea)</option>
+                    <option value="cartao_credito">Cartão de Crédito</option>
+                    <option value="cartao_debito">Cartão de Débito</option>
+                    <option value="dinheiro">Dinheiro em Espécie</option>
+                    <option value="transferencia">Transferência / TED</option>
+                    <option value="boleto">Boleto Bancário</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Status do Pagamento
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setStatusPagamento('pago')}
+                      className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                        statusPagamento === 'pago'
+                          ? 'bg-green-50 text-green-700 border-green-300 shadow-2xs font-bold'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      Pago / Liquidado
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStatusPagamento('pendente')}
+                      className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                        statusPagamento === 'pendente'
+                          ? 'bg-amber-50 text-amber-700 border-amber-300 shadow-2xs font-bold'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      Pendente / A Cobrar
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Observação do Recibo (Opcional)
                   </label>
                   <input
                     type="text"
-                    value={motivoAcompanhamento}
-                    onChange={(e) => setMotivoAcompanhamento(e.target.value)}
-                    placeholder="Ex: Revisão de 15 dias de Toxina Botulínica"
-                    className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900"
+                    placeholder="Ex: 3x sem juros, comprovante anexo..."
+                    value={observacaoPagamento}
+                    onChange={(e) => setObservacaoPagamento(e.target.value)}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   />
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* Section 3: Acompanhamento (Retorno Clínico vs Pós-Venda) */}
+          {jaAgendouRetornoNoCheckIn ? (
+            <div className="p-4 bg-blue-50/90 border border-blue-200 rounded-xl flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-600 text-white rounded-lg shrink-0 shadow-xs">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-blue-950">
+                    3. Retorno de Revisão Já Agendado no Check-in
+                  </h4>
+                  <p className="text-[11px] text-blue-800 mt-0.5">
+                    O retorno para este cliente já foi inserido na agenda durante o check-in na recepção. Não é necessário reconfigurar.
+                  </p>
+                </div>
+              </div>
+              <span className="px-2.5 py-1 bg-blue-200 text-blue-900 rounded-lg text-[10px] font-extrabold uppercase shrink-0">
+                Agendado
+              </span>
+            </div>
+          ) : (
+            <div className="space-y-3 bg-gradient-to-br from-indigo-50/50 via-slate-50 to-purple-50/50 p-4 rounded-xl border border-indigo-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
+                  <HeartHandshake className="w-4 h-4 text-indigo-600" />
+                  <span>3. Configurar Acompanhamento (Retorno / Pós-Venda)</span>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={gerarAcompanhamento}
+                    onChange={(e) => setGerarAcompanhamento(e.target.checked)}
+                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                  />
+                  <span className="text-xs font-semibold text-slate-700">Ativar Lembrete</span>
+                </label>
+              </div>
+
+              {gerarAcompanhamento && (
+                <div className="space-y-3 pt-2">
+                  {/* Switch Retorno Clínico vs Pós-Venda */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Caso do Acompanhamento:
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleTipoChange('retorno')}
+                        className={`p-2.5 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
+                          tipoAcompanhamento === 'retorno'
+                            ? 'bg-blue-50 border-blue-300 text-blue-900 shadow-2xs'
+                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className={`p-1.5 rounded-lg ${tipoAcompanhamento === 'retorno' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                          <Calendar className="w-3.5 h-3.5" />
+                        </div>
+                        <div>
+                          <span className="block font-bold text-xs">🔵 Retorno Clínico</span>
+                          <span className="block text-[11px] text-slate-500 mt-0.5">Revisão, retoque ou avaliação de procedimento</span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleTipoChange('pos_venda')}
+                        className={`p-2.5 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
+                          tipoAcompanhamento === 'pos_venda'
+                            ? 'bg-purple-50 border-purple-300 text-purple-900 shadow-2xs'
+                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className={`p-1.5 rounded-lg ${tipoAcompanhamento === 'pos_venda' ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                          <Sparkles className="w-3.5 h-3.5" />
+                        </div>
+                        <div>
+                          <span className="block font-bold text-xs">🟣 Pós-Venda</span>
+                          <span className="block text-[11px] text-slate-500 mt-0.5">Fidelização, satisfação e acompanhamento de home care</span>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Prazo em dias */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Prazo do Acompanhamento:
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {[7, 15, 21, 30, 45, 60].map((dias) => (
+                        <button
+                          key={dias}
+                          type="button"
+                          onClick={() => handleDiasChange(dias)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                            diasAcompanhamento === dias
+                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          {dias} dias
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Motivo */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Motivo / Mensagem do Lembrete
+                    </label>
+                    <input
+                      type="text"
+                      value={motivoAcompanhamento}
+                      onChange={(e) => setMotivoAcompanhamento(e.target.value)}
+                      placeholder="Ex: Revisão de 15 dias de Toxina Botulínica"
+                      className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Footer Submit Buttons */}
           <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3 shrink-0">

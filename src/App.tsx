@@ -113,7 +113,7 @@ import {
   COLLECTIONS 
 } from './services/firebaseService';
 
-// Storage keys for persistent session and navigation state
+// Storage keys for session and navigation state
 const STORAGE_AUTH_KEY = 'aura_auth_session';
 const STORAGE_USER_KEY = 'aura_current_user';
 const STORAGE_TAB_KEY = 'aura_active_tab';
@@ -126,7 +126,7 @@ function getInitialTab(userRole?: string): TabType {
     const tabFromUrl = params.get('tab') as TabType;
     if (tabFromUrl) return tabFromUrl;
 
-    const tabFromStorage = localStorage.getItem(STORAGE_TAB_KEY) as TabType;
+    const tabFromStorage = sessionStorage.getItem(STORAGE_TAB_KEY) as TabType;
     if (tabFromStorage) return tabFromStorage;
   }
   return userRole === 'cliente' ? 'portal_paciente' : 'dashboard';
@@ -134,9 +134,17 @@ function getInitialTab(userRole?: string): TabType {
 
 function getInitialUser(): UsuarioEquipe {
   if (typeof window !== 'undefined') {
-    const saved = localStorage.getItem(STORAGE_USER_KEY);
-    if (saved) {
-      try {
+    // Clear any obsolete localStorage session keys to guarantee privacy
+    try {
+      localStorage.removeItem(STORAGE_AUTH_KEY);
+      localStorage.removeItem(STORAGE_USER_KEY);
+    } catch (e) {
+      // ignore
+    }
+
+    try {
+      const saved = sessionStorage.getItem(STORAGE_USER_KEY);
+      if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && parsed.id) {
           if (isUserAdminTotal(parsed)) {
@@ -164,9 +172,9 @@ function getInitialUser(): UsuarioEquipe {
           }
           return parsed;
         }
-      } catch (e) {
-        console.warn('Erro ao carregar usuário salvo:', e);
       }
+    } catch (e) {
+      console.warn('Erro ao carregar usuário salvo na sessão:', e);
     }
   }
   return MOCK_USUARIOS[0];
@@ -174,7 +182,13 @@ function getInitialUser(): UsuarioEquipe {
 
 function getInitialAuthState(): boolean {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem(STORAGE_AUTH_KEY) === 'true';
+    try {
+      localStorage.removeItem(STORAGE_AUTH_KEY);
+      localStorage.removeItem(STORAGE_USER_KEY);
+      return sessionStorage.getItem(STORAGE_AUTH_KEY) === 'true';
+    } catch (e) {
+      return false;
+    }
   }
   return false;
 }
@@ -544,7 +558,7 @@ export default function App() {
           );
           if (activeInDb) {
             try {
-              localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(activeInDb));
+              sessionStorage.setItem(STORAGE_USER_KEY, JSON.stringify(activeInDb));
             } catch (e) {
               // ignore
             }
@@ -675,13 +689,15 @@ export default function App() {
     }
   }, [pacientes]);
 
-  // Firebase Auth real-time session listener (keeps user logged in across page reloads)
+  // Firebase Auth real-time session listener (only keeps active if session storage is authenticated)
   useEffect(() => {
     const unsubscribe = onFirebaseAuthStateChange((fbUser) => {
-      if (fbUser) {
+      const isSessionActive = typeof window !== 'undefined' && sessionStorage.getItem(STORAGE_AUTH_KEY) === 'true';
+
+      if (fbUser && isSessionActive) {
         setIsAuthenticated(true);
         try {
-          localStorage.setItem(STORAGE_AUTH_KEY, 'true');
+          sessionStorage.setItem(STORAGE_AUTH_KEY, 'true');
         } catch (e) {
           // ignore
         }
@@ -718,7 +734,7 @@ export default function App() {
               }
             };
             try {
-              localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(updated));
+              sessionStorage.setItem(STORAGE_USER_KEY, JSON.stringify(updated));
             } catch (e) {}
             return updated;
           });
@@ -799,6 +815,49 @@ export default function App() {
     setAgendamentos(prev => prev.map(a => (a.id === agendamentoId ? updated : a)));
     await saveDocument(COLLECTIONS.AGENDAMENTOS, updated);
     showToast(`Status atualizado para: ${novoStatus.replace('_', ' ').toUpperCase()}`);
+  };
+
+  const handleRescheduleAppointment = async (
+    agendamentoId: string, 
+    newDateTime: string, 
+    profissionalId?: string, 
+    profissionalNome?: string
+  ) => {
+    const ag = agendamentos.find(a => a.id === agendamentoId);
+    if (!ag) return;
+
+    const patient = pacientes.find(p => p.id === ag.paciente_id) || ag.paciente;
+    const updated: Agendamento = {
+      ...ag,
+      data_hora: newDateTime,
+      ...(profissionalId ? { profissional_id: profissionalId } : {}),
+      ...(profissionalNome ? { profissional_nome: profissionalNome } : {}),
+    };
+
+    setAgendamentos(prev => prev.map(a => (a.id === agendamentoId ? updated : a)));
+    
+    try {
+      await saveDocument(COLLECTIONS.AGENDAMENTOS, updated);
+    } catch (err) {
+      console.warn('[Error saving rescheduled appointment]', err);
+    }
+
+    try {
+      queueOfflineMutation({
+        entityType: 'agendamento',
+        entityId: agendamentoId,
+        entityTitle: `Reagendamento: ${patient?.nome || 'Cliente'} (${ag.procedimento})`,
+        action: 'update',
+        payload: updated,
+      });
+    } catch (e) {
+      // offline mutation catch
+    }
+
+    const d = new Date(newDateTime);
+    const dataFmt = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', weekday: 'short' });
+    const horaFmt = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    showToast(`Atendimento de ${patient?.nome || 'cliente'} remarcado para ${dataFmt} às ${horaFmt}!`);
   };
 
   // Procedure completion with Atomic Inventory debit and Financial creation
@@ -970,7 +1029,8 @@ export default function App() {
     if (!ag) return;
     const patientObj = ag.paciente || pacientes.find(p => p.id === ag.paciente_id);
 
-    const isPagoAgora = data.pagamento.status === 'pago' && Number(data.pagamento.valor) > 0;
+    const isPagoAgorawk = data.pagamento.status === 'pago' && Number(data.pagamento.valor) > 0;
+    const isRetornoAgendadoAgora = Boolean(data.agendarRetorno && data.dadosRetorno);
 
     // 1. Atualizar agendamento para 'em_espera' na recepção com status de pagamento
     const updatedAg: Agendamento = {
@@ -979,13 +1039,15 @@ export default function App() {
       forma_pagamento: data.pagamento.forma,
       status_pagamento: data.pagamento.status,
       valor_estimado: data.pagamento.valor || ag.valor_estimado,
-      pagamento_registrado_no_caixa: isPagoAgora, // Flag de controle anti-duplicação
+      pagamento_registrado_no_caixa: isPagoAgorawk, // Flag de controle anti-duplicação
+      pago_no_checkin: isPagoAgorawk,
+      retorno_agendado_no_checkin: isRetornoAgendadoAgora,
     };
     setAgendamentos(prev => prev.map(a => a.id === ag.id ? updatedAg : a));
     await saveDocument(COLLECTIONS.AGENDAMENTOS, updatedAg);
 
     // 2. Registrar transação financeira caso valor positivo (Lançamento único)
-    if (isPagoAgora) {
+    if (isPagoAgorawk) {
       const novaTx: TransacaoFinanceira = {
         id: `tx-checkin-${Date.now()}`,
         agendamento_id: ag.id,
@@ -1855,7 +1917,7 @@ export default function App() {
     const userToSet = isSuper ? { ...user, role: 'admin_total' as UserRole, cargo: 'Super Admin (Master)' } : user;
     setCurrentUser(userToSet);
     try {
-      localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(userToSet));
+      sessionStorage.setItem(STORAGE_USER_KEY, JSON.stringify(userToSet));
     } catch (e) {
       // ignore
     }
@@ -1877,8 +1939,10 @@ export default function App() {
     setCurrentUser(userToSet);
     setIsAuthenticated(true);
     try {
-      localStorage.setItem(STORAGE_AUTH_KEY, 'true');
-      localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(userToSet));
+      sessionStorage.setItem(STORAGE_AUTH_KEY, 'true');
+      sessionStorage.setItem(STORAGE_USER_KEY, JSON.stringify(userToSet));
+      localStorage.removeItem(STORAGE_AUTH_KEY);
+      localStorage.removeItem(STORAGE_USER_KEY);
     } catch (e) {
       // ignore
     }
@@ -1901,6 +1965,9 @@ export default function App() {
   const handleLogout = () => {
     setIsAuthenticated(false);
     try {
+      sessionStorage.removeItem(STORAGE_AUTH_KEY);
+      sessionStorage.removeItem(STORAGE_USER_KEY);
+      sessionStorage.removeItem(STORAGE_TAB_KEY);
       localStorage.removeItem(STORAGE_AUTH_KEY);
       localStorage.removeItem(STORAGE_USER_KEY);
       localStorage.removeItem(STORAGE_TAB_KEY);
@@ -2104,6 +2171,7 @@ export default function App() {
               onOpenCompleteModal={(ag) => setAppointmentToComplete(ag)}
               onOpenCheckInModal={(ag) => setAppointmentToCheckIn(ag)}
               onDeleteAppointment={handleDeleteAppointment}
+              onRescheduleAppointment={handleRescheduleAppointment}
               currentUser={currentUser}
             />
           )}

@@ -98,9 +98,14 @@ export const NewPatientModal: React.FC<NewPatientModalProps> = ({
       return;
     }
 
-    // Check custom mandatory fields
-    if (isFieldMandatory('cliente.cpf', configuracaoCampos) && !cpf.trim()) {
-      setFormError(`O campo "${getFieldLabel('cliente.cpf', configuracaoCampos, 'CPF')}" foi configurado como obrigatório.`);
+    const cleanCpf = cpf.replace(/\D/g, '');
+    if (!cleanCpf || cleanCpf.length !== 11) {
+      setFormError(`O ${getFieldLabel('cliente.cpf', configuracaoCampos, 'CPF')} do cliente é obrigatório e deve conter 11 dígitos.`);
+      return;
+    }
+
+    if (!endereco.trim() || endereco.trim().length < 5) {
+      setFormError(`O ${getFieldLabel('cliente.endereco', configuracaoCampos, 'Endereço de Residência')} é obrigatório (informe rua, número, bairro e cidade).`);
       return;
     }
 
@@ -264,12 +269,14 @@ export const NewPatientModal: React.FC<NewPatientModalProps> = ({
               <FieldWrapper
                 campoId="cliente.cpf"
                 configuracaoCampos={configuracaoCampos}
-                label="CPF (Opcional)"
+                label="CPF do Cliente *"
+                required
               >
                 <div className="relative">
                   <CreditCard className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
+                    required
                     placeholder={getFieldPlaceholder('cliente.cpf', configuracaoCampos, '000.000.000-00')}
                     maxLength={14}
                     value={cpf}
@@ -345,13 +352,15 @@ export const NewPatientModal: React.FC<NewPatientModalProps> = ({
               <FieldWrapper
                 campoId="cliente.endereco"
                 configuracaoCampos={configuracaoCampos}
-                label="Endereço Completo (Rua, Número, Bairro, Cidade)"
+                label="Endereço de Residência Completo *"
+                required
                 className="sm:col-span-2"
               >
                 <div className="relative">
                   <MapPin className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
+                    required
                     placeholder={getFieldPlaceholder('cliente.endereco', configuracaoCampos, 'Rua, Número, Bairro, Cidade - UF')}
                     value={endereco}
                     onChange={(e) => setEndereco(e.target.value)}

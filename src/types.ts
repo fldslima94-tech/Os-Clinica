@@ -468,6 +468,8 @@ export interface Agendamento {
   total_sessoes_pacote?: number;
   // Controle de fluxo de caixa e finalização
   pagamento_registrado_no_caixa?: boolean;
+  pago_no_checkin?: boolean;
+  retorno_agendado_no_checkin?: boolean;
   concluido_em?: string;
   // Populated relation
   paciente?: Paciente;

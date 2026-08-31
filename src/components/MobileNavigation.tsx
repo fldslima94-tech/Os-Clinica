@@ -260,7 +260,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
                 </div>
               </div>
 
-              {onRequestSwitchUser && (
+              {onRequestSwitchUser && isAdminTotal && (
                 <button
                   type="button"
                   onClick={() => {

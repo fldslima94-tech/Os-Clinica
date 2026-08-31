@@ -36,7 +36,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
@@ -486,24 +485,11 @@ export const LoginView: React.FC<LoginViewProps> = ({
               </div>
             </div>
 
-            {/* Remember Me Checkbox */}
-            <div className="flex items-center justify-between pt-1">
-              <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                />
-                <span>Manter conectado neste dispositivo</span>
-              </label>
-            </div>
-
             {/* Submit Login Button */}
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold rounded-xl shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-75"
+              className="w-full mt-2 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold rounded-xl shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-75"
             >
               {isLoading ? (
                 <>
@@ -520,42 +506,10 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
           </form>
 
-          {/* Quick Access Credentials / Fast Login */}
-          <div className="mt-5 pt-4 border-t border-slate-100">
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 text-center">
-              Acesso Rápido por Perfil
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('fldslima94@gmail.com');
-                  setSenha('admin123');
-                  setErrorMessage(null);
-                }}
-                className="p-2 text-left bg-indigo-50/70 hover:bg-indigo-100/70 border border-indigo-100 rounded-lg transition-colors cursor-pointer"
-              >
-                <span className="block text-[11px] font-bold text-indigo-900">Fabio Lima</span>
-                <span className="block text-[10px] text-indigo-600">Super Admin Master</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('camila@aura.com');
-                  setSenha('admin123');
-                  setErrorMessage(null);
-                }}
-                className="p-2 text-left bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer"
-              >
-                <span className="block text-[11px] font-bold text-slate-800">Dra. Camila</span>
-                <span className="block text-[10px] text-slate-500">Admin Biomédica</span>
-              </button>
-            </div>
-          </div>
-
           {/* Security Note Footer */}
-          <div className="mt-4 text-center text-[11px] text-slate-500">
-            <span>Acesso seguro com sincronização em tempo real via Firestore.</span>
+          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-center gap-2 text-center text-xs text-slate-500">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>Ambiente protegido com autenticação individual criptografada.</span>
           </div>
 
         </div>

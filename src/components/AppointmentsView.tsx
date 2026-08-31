@@ -40,6 +40,12 @@ interface AppointmentsViewProps {
   onOpenCompleteModal?: (agendamento: Agendamento) => void;
   onOpenCheckInModal?: (agendamento: Agendamento) => void;
   onDeleteAppointment?: (id: string) => void;
+  onRescheduleAppointment?: (
+    agendamentoId: string, 
+    newDateTime: string, 
+    profissionalId?: string, 
+    profissionalNome?: string
+  ) => void;
   currentUser?: UsuarioEquipe;
   initialBalcaoMode?: boolean;
 }
@@ -54,6 +60,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
   onOpenCompleteModal,
   onOpenCheckInModal,
   onDeleteAppointment,
+  onRescheduleAppointment,
   currentUser,
   initialBalcaoMode = false,
 }) => {
@@ -636,6 +643,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
           onSelectAgendamento={(ag) => handleConcludeClick(ag)}
           onViewPatient={onViewPatient}
           onUpdateStatus={onUpdateStatus}
+          onRescheduleAppointment={onRescheduleAppointment}
         />
       ) : viewFormat === 'profissionais' ? (
         /* VISÃO SEPARADA POR PROFISSIONAL (COLUNAS / ABAS) */

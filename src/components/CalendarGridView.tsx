@@ -8,7 +8,12 @@ import {
   Calendar as CalendarIcon, 
   CheckCircle2, 
   AlertCircle,
-  Filter
+  Filter,
+  GripVertical,
+  Move,
+  ArrowRightLeft,
+  Sparkles,
+  Lock
 } from 'lucide-react';
 import { Agendamento, Paciente, StatusAgendamento, UsuarioEquipe } from '../types';
 
@@ -20,6 +25,12 @@ interface CalendarGridViewProps {
   onSelectAgendamento: (agendamento: Agendamento) => void;
   onViewPatient: (paciente: Paciente) => void;
   onUpdateStatus: (id: string, status: StatusAgendamento) => void;
+  onRescheduleAppointment?: (
+    agendamentoId: string, 
+    newDateTime: string, 
+    profissionalId?: string, 
+    profissionalNome?: string
+  ) => void;
 }
 
 const HOURS = [
@@ -35,10 +46,21 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
   onSelectAgendamento,
   onViewPatient,
   onUpdateStatus,
+  onRescheduleAppointment,
 }) => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<'semana' | 'dia'>('semana');
   const [selectedProfissionalId, setSelectedProfissionalId] = useState<string>('todos');
+
+  // Drag and drop states
+  const [draggedAgendamentoId, setDraggedAgendamentoId] = useState<string | null>(null);
+  const [dragOverSlotKey, setDragOverSlotKey] = useState<string | null>(null);
+
+  // Helper to format date to YYYY-MM-DD for slot keys
+  const formatDateKey = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
 
   // Helper to get week days around selectedDate (Monday to Saturday)
   const getWeekDays = (baseDate: Date) => {
@@ -110,6 +132,75 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
     p => p.role !== 'cliente'
   );
 
+  // Drag & Drop Handlers
+  const handleDragStart = (e: React.DragEvent, ag: Agendamento) => {
+    if (ag.status === 'concluido') {
+      e.preventDefault();
+      return;
+    }
+    e.dataTransfer.setData('text/plain', ag.id);
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggedAgendamentoId(ag.id);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedAgendamentoId(null);
+    setDragOverSlotKey(null);
+  };
+
+  const handleDragOverSlot = (e: React.DragEvent, slotKey: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverSlotKey !== slotKey) {
+      setDragOverSlotKey(slotKey);
+    }
+  };
+
+  const handleDragLeaveSlot = (e: React.DragEvent, slotKey: string) => {
+    // Only clear if we really left the current slot container
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    if (dragOverSlotKey === slotKey) {
+      setDragOverSlotKey(null);
+    }
+  };
+
+  const handleDropOnSlot = (e: React.DragEvent, targetDate: Date, hourStr: string) => {
+    e.preventDefault();
+    setDragOverSlotKey(null);
+
+    const agId = e.dataTransfer.getData('text/plain') || draggedAgendamentoId;
+    setDraggedAgendamentoId(null);
+
+    if (!agId) return;
+
+    const ag = agendamentos.find(a => a.id === agId);
+    if (!ag || ag.status === 'concluido') return;
+
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const y = targetDate.getFullYear();
+    const m = pad(targetDate.getMonth() + 1);
+    const d = pad(targetDate.getDate());
+    const [h, min] = hourStr.split(':');
+    const newDateTime = `${y}-${m}-${d}T${h}:${min || '00'}:00`;
+
+    // Check if it's the exact same time
+    if (ag.data_hora) {
+      const oldD = new Date(ag.data_hora);
+      if (
+        oldD.getFullYear() === targetDate.getFullYear() &&
+        oldD.getMonth() === targetDate.getMonth() &&
+        oldD.getDate() === targetDate.getDate() &&
+        oldD.getHours() === parseInt(h, 10)
+      ) {
+        return; // No change
+      }
+    }
+
+    if (onRescheduleAppointment) {
+      onRescheduleAppointment(ag.id, newDateTime);
+    }
+  };
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
       
@@ -148,6 +239,12 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
 
         {/* Professional and View Mode Selectors */}
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* Helper Drag and drop tip badge */}
+          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50/90 text-indigo-700 border border-indigo-200/80 rounded-lg text-xs font-medium">
+            <Move className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
+            <span>Arraste os cards para reagendar</span>
+          </div>
+
           {/* Filter by Professional directly on Calendar */}
           {clinicalProfessionals.length > 0 && (
             <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
@@ -233,7 +330,7 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
             {/* Hours and Slot Grid */}
             <div className="divide-y divide-slate-100">
               {HOURS.map((hour) => (
-                <div key={hour} className="grid grid-cols-7 min-h-[72px]">
+                <div key={hour} className="grid grid-cols-7 min-h-[76px]">
                   
                   {/* Time column */}
                   <div className="p-2.5 border-r border-slate-200 text-[11px] font-mono font-medium text-slate-400 text-center bg-slate-50/50 flex items-start justify-center">
@@ -244,16 +341,35 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
                   {weekDays.map((day, dIdx) => {
                     const slotAgendamentos = getAgendamentosForDayAndHour(day, hour);
                     const dayIsToday = isToday(day);
+                    const slotKey = `${formatDateKey(day)}_${hour}`;
+                    const isDragOverThisSlot = dragOverSlotKey === slotKey;
 
                     return (
                       <div 
                         key={dIdx}
-                        className={`p-1.5 border-r border-slate-200 last:border-r-0 relative group transition-colors ${
-                          dayIsToday ? 'bg-indigo-50/20' : 'hover:bg-slate-50/70'
+                        onDragOver={(e) => handleDragOverSlot(e, slotKey)}
+                        onDragLeave={(e) => handleDragLeaveSlot(e, slotKey)}
+                        onDrop={(e) => handleDropOnSlot(e, day, hour)}
+                        className={`p-1.5 border-r border-slate-200 last:border-r-0 relative group transition-all min-h-[76px] ${
+                          isDragOverThisSlot
+                            ? 'bg-indigo-100/90 border-2 border-dashed border-indigo-500 shadow-md ring-2 ring-indigo-300 z-10'
+                            : dayIsToday 
+                            ? 'bg-indigo-50/20' 
+                            : 'hover:bg-slate-50/70'
                         }`}
                       >
+                        {/* Drop Hover Indicator */}
+                        {isDragOverThisSlot && (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-indigo-600/10 backdrop-blur-[1px] rounded pointer-events-none z-20">
+                            <span className="text-[11px] font-extrabold text-indigo-700 bg-white/95 px-2 py-1 rounded shadow-xs flex items-center gap-1 border border-indigo-300">
+                              <Move className="w-3 h-3 text-indigo-600" />
+                              Mover para {hour}
+                            </span>
+                          </div>
+                        )}
+
                         {slotAgendamentos.length > 0 ? (
-                          <div className="space-y-1">
+                          <div className="space-y-1.5">
                             {slotAgendamentos.map((ag) => {
                               const patient = ag.paciente || pacientes.find(p => p.id === ag.paciente_id);
                               const isConfirmed = ag.status === 'confirmado';
@@ -261,13 +377,22 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
                               const isPending = ag.status === 'pendente';
                               const isWaiting = ag.status === 'em_espera';
                               const isInRoom = ag.status === 'em_atendimento';
+                              const isBeingDragged = draggedAgendamentoId === ag.id;
 
                               return (
                                 <div
                                   key={ag.id}
+                                  draggable={!isDone}
+                                  onDragStart={(e) => handleDragStart(e, ag)}
+                                  onDragEnd={handleDragEnd}
                                   onClick={() => onSelectAgendamento(ag)}
-                                  className={`p-2 rounded-lg text-xs cursor-pointer border shadow-2xs transition-transform hover:scale-[1.02] ${
-                                    isInRoom
+                                  title={isDone ? 'Atendimento concluído' : 'Arraste para reagendar para outro horário ou clique para abrir'}
+                                  className={`p-2 rounded-lg text-xs border shadow-2xs transition-all select-none ${
+                                    isDone ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing hover:scale-[1.02]'
+                                  } ${
+                                    isBeingDragged
+                                      ? 'opacity-40 scale-95 ring-2 ring-indigo-400 border-dashed'
+                                      : isInRoom
                                       ? 'bg-indigo-100 text-indigo-900 border-indigo-300 font-bold'
                                       : isWaiting
                                       ? 'bg-amber-100 text-amber-900 border-amber-300 font-semibold'
@@ -281,26 +406,33 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
                                   }`}
                                 >
                                   <div className="flex items-center justify-between gap-1 mb-0.5">
-                                    <span className="font-bold truncate text-[11px]">
-                                      {patient?.nome || ag.paciente?.nome || 'Paciente'}
-                                    </span>
+                                    <div className="flex items-center gap-1 min-w-0">
+                                      {!isDone ? (
+                                        <GripVertical className="w-3 h-3 text-slate-400 shrink-0 opacity-50 group-hover:opacity-100" />
+                                      ) : (
+                                        <Lock className="w-2.5 h-2.5 text-slate-400 shrink-0" />
+                                      )}
+                                      <span className="font-bold truncate text-[11px]">
+                                        {patient?.nome || ag.paciente?.nome || 'Paciente'}
+                                      </span>
+                                    </div>
                                     <span className="text-[9px] px-1 py-0.2 rounded font-semibold capitalize shrink-0 bg-white/80">
                                       {ag.status === 'em_espera' ? 'Na Recepção' : ag.status === 'em_atendimento' ? 'Em Sala' : ag.status}
                                     </span>
                                   </div>
 
-                                  <p className="text-[10px] text-slate-600 truncate font-medium">
+                                  <p className="text-[10px] text-slate-600 truncate font-medium pl-3.5">
                                     {ag.procedimento}
                                   </p>
 
                                   {ag.profissional_nome && (
-                                    <p className="text-[9px] text-indigo-700 truncate font-bold mt-0.5">
+                                    <p className="text-[9px] text-indigo-700 truncate font-bold mt-0.5 pl-3.5">
                                       • {ag.profissional_nome}
                                     </p>
                                   )}
 
                                   {ag.valor_estimado ? (
-                                    <p className="text-[10px] font-mono font-bold mt-0.5 text-slate-800">
+                                    <p className="text-[10px] font-mono font-bold mt-0.5 text-slate-800 pl-3.5">
                                       R$ {ag.valor_estimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                     </p>
                                   ) : null}
@@ -320,7 +452,7 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
                                 profissional_nome: profObj?.nome
                               });
                             }}
-                            className="w-full h-full opacity-0 group-hover:opacity-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 rounded text-[11px] font-medium transition-opacity cursor-pointer"
+                            className="w-full h-full min-h-[48px] opacity-0 group-hover:opacity-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 rounded text-[11px] font-medium transition-opacity cursor-pointer"
                           >
                             + Agendar
                           </button>
@@ -341,10 +473,15 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
       {viewMode === 'dia' && (
         <div className="p-6">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-base font-bold text-slate-900">
-              Agenda de {selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
-            </h3>
-            <span className="text-xs text-slate-500 font-medium">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">
+                Agenda de {selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Arraste os cards entre as faixas de horário para reagendar.
+              </p>
+            </div>
+            <span className="text-xs text-slate-500 font-medium bg-slate-100 px-3 py-1 rounded-lg">
               {HOURS.reduce((acc, h) => acc + getAgendamentosForDayAndHour(selectedDate, h).length, 0)} agendamentos neste dia
             </span>
           </div>
@@ -352,16 +489,30 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
           <div className="space-y-3">
             {HOURS.map((hour) => {
               const dayAgendamentos = getAgendamentosForDayAndHour(selectedDate, hour);
+              const slotKey = `${formatDateKey(selectedDate)}_${hour}`;
+              const isDragOverThisSlot = dragOverSlotKey === slotKey;
+
               return (
-                <div key={hour} className="flex gap-4 items-start p-3 bg-slate-50 rounded-xl border border-slate-200">
-                  <div className="w-16 font-mono font-bold text-xs text-slate-600 shrink-0 pt-1">
-                    {hour}
+                <div 
+                  key={hour}
+                  onDragOver={(e) => handleDragOverSlot(e, slotKey)}
+                  onDragLeave={(e) => handleDragLeaveSlot(e, slotKey)}
+                  onDrop={(e) => handleDropOnSlot(e, selectedDate, hour)}
+                  className={`flex gap-4 items-start p-3 rounded-xl border transition-all ${
+                    isDragOverThisSlot
+                      ? 'bg-indigo-100/90 border-2 border-dashed border-indigo-500 shadow-md ring-2 ring-indigo-200'
+                      : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="w-16 font-mono font-bold text-xs text-slate-600 shrink-0 pt-1 flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-slate-400" />
+                    <span>{hour}</span>
                   </div>
 
                   <div className="flex-1">
                     {dayAgendamentos.length === 0 ? (
                       <div className="flex items-center justify-between text-xs text-slate-400 py-1">
-                        <span>Horário livre</span>
+                        <span>{isDragOverThisSlot ? 'Soltar aqui para reagendar para ' + hour : 'Horário livre'}</span>
                         <button
                           onClick={() => {
                             const dStr = selectedDate.toISOString().split('T')[0];
@@ -382,23 +533,38 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
                       <div className="space-y-2">
                         {dayAgendamentos.map((ag) => {
                           const patient = ag.paciente || pacientes.find(p => p.id === ag.paciente_id);
+                          const isDone = ag.status === 'concluido';
+                          const isBeingDragged = draggedAgendamentoId === ag.id;
+
                           return (
                             <div 
                               key={ag.id}
-                              className="p-3 bg-white rounded-lg border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+                              draggable={!isDone}
+                              onDragStart={(e) => handleDragStart(e, ag)}
+                              onDragEnd={handleDragEnd}
+                              className={`p-3 bg-white rounded-lg border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all ${
+                                !isDone ? 'cursor-grab active:cursor-grabbing' : ''
+                              } ${
+                                isBeingDragged ? 'opacity-40 scale-95 ring-2 ring-indigo-400 border-dashed' : ''
+                              }`}
                             >
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-bold text-sm text-slate-900">
-                                    {patient?.nome || ag.paciente?.nome || 'Cliente'}
-                                  </span>
-                                  <span className="text-[10px] px-2 py-0.5 rounded-full font-medium capitalize bg-slate-100 text-slate-700 border border-slate-200">
-                                    {ag.status === 'em_espera' ? 'Na Recepção' : ag.status === 'em_atendimento' ? 'Em Sala' : ag.status}
-                                  </span>
+                              <div className="flex items-start gap-2">
+                                {!isDone && (
+                                  <GripVertical className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                                )}
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-sm text-slate-900">
+                                      {patient?.nome || ag.paciente?.nome || 'Cliente'}
+                                    </span>
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full font-medium capitalize bg-slate-100 text-slate-700 border border-slate-200">
+                                      {ag.status === 'em_espera' ? 'Na Recepção' : ag.status === 'em_atendimento' ? 'Em Sala' : ag.status}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-slate-600 mt-0.5 font-medium">
+                                    {ag.procedimento} • Profissional: <strong className="text-indigo-700">{ag.profissional_nome || 'Equipe Geral'}</strong> • Duração: {ag.duracao_minutos || 45} min
+                                  </p>
                                 </div>
-                                <p className="text-xs text-slate-600 mt-0.5 font-medium">
-                                  {ag.procedimento} • Profissional: <strong className="text-indigo-700">{ag.profissional_nome || 'Equipe Geral'}</strong> • Duração: {ag.duracao_minutos || 45} min
-                                </p>
                               </div>
 
                               <div className="flex items-center gap-2">
@@ -435,4 +601,5 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
     </div>
   );
 };
+
 

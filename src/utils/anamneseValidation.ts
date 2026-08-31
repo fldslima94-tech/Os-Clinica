@@ -57,6 +57,7 @@ export const anamneseCompletaSchema = z.object({
     dataNascimento: z.string().min(1, 'A data de nascimento é obrigatória.'),
     idade: z.number().min(0, 'Idade inválida.'),
     telefone: z.string().min(10, 'O telefone/WhatsApp deve ser válido.'),
+    cpf: z.string().optional().default(''),
     email: z.string().email('E-mail inválido.').or(z.literal('')).optional(),
     endereco: z.string().optional().default(''),
     profissao: z.string().optional().default(''),

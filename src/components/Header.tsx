@@ -382,87 +382,104 @@ export const Header: React.FC<HeaderProps> = ({
                 className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-100"
                 onClick={() => setIsUserMenuOpen(false)}
               >
-                <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                    Alternar Usuário (Senha)
-                  </span>
-                  <KeyRound className="w-3 h-3 text-slate-400" />
-                </div>
+                {isUserAdminTotal(currentUser) ? (
+                  <>
+                    <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                        Alternar Usuário (Master)
+                      </span>
+                      <KeyRound className="w-3 h-3 text-slate-400" />
+                    </div>
 
-                <div className="p-1 space-y-1">
-                  {usuarios.map(u => (
-                    <button
-                      key={u.id}
-                      onClick={() => onRequestSwitchUser(u)}
-                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs text-left transition-colors cursor-pointer ${
-                        u.id === currentUser.id
-                          ? 'bg-indigo-50 text-indigo-900 font-semibold'
-                          : 'hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <img
-                          src={u.avatar_url}
-                          alt={u.nome}
-                          className="w-6 h-6 rounded-md object-cover"
-                        />
-                        <div>
-                          <p className="font-semibold leading-tight">{u.nome}</p>
-                          <p className="text-[10px] text-slate-400">
-                            {isUserAdminTotal(u)
-                              ? 'Super Admin'
+                    <div className="p-1 space-y-1 max-h-48 overflow-y-auto">
+                      {usuarios.map(u => (
+                        <button
+                          key={u.id}
+                          onClick={() => onRequestSwitchUser(u)}
+                          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs text-left transition-colors cursor-pointer ${
+                            u.id === currentUser.id
+                              ? 'bg-indigo-50 text-indigo-900 font-semibold'
+                              : 'hover:bg-slate-50 text-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <img
+                              src={u.avatar_url}
+                              alt={u.nome}
+                              className="w-6 h-6 rounded-md object-cover"
+                            />
+                            <div>
+                              <p className="font-semibold leading-tight">{u.nome}</p>
+                              <p className="text-[10px] text-slate-400">
+                                {isUserAdminTotal(u)
+                                  ? 'Super Admin'
+                                  : u.role === 'admin_local' || u.role === 'admin' || u.role === 'gestor'
+                                  ? 'Admin Local'
+                                  : u.role === 'profissional'
+                                  ? 'Profissional'
+                                  : u.role === 'recepcao' || u.role === 'operador'
+                                  ? 'Recepção'
+                                  : 'Cliente'}
+                              </p>
+                            </div>
+                          </div>
+                          <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                            isUserAdminTotal(u) 
+                              ? 'bg-amber-100 text-amber-800'
                               : u.role === 'admin_local' || u.role === 'admin' || u.role === 'gestor'
-                              ? 'Admin Local'
+                              ? 'bg-indigo-100 text-indigo-700' 
                               : u.role === 'profissional'
-                              ? 'Profissional'
+                              ? 'bg-teal-100 text-teal-700'
+                              : u.role === 'recepcao' || u.role === 'operador'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {isUserAdminTotal(u)
+                              ? 'Master'
+                              : u.role === 'admin_local' || u.role === 'admin' || u.role === 'gestor'
+                              ? 'Admin'
+                              : u.role === 'profissional'
+                              ? 'Pro'
                               : u.role === 'recepcao' || u.role === 'operador'
                               ? 'Recepção'
                               : 'Cliente'}
-                          </p>
-                        </div>
-                      </div>
-                      <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                        isUserAdminTotal(u) 
-                          ? 'bg-amber-100 text-amber-800'
-                          : u.role === 'admin_local' || u.role === 'admin' || u.role === 'gestor'
-                          ? 'bg-indigo-100 text-indigo-700' 
-                          : u.role === 'profissional'
-                          ? 'bg-teal-100 text-teal-700'
-                          : u.role === 'recepcao' || u.role === 'operador'
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-blue-100 text-blue-700'
-                      }`}>
-                        {isUserAdminTotal(u)
-                          ? 'Master'
-                          : u.role === 'admin_local' || u.role === 'admin' || u.role === 'gestor'
-                          ? 'Admin'
-                          : u.role === 'profissional'
-                          ? 'Pro'
-                          : u.role === 'recepcao' || u.role === 'operador'
-                          ? 'Recepção'
-                          : 'Cliente'}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
 
-                <div className="px-2 pt-2 mt-1 border-t border-slate-100 space-y-1">
-                  {(isUserAdminTotal(currentUser) || currentUser.role === 'admin_local' || currentUser.role === 'admin' || currentUser.role === 'gestor') && (
-                    <button
-                      onClick={() => setActiveTab('usuarios')}
-                      className="w-full text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 px-2 py-1.5 rounded-md flex items-center gap-1.5"
-                    >
-                      <Users className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Gerenciar Equipe (Admin)</span>
-                    </button>
-                  )}
+                    <div className="px-2 pt-2 mt-1 border-t border-slate-100 space-y-1">
+                      <button
+                        onClick={() => setActiveTab('usuarios')}
+                        className="w-full text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 px-2 py-1.5 rounded-md flex items-center gap-1.5"
+                      >
+                        <Users className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Gerenciar Equipe (Admin)</span>
+                      </button>
 
+                      <button
+                        onClick={() => onRequestSwitchUser()}
+                        className="w-full text-left text-xs font-semibold text-indigo-700 hover:bg-indigo-50 px-2 py-1.5 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <KeyRound className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Trocar Usuário com Senha</span>
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="px-3 py-2 border-b border-slate-100">
+                    <p className="text-xs font-bold text-slate-800">{currentUser.nome}</p>
+                    <p className="text-[11px] text-slate-500">{currentUser.email || 'Conta da Equipe'}</p>
+                  </div>
+                )}
+
+                <div className="px-2 pt-2 mt-1 space-y-1">
                   <button
-                    onClick={() => onRequestSwitchUser()}
-                    className="w-full text-left text-xs font-semibold text-indigo-700 hover:bg-indigo-50 px-2 py-1.5 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer"
+                    onClick={() => setActiveTab('perfil')}
+                    className="w-full text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 px-2 py-1.5 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer"
                   >
-                    <KeyRound className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Trocar Usuário com Senha</span>
+                    <Users className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Meu Perfil & Senha</span>
                   </button>
 
                   {onLogout && (
@@ -479,15 +496,17 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          {/* Trocar Usuário Button requiring password */}
-          <button
-            onClick={() => onRequestSwitchUser()}
-            className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer shadow-2xs"
-            title="Sempre solicita senha para trocar de usuário"
-          >
-            <KeyRound className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Trocar Usuário</span>
-          </button>
+          {/* Trocar Usuário Button requiring password (Only visible for Master) */}
+          {isUserAdminTotal(currentUser) && (
+            <button
+              onClick={() => onRequestSwitchUser()}
+              className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer shadow-2xs"
+              title="Alternar perfil com verificação de senha master"
+            >
+              <KeyRound className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Trocar Usuário</span>
+            </button>
+          )}
 
           {/* Quick New Appointment Button (Only visible for Admin and Operador) */}
           {currentUser.role !== 'cliente' && (
