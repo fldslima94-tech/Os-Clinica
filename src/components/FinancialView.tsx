@@ -37,10 +37,13 @@ import {
   UsuarioEquipe, 
   DespesaRecorrente,
   Fornecedor,
-  ProcedimentoClinico
+  ProcedimentoClinico,
+  ClinicaConfig
 } from '../types';
 import { checkUserCustomPermission, isUserAdminTotal } from '../services/firebaseService';
 import { FinancialReportsView } from './FinancialReportsView';
+import { PrintableReceiptModal } from './PrintableReceiptModal';
+import { FinancialEvolutionChart } from './FinancialEvolutionChart';
 
 interface FinancialViewProps {
   transacoes: TransacaoFinanceira[];
@@ -48,6 +51,7 @@ interface FinancialViewProps {
   fornecedores?: Fornecedor[];
   procedimentos?: ProcedimentoClinico[];
   profissionais?: UsuarioEquipe[];
+  clinicaConfig?: ClinicaConfig;
   onAddTransaction: (nova: Partial<TransacaoFinanceira>) => void;
   onUpdateTransactionStatus: (id: string, status: StatusPagamento) => void;
   onSoftDeleteTransaction?: (id: string, motivo: string) => void;
@@ -64,6 +68,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
   fornecedores = [],
   procedimentos = [],
   profissionais = [],
+  clinicaConfig,
   onAddTransaction,
   onUpdateTransactionStatus,
   onSoftDeleteTransaction,
@@ -82,6 +87,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
 
   // Active Financial Tab: 'entradas' | 'saidas' | 'recorrentes' | 'relatorios'
   const [activeFinTab, setActiveFinTab] = useState<'entradas' | 'saidas' | 'recorrentes' | 'relatorios'>('entradas');
+  const [showEvolutionChart, setShowEvolutionChart] = useState<boolean>(true);
   const [filterPeriod, setFilterPeriod] = useState<'hoje' | '7dias' | 'mes' | 'todos'>('mes');
   const [search, setSearch] = useState('');
   const [isNewTxModalOpen, setIsNewTxModalOpen] = useState(false);
@@ -305,6 +311,19 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
 
         <div className="flex items-center gap-2.5">
           <button
+            type="button"
+            onClick={() => setShowEvolutionChart(!showEvolutionChart)}
+            className={`inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all border cursor-pointer ${
+              showEvolutionChart 
+                ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100' 
+                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4 text-indigo-600" />
+            <span>{showEvolutionChart ? 'Ocultar Gráfico' : 'Ver Gráfico Mensal'}</span>
+          </button>
+
+          <button
             onClick={() => setIsNewTxModalOpen(true)}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-sm font-semibold transition-all shadow-sm cursor-pointer"
           >
@@ -377,6 +396,11 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
           </p>
         </div>
       </div>
+
+      {/* Gráfico Recharts de Evolução Mensal de Receitas vs Despesas com Filtro de Intervalo de Datas */}
+      {showEvolutionChart && (
+        <FinancialEvolutionChart transacoes={transacoes} />
+      )}
 
       {/* 3 Main Tabs: Entradas, Saídas, Despesas Recorrentes */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
@@ -1214,59 +1238,14 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
         </div>
       )}
 
-      {/* Recibo Modal */}
-      {selectedTxForReceipt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full border border-slate-200 shadow-2xl">
-            <div className="flex items-center justify-between border-b pb-3 mb-4">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Receipt className="w-5 h-5 text-indigo-600" />
-                Comprovante de Recibo
-              </h3>
-              <button onClick={() => setSelectedTxForReceipt(null)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs text-slate-700 bg-slate-50 p-4 rounded-xl border border-slate-100 font-mono">
-              <div className="flex justify-between border-b border-dashed pb-2">
-                <span>Nº RECIBO:</span>
-                <span className="font-bold">{selectedTxForReceipt.id}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>CLIENTE:</span>
-                <span className="font-bold">{selectedTxForReceipt.paciente_nome}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>SERVIÇO:</span>
-                <span>{selectedTxForReceipt.procedimento}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>DATA:</span>
-                <span>{new Date(selectedTxForReceipt.data).toLocaleDateString('pt-BR')}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>PAGAMENTO:</span>
-                <span>{getFormaLabel(selectedTxForReceipt.forma_pagamento)}</span>
-              </div>
-              <div className="flex justify-between border-t border-dashed pt-2 text-sm font-bold text-slate-900">
-                <span>TOTAL PAGO:</span>
-                <span className="text-emerald-700">{formatCurrency(selectedTxForReceipt.valor)}</span>
-              </div>
-            </div>
-
-            <div className="mt-5 flex items-center justify-end gap-2">
-              <button
-                onClick={() => window.print()}
-                className="px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5"
-              >
-                <Printer className="w-4 h-4" />
-                <span>Imprimir Recibo</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Recibo e Comprovante em PDF Modal Formatado */}
+      <PrintableReceiptModal
+        isOpen={Boolean(selectedTxForReceipt)}
+        onClose={() => setSelectedTxForReceipt(null)}
+        transacao={selectedTxForReceipt}
+        clinicaConfig={clinicaConfig}
+        currentUser={currentUser}
+      />
     </div>
   );
 };

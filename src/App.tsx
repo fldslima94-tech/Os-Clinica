@@ -2019,6 +2019,46 @@ export default function App() {
     showToast(`Usuário "${user?.nome || 'Usuário'}" excluído do sistema com sucesso.`);
   };
 
+  const isDirectTvMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mode') === 'tv';
+  const isTvRecepcaoActive = activeTab === 'balcao_tv' || isDirectTvMode;
+
+  // TV Reception Standalone Mode (Full Screen without Application Header, Sidebar or Footer)
+  if (isTvRecepcaoActive) {
+    return (
+      <MasterEditProvider currentUser={currentUser}>
+        <div className="min-h-screen w-full bg-slate-950 text-slate-100 flex flex-col antialiased">
+          {/* Toast Notification */}
+          {toastMessage && (
+            <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-4 duration-200">
+              <div className="flex items-center gap-2.5 px-4 py-3 bg-slate-900 text-white rounded-xl shadow-xl border border-slate-800 text-xs sm:text-sm font-medium">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{toastMessage.text}</span>
+              </div>
+            </div>
+          )}
+
+          <ReceptionTVView
+            agendamentos={agendamentos}
+            pacientes={pacientes}
+            profissionais={usuarios}
+            clinicaConfig={clinicaConfig}
+            onCloseTvMode={() => {
+              if (isDirectTvMode) {
+                const url = new URL(window.location.href);
+                url.searchParams.delete('mode');
+                url.searchParams.set('tab', 'dashboard');
+                window.location.href = url.pathname;
+              } else {
+                setActiveTab('dashboard');
+              }
+            }}
+            isStandalone={true}
+          />
+        </div>
+      </MasterEditProvider>
+    );
+  }
+
   // If user is not authenticated, display full secure Login screen
   if (!isAuthenticated) {
     return (
@@ -2148,16 +2188,6 @@ export default function App() {
               onOpenCheckInModal={(ag) => setAppointmentToCheckIn(ag)}
               onOpenSecondScreenModal={() => setIsSecondScreenModalOpen(true)}
               searchQuery={searchQuery}
-            />
-          )}
-
-          {activeTab === 'balcao_tv' && (
-            <ReceptionTVView
-              agendamentos={agendamentos}
-              pacientes={pacientes}
-              profissionais={usuarios}
-              clinicaConfig={clinicaConfig}
-              onCloseTvMode={() => setActiveTab('dashboard')}
             />
           )}
 
@@ -2308,6 +2338,7 @@ export default function App() {
               fornecedores={fornecedores}
               procedimentos={procedimentos}
               profissionais={usuarios}
+              clinicaConfig={clinicaConfig}
               onAddTransaction={handleAddTransaction}
               onUpdateTransactionStatus={handleUpdateTransactionStatus}
               onSoftDeleteTransaction={handleSoftDeleteTransaction}
