@@ -184,9 +184,100 @@
         "status": { "type": "string", "maxLength": 30 }
       },
       "required": ["id", "paciente_nome", "paciente_email"]
+    },
+    "Fornecedor": {
+      "title": "Fornecedor",
+      "description": "Cadastro e controle de fornecedores da clínica",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "nome": { "type": "string", "maxLength": 150 },
+        "categoria": { "type": "string", "maxLength": 80 },
+        "telefone": { "type": "string", "maxLength": 30 },
+        "email": { "type": "string", "maxLength": 120 },
+        "cnpj": { "type": "string", "maxLength": 30 },
+        "contato_responsavel": { "type": "string", "maxLength": 100 },
+        "ativo": { "type": "boolean" }
+      },
+      "required": ["id", "nome", "categoria"]
+    },
+    "AvisoQuadro": {
+      "title": "AvisoQuadro",
+      "description": "Avisos e comunicados no quadro interno da equipe",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "titulo": { "type": "string", "maxLength": 150 },
+        "mensagem": { "type": "string", "maxLength": 2000 },
+        "autor_nome": { "type": "string", "maxLength": 100 },
+        "data_criacao": { "type": "string", "maxLength": 40 },
+        "prioridade": { "type": "string", "enum": ["normal", "alta", "urgente"] },
+        "fixado": { "type": "boolean" }
+      },
+      "required": ["id", "titulo", "mensagem", "autor_nome"]
+    },
+    "AlertaRetornoPos": {
+      "title": "AlertaRetornoPos",
+      "description": "Alertas de pós-procedimento e acompanhamento de retoques",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "paciente_id": { "type": "string", "maxLength": 128 },
+        "paciente_nome": { "type": "string", "maxLength": 120 },
+        "procedimento_nome": { "type": "string", "maxLength": 150 },
+        "data_procedimento": { "type": "string", "maxLength": 40 },
+        "data_prevista_retorno": { "type": "string", "maxLength": 40 },
+        "status": { "type": "string", "enum": ["pendente", "contatado", "agendado", "dispensado"] }
+      },
+      "required": ["id", "paciente_id", "data_prevista_retorno", "status"]
+    },
+    "ConfiguracaoCampos": {
+      "title": "ConfiguracaoCampos",
+      "description": "Configurações de campos personalizados e dinâmicos da clínica",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "campos_paciente": { "type": "array" },
+        "campos_anamnese": { "type": "array" },
+        "campos_procedimento": { "type": "array" }
+      },
+      "required": ["id"]
+    },
+    "FichaRetornoEvolucao": {
+      "title": "FichaRetornoEvolucao",
+      "description": "Evolução e notas de retorno pós-procedimento",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "paciente_id": { "type": "string", "maxLength": 128 },
+        "data_retorno": { "type": "string", "maxLength": 40 },
+        "numero_sessao": { "type": "number" },
+        "observacoes_cicatrizacao": { "type": "string", "maxLength": 3000 }
+      },
+      "required": ["id", "paciente_id", "data_retorno"]
+    },
+    "SnapshotBackupSistema": {
+      "title": "SnapshotBackupSistema",
+      "description": "Snapshots de backup do banco de dados e registros clínicos",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "dataCriacao": { "type": "string", "maxLength": 50 },
+        "tipo": { "type": "string", "enum": ["automatico", "manual"] },
+        "criadoPor": { "type": "string", "maxLength": 100 },
+        "totalRegistros": { "type": "number" },
+        "tamanhoKb": { "type": "number" },
+        "estatisticas": { "type": "object" },
+        "dados": { "type": "object" }
+      },
+      "required": ["id", "dataCriacao", "tipo", "totalRegistros"]
     }
   },
   "firestore": {
+    "/clinica_config/{configId}": {
+      "schema": "ClinicaConfig",
+      "description": "Configurações da clínica"
+    },
     "/clinicas/{clinicaId}/config/{configId}": {
       "schema": "ClinicaConfig",
       "description": "Configurações da clínica"
@@ -198,6 +289,10 @@
     "/pacientes/{pacienteId}": {
       "schema": "Paciente",
       "description": "Clientes e fichas"
+    },
+    "/fornecedores/{fornecedorId}": {
+      "schema": "Fornecedor",
+      "description": "Fornecedores de insumos e equipamentos"
     },
     "/agendamentos/{agendamentoId}": {
       "schema": "Agendamento",
@@ -230,6 +325,26 @@
     "/solicitacoes_orcamento/{orcamentoId}": {
       "schema": "SolicitacaoOrcamento",
       "description": "Solicitações de orçamento do portal"
+    },
+    "/avisos/{avisoId}": {
+      "schema": "AvisoQuadro",
+      "description": "Avisos internos e comunicados da equipe"
+    },
+    "/alertas_retorno/{alertaId}": {
+      "schema": "AlertaRetornoPos",
+      "description": "Acompanhamentos de retorno e retoques pós-procedimento"
+    },
+    "/configuracoes_campos/{configId}": {
+      "schema": "ConfiguracaoCampos",
+      "description": "Campos customizados do sistema"
+    },
+    "/fichas_retorno/{fichaId}": {
+      "schema": "FichaRetornoEvolucao",
+      "description": "Registros de evolução e retorno"
+    },
+    "/backups_sistema/{backupId}": {
+      "schema": "SnapshotBackupSistema",
+      "description": "Snapshots de backups automáticos e manuais do sistema"
     }
   }
 }

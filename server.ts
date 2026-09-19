@@ -4,6 +4,13 @@ import { createServer as createViteServer } from "vite";
 import { requireAuth, AuthRequest } from "./src/middleware/auth.ts";
 import { getOrCreateUser, getUsers } from "./src/db/users.ts";
 import { handleGeminiChat, handleMapsGrounding, handleGenerateImage } from "./server/gemini.ts";
+import {
+  executarDumpCriticoStorage,
+  listarDumpsStorage,
+  obterConteudoArquivoDump,
+  salvarDumpLocal,
+  iniciarAgendador03h
+} from "./server/cloudStorageBackup.ts";
 
 async function startServer() {
   const app = express();
@@ -92,6 +99,93 @@ async function startServer() {
       res.status(500).json({ error: error.message || "Failed to fetch users" });
     }
   });
+
+  // ==========================================
+  // Rotas da Cloud Function / Dumps Firebase Storage
+  // ==========================================
+
+  // 1. Listar dumps salvos no Firebase Storage
+  app.get("/api/backups/storage/list", async (req, res) => {
+    try {
+      const dumps = await listarDumpsStorage();
+      res.json({ sucesso: true, dumps });
+    } catch (error: any) {
+      console.error("Erro ao listar dumps do storage:", error);
+      res.status(500).json({ error: error.message || "Erro ao listar dumps do storage" });
+    }
+  });
+
+  // 2. Disparar dump imediato das coleções críticas para o Storage (mesma lógica da Cloud Function 03:00)
+  app.post("/api/backups/storage/trigger-dump", async (req, res) => {
+    try {
+      const tipo = req.body?.tipo === 'cloud_function_03h' ? 'cloud_function_03h' : 'manual_cloud_trigger';
+      const resultado = await executarDumpCriticoStorage(tipo);
+      res.json({
+        sucesso: true,
+        mensagem: "Dump das coleções críticas realizado com sucesso para o Firebase Storage!",
+        metadata: resultado.metadata
+      });
+    } catch (error: any) {
+      console.error("Erro ao executar dump crítico para storage:", error);
+      res.status(500).json({ error: error.message || "Falha ao processar dump para o Firebase Storage" });
+    }
+  });
+
+  // 3. Download manual direto do arquivo JSON de backup do Storage
+  app.get("/api/backups/storage/download/:filenameOrId", async (req, res) => {
+    try {
+      const { filenameOrId } = req.params;
+      const conteudo = obterConteudoArquivoDump(filenameOrId);
+
+      if (!conteudo) {
+        return res.status(404).json({ error: "Arquivo de backup não localizado no Storage." });
+      }
+
+      const nomeDownload = filenameOrId.endsWith('.json') ? filenameOrId : `${filenameOrId}.json`;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${nomeDownload}"`);
+      res.send(conteudo);
+    } catch (error: any) {
+      console.error("Erro no download de backup do storage:", error);
+      res.status(500).json({ error: error.message || "Erro ao baixar arquivo do storage" });
+    }
+  });
+
+  // 4. Obter prévia/conteúdo do arquivo JSON de backup
+  app.get("/api/backups/storage/content/:filenameOrId", async (req, res) => {
+    try {
+      const { filenameOrId } = req.params;
+      const conteudo = obterConteudoArquivoDump(filenameOrId);
+
+      if (!conteudo) {
+        return res.status(404).json({ error: "Arquivo de backup não localizado." });
+      }
+
+      const parsed = JSON.parse(conteudo);
+      res.json({ sucesso: true, dados: parsed });
+    } catch (error: any) {
+      console.error("Erro ao ler conteúdo do dump:", error);
+      res.status(500).json({ error: error.message || "Erro ao abrir conteúdo do backup" });
+    }
+  });
+
+  // 5. Salvar dump emitido pelo cliente no armazenamento local do servidor
+  app.post("/api/backups/storage/save-dump", async (req, res) => {
+    try {
+      const { metadata, payload } = req.body;
+      if (!metadata || !metadata.nomeArquivo) {
+        return res.status(400).json({ error: "Metadados do dump inválidos" });
+      }
+      const ok = salvarDumpLocal(metadata, payload);
+      res.json({ sucesso: ok });
+    } catch (error: any) {
+      console.error("Erro ao salvar dump local no servidor:", error);
+      res.status(500).json({ error: error.message || "Falha ao salvar dump no servidor" });
+    }
+  });
+
+  // Inicializa o agendador das 03:00 (America/Sao_Paulo)
+  iniciarAgendador03h();
 
   // Vite middleware for development vs static serve for production
   if (process.env.NODE_ENV !== "production") {

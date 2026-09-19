@@ -58,9 +58,6 @@ import { AssetsView } from './components/AssetsView';
 import { PermissionsManagementView } from './components/PermissionsManagementView';
 import { UserProfileView } from './components/UserProfileView';
 import { LoginView } from './components/LoginView';
-import { GeminiChatbotView } from './components/GeminiChatbotView';
-import { MapsGroundingView } from './components/MapsGroundingView';
-import { ImageStudioAIView } from './components/ImageStudioAIView';
 import { UrgentAlertPopupModal } from './components/UrgentAlertPopupModal';
 import { SwitchUserPasswordModal } from './components/SwitchUserPasswordModal';
 import { NewAppointmentModal } from './components/NewAppointmentModal';
@@ -77,6 +74,7 @@ import { CompleteProcedureModal } from './components/CompleteProcedureModal';
 import { CheckInPaymentAndReturnModal } from './components/CheckInPaymentAndReturnModal';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { DatabaseMasterView } from './components/DatabaseMasterView';
+import { BackupManagementView } from './components/BackupManagementView';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { TreatmentPackagesModal } from './components/TreatmentPackagesModal';
 import { ClinicSettingsModal } from './components/ClinicSettingsModal';
@@ -109,8 +107,11 @@ import {
   onFirebaseAuthStateChange,
   logoutFirebase,
   ensureSuperAdminInFirestore,
+  executarVerificacaoBackupAutomatico,
   SUPER_ADMIN_EMAILS,
-  COLLECTIONS 
+  COLLECTIONS,
+  auth,
+  type FirebaseUser
 } from './services/firebaseService';
 
 // Storage keys for session and navigation state
@@ -126,7 +127,7 @@ function getInitialTab(userRole?: string): TabType {
     const tabFromUrl = params.get('tab') as TabType;
     if (tabFromUrl) return tabFromUrl;
 
-    const tabFromStorage = sessionStorage.getItem(STORAGE_TAB_KEY) as TabType;
+    const tabFromStorage = (sessionStorage.getItem(STORAGE_TAB_KEY) || localStorage.getItem(STORAGE_TAB_KEY)) as TabType;
     if (tabFromStorage) return tabFromStorage;
   }
   return userRole === 'cliente' ? 'portal_paciente' : 'dashboard';
@@ -248,6 +249,7 @@ export default function App() {
   // Persistent Auth & Navigation State
   const [currentUser, setCurrentUser] = useState<UsuarioEquipe>(getInitialUser);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(getInitialAuthState);
+  const [firebaseAuthUser, setFirebaseAuthUser] = useState<FirebaseUser | null>(() => auth.currentUser);
   const [activeTab, setActiveTabState] = useState<TabType>(() => getInitialTab(getInitialUser().role));
 
   // Quadro de Avisos / Pop-up Alerts State
@@ -264,6 +266,7 @@ export default function App() {
     setActiveTabState(newTab);
     try {
       localStorage.setItem(STORAGE_TAB_KEY, newTab);
+      sessionStorage.setItem(STORAGE_TAB_KEY, newTab);
     } catch (e) {
       // quota or private mode fallback
     }
@@ -397,12 +400,8 @@ export default function App() {
     };
   }, []);
 
-  // Firebase Cloud Firestore Real-Time Synchronizations (onSnapshot)
+  // 1. Sincronização de Dados Públicos (Configurações da Clínica)
   useEffect(() => {
-    // Auto-heal super admin master credentials in Firestore
-    ensureSuperAdminInFirestore();
-
-    // Real-Time onSnapshot Collection Subscriptions
     const unsubClinica = subscribeToCollection<ClinicaConfig>(
       COLLECTIONS.CLINICA_CONFIG,
       (data) => {
@@ -413,6 +412,25 @@ export default function App() {
       },
       [MOCK_CLINICA_CONFIG]
     );
+
+    return () => {
+      unsubClinica();
+    };
+  }, []);
+
+  // 2. Sincronização de Coleções Protegidas (disparada exclusivamente após autenticação confirmada)
+  useEffect(() => {
+    // Evita disparos de onSnapshot com auth.currentUser === null para garantir segurança e eliminar erros de permissão
+    if (!firebaseAuthUser && !auth.currentUser) {
+      return;
+    }
+
+    if (!isAuthenticated) {
+      return;
+    }
+
+    // Auto-cura do perfil do Super Admin no Firestore agora que o usuário está autenticado
+    ensureSuperAdminInFirestore();
 
     const unsubPacientes = subscribeToCollection<Paciente>(
       COLLECTIONS.PACIENTES, 
@@ -600,7 +618,6 @@ export default function App() {
     );
 
     return () => {
-      unsubClinica();
       unsubPacientes();
       unsubFornecedores();
       unsubAgendamentos();
@@ -615,7 +632,7 @@ export default function App() {
       unsubAlertas();
       unsubConfigCampos();
     };
-  }, []);
+  }, [firebaseAuthUser, isAuthenticated]);
 
   // Monitor loading progress of essential collections
   useEffect(() => {
@@ -640,6 +657,15 @@ export default function App() {
     }, 2500);
     return () => clearTimeout(timer);
   }, []);
+
+  // Rotina de verificação e execução de backup automático em segundo plano
+  useEffect(() => {
+    if (!isInitialDataLoading && isAuthenticated && isUserAdminLocalOrTotal(currentUser)) {
+      executarVerificacaoBackupAutomatico(currentUser).catch(err => {
+        console.warn('[App] Aviso na verificação de backup automático:', err);
+      });
+    }
+  }, [isInitialDataLoading, isAuthenticated, currentUser]);
 
   // Listen to browser popstate (Back/Forward history buttons) and sync active tab & deep links
   useEffect(() => {
@@ -692,6 +718,7 @@ export default function App() {
   // Firebase Auth real-time session listener (only keeps active if session storage is authenticated)
   useEffect(() => {
     const unsubscribe = onFirebaseAuthStateChange((fbUser) => {
+      setFirebaseAuthUser(fbUser);
       const isSessionActive = typeof window !== 'undefined' && sessionStorage.getItem(STORAGE_AUTH_KEY) === 'true';
 
       if (fbUser && isSessionActive) {
@@ -1313,8 +1340,21 @@ export default function App() {
       return;
     }
     const patientName = pacientes.find(p => p.id === id)?.nome || 'Cliente';
+    
+    // Deletar também agendamentos e alertas vinculados ao paciente para manter a integridade referencial
+    const patientAgendamentos = agendamentos.filter(a => a.paciente_id === id);
+    patientAgendamentos.forEach(ag => {
+      removeDocument(COLLECTIONS.AGENDAMENTOS, ag.id);
+    });
+    
+    const patientAlertas = alertasRetorno.filter(al => al.paciente_id === id);
+    patientAlertas.forEach(al => {
+      removeDocument(COLLECTIONS.ALERTAS_RETORNO, al.id);
+    });
+
     setPacientes(prev => prev.filter(p => p.id !== id));
     setAgendamentos(prev => prev.filter(a => a.paciente_id !== id));
+    setAlertasRetorno(prev => prev.filter(al => al.paciente_id !== id));
     removeDocument(COLLECTIONS.PACIENTES, id);
 
     if (selectedPatientForDetails?.id === id) {
@@ -1558,6 +1598,11 @@ export default function App() {
       ...(newName ? { nome: newName } : {}),
     };
     setCurrentUser(updated);
+    try {
+      sessionStorage.setItem(STORAGE_USER_KEY, JSON.stringify(updated));
+    } catch (e) {
+      // quota or private mode fallback
+    }
     setUsuarios(prev => prev.map(u => (u.id === updated.id ? updated : u)));
     saveDocument(COLLECTIONS.USUARIOS, updated);
     showToast('Foto de perfil e dados atualizados com sucesso!');
@@ -1779,51 +1824,6 @@ export default function App() {
     setOrcamentos(prev => prev.filter(o => o.id !== id));
     removeDocument(COLLECTIONS.ORCAMENTOS, id);
     showToast('Orçamento excluído.');
-  };
-
-  // AI & Image Studio Gallery Handler
-  const handleSaveAIToPatientGallery = (pacienteId: string, imageUrl: string, caption: string) => {
-    const target = pacientes.find(p => p.id === pacienteId);
-    if (!target) return;
-
-    const novaFoto = {
-      id: `ai-foto-${Date.now()}`,
-      titulo: caption || 'Simulação Estética IA',
-      data: new Date().toISOString().split('T')[0],
-      foto_depois_url: imageUrl,
-      procedimento_nome: 'Simulação Estética Generativa',
-      legenda: caption,
-      criado_em: new Date().toISOString()
-    };
-
-    const updated: Paciente = {
-      ...target,
-      fotos_antes_depois: [novaFoto, ...(target.fotos_antes_depois || [])]
-    };
-
-    setPacientes(prev => prev.map(p => p.id === pacienteId ? updated : p));
-    saveDocument(COLLECTIONS.PACIENTES, updated);
-    showToast(`Imagem IA vinculada ao prontuário de ${target.nome}!`);
-  };
-
-  // Maps Grounding Add Supplier Handler
-  const handleAddSupplierFromMaps = (novo: Partial<Fornecedor>) => {
-    const created: Fornecedor = {
-      id: `forn-maps-${Date.now()}`,
-      nome_empresa: novo.nome_empresa || 'Fornecedor Localizado',
-      razao_social: novo.razao_social || novo.nome_empresa || 'Fornecedor Localizado',
-      telefone: novo.telefone || '(11) 99999-0000',
-      endereco: novo.endereco || '',
-      site: novo.site || '',
-      categoria: novo.categoria || 'insumos_injetaveis',
-      status: 'ativo',
-      observacoes: novo.observacoes || 'Fornecedor salvo a partir do Google Maps Grounding.',
-      criado_em: new Date().toISOString()
-    };
-
-    setFornecedores(prev => [created, ...prev]);
-    saveDocument(COLLECTIONS.FORNECEDORES, created);
-    showToast(`Fornecedor "${created.nome_empresa}" cadastrado com sucesso!`);
   };
 
   // Notice Board Handlers
@@ -2358,25 +2358,6 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'gemini_copilot' && (
-            <GeminiChatbotView currentUser={currentUser} />
-          )}
-
-          {activeTab === 'studio_ia_imagem' && (
-            <ImageStudioAIView
-              currentUser={currentUser}
-              pacientes={pacientes}
-              onSaveToPatientGallery={handleSaveAIToPatientGallery}
-            />
-          )}
-
-          {activeTab === 'maps_grounding' && (
-            <MapsGroundingView
-              currentUser={currentUser}
-              onAddFornecedor={handleAddSupplierFromMaps}
-            />
-          )}
-
           {activeTab === 'retorno_pos' && currentUser.role !== 'cliente' && (
             <PostCareReturnView
               alertas={alertasRetorno}
@@ -2430,6 +2411,22 @@ export default function App() {
                 onUpdatePaciente={(updatedP) => {
                   setPacientes(prev => prev.map(p => p.id === updatedP.id ? updatedP : p));
                 }}
+              />
+            </ErrorBoundary>
+          )}
+
+          {activeTab === 'backups' && (isUserAdminLocalOrTotal(currentUser)) && (
+            <ErrorBoundary fallbackTitle="Backups Automáticos & PITR">
+              <BackupManagementView
+                currentUser={currentUser}
+                clinicaConfig={clinicaConfig}
+                onRefreshData={() => {
+                  showToast('Dados sincronizados com o banco com sucesso!');
+                }}
+                pacientesCount={pacientes.length}
+                agendamentosCount={agendamentos.length}
+                financeiroCount={transacoes.length}
+                estoqueCount={estoque.length}
               />
             </ErrorBoundary>
           )}

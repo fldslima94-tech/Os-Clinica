@@ -691,14 +691,12 @@ export type TabType =
   | 'financeiro' 
   | 'retorno_pos' 
   | 'whatsapp'
-  | 'gemini_copilot' // Aura Copilot IA & Chatbot Clínico
-  | 'studio_ia_imagem' // Estética Studio IA - Criador & Simulador de Imagens
-  | 'maps_grounding' // Google Maps Grounding & Fornecedores Locais
   | 'portal_paciente'
   | 'quadro_avisos'
   | 'usuarios'
   | 'permissoes' // Módulo de Gestão de Permissões e Campos do admin_total
   | 'banco_dados' // Edição & Banco de Dados Master Total
+  | 'backups' // Backups Automáticos & Recuperação
   | 'perfil' // Meu Perfil / Minha Conta
   | 'configuracoes'
   | 'supabase_guide';
@@ -798,4 +796,87 @@ export type AtivoPatrimonial = BemPatrimonial;
 export type AvisoMural = AvisoQuadro;
 export type PlanoTratamento = PacoteTratamento;
 export type EvolucaoRetorno = FichaRetornoEvolucao;
+
+// Definições do Sistema de Backup
+export interface ConfiguracaoBackupAutomatico {
+  ativo: boolean;
+  frequencia: 'diario' | 'a_cada_12h' | 'semanal';
+  horaPreferencial?: string;
+  retencaoDias: number; // 7, 15, 30
+  salvarNoFirestore: boolean;
+  baixarArquivoJson: boolean;
+  ultimoBackupEm?: string;
+  ultimoBackupStatus?: 'sucesso' | 'erro';
+  ultimoBackupMensagem?: string;
+}
+
+export interface EstatisticasBackup {
+  pacientes: number;
+  agendamentos: number;
+  procedimentos: number;
+  estoque: number;
+  financeiro: number;
+  despesasRecorrentes: number;
+  fornecedores: number;
+  bens: number;
+  avisos: number;
+  usuarios: number;
+  modelosAnamnese: number;
+  alertasRetorno: number;
+}
+
+export interface SnapshotBackupSistema {
+  id: string;
+  dataCriacao: string;
+  tipo: 'automatico' | 'manual';
+  criadoPor: string;
+  criadoPorEmail?: string;
+  versaoApp: string;
+  totalRegistros: number;
+  estatisticas: EstatisticasBackup;
+  dados?: {
+    pacientes: Paciente[];
+    agendamentos: Agendamento[];
+    procedimentos: ProcedimentoClinico[];
+    estoque: EstoqueInsumo[];
+    financeiro: TransacaoFinanceira[];
+    despesasRecorrentes: DespesaRecorrente[];
+    fornecedores: Fornecedor[];
+    bens: BemPatrimonial[];
+    avisos: AvisoQuadro[];
+    usuarios: UsuarioEquipe[];
+    clinicaConfig: ClinicaConfig;
+    modelosAnamnese?: ModeloAnamnese[];
+    alertasRetorno?: AlertaRetornoPos[];
+  };
+  tamanhoKb?: number;
+  checksum?: string;
+}
+
+export interface FirebaseStorageDump {
+  id: string;
+  nomeArquivo: string;
+  caminhoStorage: string;
+  bucket: string;
+  dataCriacao: string;
+  tamanhoBytes: number;
+  tamanhoKb: number;
+  tipo: 'cloud_function_03h' | 'manual_cloud_trigger';
+  origem: string;
+  totalRegistros: number;
+  colecoesCriticas: {
+    pacientes: number;
+    agendamentos: number;
+    financeiro: number;
+    estoque?: number;
+    procedimentos?: number;
+  };
+  criadoPor: string;
+  status: 'concluido' | 'erro';
+  downloadUrl?: string;
+  dadosCompactadosAviso?: string;
+  agendamento?: string;
+}
+
+
 

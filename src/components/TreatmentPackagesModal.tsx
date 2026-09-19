@@ -89,10 +89,6 @@ export const TreatmentPackagesModal: React.FC<TreatmentPackagesModalProps> = ({
   const [customValorDesconto, setCustomValorDesconto] = useState<number>(0);
   const [observacoes, setObservacoes] = useState('');
 
-  if (!isOpen) return null;
-
-  const pacotes = paciente.pacotes || [];
-
   // Calculate Base Gross Value (Sem Desconto)
   const totalSessoesCalculado = useMemo(() => {
     if (packageType === 'simples') {
@@ -146,6 +142,10 @@ export const TreatmentPackagesModal: React.FC<TreatmentPackagesModalProps> = ({
       isAboveSystemLimit: aboveLimit,
     };
   }, [descontoTipo, regraDescontoSelecionada, customPercentual, customValorDesconto, valorOriginalSemDesconto, isAdmin]);
+
+  if (!isOpen || !paciente) return null;
+
+  const pacotes = paciente.pacotes || [];
 
   // Add Item to Custom Package
   const handleAddItemCustomizado = () => {

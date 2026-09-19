@@ -1,19 +1,179 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ==========================================
+    // Funções Auxiliares de Autenticação e RBAC
+    // ==========================================
     function isAuthenticated() {
       return request.auth != null;
     }
+
     function isSuperAdmin() {
       return isAuthenticated() && (
-        request.auth.token.email == 'fldslima94@gmail.com' ||
-        request.auth.token.email == 'fabio@teste.com'
+        request.auth.token.email in ['fldslima94@gmail.com', 'fabio@teste.com']
       );
     }
+
+    // ==========================================
+    // 1. CONFIGURAÇÕES DA CLÍNICA & PROCEDIMENTOS (Catálogo Público)
+    // ==========================================
+    match /clinica_config/{configId} {
+      allow read: if true; // Leitura pública dos dados e identidade da clínica
+      allow write: if isAuthenticated();
+    }
+
+    match /clinicas/{clinicaId}/config/{configId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /procedimentos/{procedimentoId} {
+      allow read: if true; // Leitura pública do catálogo de serviços para agendamento e portal
+      allow write: if isAuthenticated();
+    }
+
+    // ==========================================
+    // 2. ORÇAMENTOS & PRÉ-AVALIAÇÕES (Envio Público + Gestão Autenticada)
+    // ==========================================
+    match /solicitacoes_orcamento/{orcamentoId} {
+      allow create: if true; // Permite envio por pacientes/visitantes no portal
+      allow read, update, delete: if isAuthenticated();
+    }
+
+    match /orcamentos_solicitacoes/{orcamentoId} {
+      allow create: if true;
+      allow read, update, delete: if isAuthenticated();
+    }
+
+    // ==========================================
+    // 3. AGENDAMENTOS
+    // ==========================================
+    match /agendamentos/{agendamentoId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==========================================
+    // 4. PACIENTES & PRONTUÁRIOS
+    // ==========================================
+    match /pacientes/{pacienteId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /fichas_clientes/{fichaId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /fichas_retorno/{fichaId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==========================================
+    // 5. USUÁRIOS & PERFIS DA EQUIPE
+    // ==========================================
+    match /usuarios/{usuarioId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /perfis/{perfilId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==========================================
+    // 6. FINANCEIRO & FLUXO DE CAIXA
+    // ==========================================
+    match /transacoes/{transacaoId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /fluxo_caixa/{fluxoId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /despesas_recorrentes/{despesaId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==========================================
+    // 7. ESTOQUE & INSUMOS
+    // ==========================================
+    match /estoque/{insumoId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /estoque_insumos/{insumoId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==========================================
+    // 8. BENS & PATRIMÔNIO ATIVO
+    // ==========================================
+    match /bens/{bemId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /bens_ativos/{bemId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==========================================
+    // 9. FORNECEDORES & PARCEIROS
+    // ==========================================
+    match /fornecedores/{fornecedorId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==========================================
+    // 10. AVISOS & COMUNICAÇÃO INTERNA
+    // ==========================================
+    match /avisos/{avisoId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /comunicados_internos/{avisoId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /alertas_retorno/{alertaId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==========================================
+    // 11. MODELOS DE ANAMNESE & CONTRATOS
+    // ==========================================
+    match /modelos_anamnese/{modeloId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /modelos_contratos/{modeloId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==========================================
+    // 12. CONFIGURAÇÕES DE CAMPOS & SISTEMA
+    // ==========================================
+    match /configuracoes_campos/{configId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /configuracoes_sistema/{configId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==========================================
+    // 13. BACKUPS DO SISTEMA
+    // ==========================================
+    match /backups_sistema/{backupId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Bloqueio por padrão para qualquer outro caminho não declarado
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }
+
+
 
 

@@ -36,8 +36,10 @@ import {
   sendPasswordResetEmail,
   signInAnonymously
 } from 'firebase/auth';
-import { db, auth, googleProvider } from '../lib/firebase';
-export { db, auth, googleProvider };
+import { db, auth, googleProvider, storage } from '../lib/firebase';
+export { db, auth, googleProvider, storage };
+export type { FirebaseUser };
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import {
   Paciente,
   Agendamento,
@@ -60,7 +62,11 @@ import {
   PermissoesCustomizadas,
   PerfilUsuario,
   ConfiguracaoCampos,
-  Fornecedor
+  Fornecedor,
+  ConfiguracaoBackupAutomatico,
+  SnapshotBackupSistema,
+  EstatisticasBackup,
+  FirebaseStorageDump
 } from '../types';
 
 // Collection Names & Canonical Firestore Paths
@@ -92,6 +98,7 @@ export const COLLECTIONS = {
   AVISOS: 'avisos',
   COMUNICADOS_INTERNOS: 'comunicados_internos',
   ALERTAS_RETORNO: 'alertas_retorno',
+  BACKUPS: 'backups_sistema',
 } as const;
 
 export enum OperationType {
@@ -125,6 +132,11 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   // Graceful handling for temporary offline / connecting network states
   if (errMsg.includes('unavailable') || errMsg.includes('offline') || errMsg.includes('Connection failed')) {
     console.info(`[Firestore Offline] Sincronização em segundo plano/modo local ativo para ${operationType} em ${path || 'coleção'}.`);
+    return;
+  }
+  // Graceful handling for permission errors to prevent breaking the UI
+  if (errMsg.includes('permission-denied') || errMsg.includes('Missing or insufficient permissions') || errMsg.includes('insufficient permissions')) {
+    console.warn(`[Firestore Permissão] Acesso restrito ou pendente de autenticação para ${operationType} em ${path || 'coleção'}. Operação tratada com segurança.`);
     return;
   }
   const errInfo: FirestoreErrorInfo = {
@@ -824,6 +836,14 @@ export function subscribeToCollection<T extends { id?: string }>(
   fallbackData: T[] = [],
   clinicaId?: string
 ): () => void {
+  const isPublicCollection = collectionName === COLLECTIONS.CLINICA_CONFIG || collectionName === COLLECTIONS.PROCEDIMENTOS;
+
+  // Garante que listeners de coleções privadas só sejam disparados se o usuário estiver autenticado no Firebase Auth
+  if (!isPublicCollection && !auth.currentUser) {
+    onData(fallbackData || []);
+    return () => {};
+  }
+
   try {
     const colRef = collection(db, collectionName);
     const q = clinicaId ? query(colRef, where('clinicaId', '==', clinicaId)) : colRef;
@@ -836,27 +856,32 @@ export function subscribeToCollection<T extends { id?: string }>(
         // Salva silenciosamente no cache local IndexedDB para carregamento instantâneo nas próximas sessões
         saveLocalCollection(collectionName, items).catch(() => {});
       },
-      (error) => {
-        console.error(`[Firestore Subscription Error] Erro ao sincronizar coleção "${collectionName}":`, error);
-        handleFirestoreError(error, OperationType.GET, collectionName);
-        if (fallbackData && fallbackData.length > 0) {
-          onData(fallbackData);
+      (error: any) => {
+        const isPermError = error?.code === 'permission-denied' || (error?.message && error.message.includes('permission'));
+        if (isPermError) {
+          console.warn(`[Firestore Permissão] Acesso restrito na coleção "${collectionName}". Mantendo cache local.`);
+        } else {
+          console.error(`[Firestore Subscription Error] Erro ao sincronizar coleção "${collectionName}":`, error);
         }
+        handleFirestoreError(error, OperationType.GET, collectionName);
+        onData(fallbackData || []);
       }
     );
     return unsubscribe;
   } catch (error) {
     console.error(`[Firestore Subscription Init Error] Erro ao inicializar listener em "${collectionName}":`, error);
     handleFirestoreError(error, OperationType.GET, collectionName);
-    if (fallbackData && fallbackData.length > 0) {
-      onData(fallbackData);
-    }
+    onData(fallbackData || []);
     return () => {};
   }
 }
 
 // Fetch documents filtered by clinicaId
 export async function getClinicaDocs<T>(collectionName: string, clinicaId?: string): Promise<T[]> {
+  const isPublicCollection = collectionName === COLLECTIONS.CLINICA_CONFIG || collectionName === COLLECTIONS.PROCEDIMENTOS;
+  if (!isPublicCollection && !auth.currentUser) {
+    return [];
+  }
   try {
     const colRef = collection(db, collectionName);
     const q = clinicaId ? query(colRef, where('clinicaId', '==', clinicaId)) : colRef;
@@ -959,7 +984,7 @@ export function onFirebaseAuthStateChange(callback: (user: FirebaseUser | null) 
  */
 export async function fetchUserFromFirestoreByEmail(email: string): Promise<UsuarioEquipe | null> {
   const cleanEmail = email.trim().toLowerCase();
-  if (!cleanEmail) return null;
+  if (!cleanEmail || !auth.currentUser) return null;
 
   try {
     // 1. Busca direta na coleção principal de usuários
@@ -991,6 +1016,9 @@ export async function fetchUserFromFirestoreByEmail(email: string): Promise<Usua
  * Carrega todos os usuários salvos no Firestore de forma direta e síncrona
  */
 export async function fetchAllUsersFromFirestore(): Promise<UsuarioEquipe[]> {
+  if (!auth.currentUser) {
+    return [];
+  }
   try {
     const snap = await getDocs(collection(db, COLLECTIONS.USUARIOS));
     if (!snap.empty) {
@@ -1232,6 +1260,9 @@ export function canAccessFinancials(user?: UsuarioEquipe | null): boolean {
  * Auto-cura e garantia de existência do Super Admin no Firestore
  */
 export async function ensureSuperAdminInFirestore(): Promise<void> {
+  if (!auth.currentUser) {
+    return;
+  }
   try {
     const superAdminData: UsuarioEquipe = {
       id: 'user-super-admin',
@@ -1801,4 +1832,706 @@ export async function deletePatientClinicalHistoryItem(
     return null;
   }
 }
+
+// =========================================================================
+// SISTEMA DE BACKUPS AUTOMÁTICOS & RECUPERAÇÃO DE DADOS (FIRESTORE & LOCAL)
+// =========================================================================
+
+export const DEFAULT_BACKUP_CONFIG: ConfiguracaoBackupAutomatico = {
+  ativo: true,
+  frequencia: 'diario',
+  horaPreferencial: '03:00',
+  retencaoDias: 15,
+  salvarNoFirestore: true,
+  baixarArquivoJson: false,
+};
+
+const BACKUP_CONFIG_DOC_ID = 'backup_rotina_config';
+const LOCAL_STORAGE_BACKUP_CONFIG_KEY = 'aura_backup_rotina_config';
+const LOCAL_STORAGE_BACKUPS_KEY = 'aura_backups_snapshots';
+
+/**
+ * Obtém as configurações de rotina de backup
+ */
+export async function getConfiguracaoBackup(): Promise<ConfiguracaoBackupAutomatico> {
+  try {
+    const docRef = doc(db, COLLECTIONS.CONFIGURACOES_SISTEMA, BACKUP_CONFIG_DOC_ID);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return { ...DEFAULT_BACKUP_CONFIG, ...(docSnap.data() as ConfiguracaoBackupAutomatico) };
+    }
+  } catch (err) {
+    console.warn('[getConfiguracaoBackup] Tentando recuperar de localStorage:', err);
+  }
+
+  // Fallback localStorage
+  try {
+    const local = localStorage.getItem(LOCAL_STORAGE_BACKUP_CONFIG_KEY);
+    if (local) {
+      return { ...DEFAULT_BACKUP_CONFIG, ...JSON.parse(local) };
+    }
+  } catch (err) {
+    console.warn('[getConfiguracaoBackup] Erro ao ler do localStorage:', err);
+  }
+
+  return DEFAULT_BACKUP_CONFIG;
+}
+
+/**
+ * Salva as configurações de rotina de backup no Firestore e localmente
+ */
+export async function salvarConfiguracaoBackup(config: ConfiguracaoBackupAutomatico): Promise<void> {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_BACKUP_CONFIG_KEY, JSON.stringify(config));
+  } catch (e) {
+    console.warn('[salvarConfiguracaoBackup] Falha ao persistir local:', e);
+  }
+
+  try {
+    const docRef = doc(db, COLLECTIONS.CONFIGURACOES_SISTEMA, BACKUP_CONFIG_DOC_ID);
+    await setDoc(docRef, sanitizeForFirestore({ ...config, atualizadoEm: new Date().toISOString() }), { merge: true });
+  } catch (err) {
+    console.warn('[salvarConfiguracaoBackup] Falha ao salvar no Firestore:', err);
+  }
+}
+
+/**
+ * Baixa um snapshot de backup como arquivo JSON no navegador
+ */
+export function baixarBackupComoArquivoJson(snapshot: SnapshotBackupSistema): void {
+  try {
+    const dataStr = JSON.stringify(snapshot, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safeDate = snapshot.dataCriacao.substring(0, 16).replace(/[:T]/g, '-');
+    a.href = url;
+    a.download = `backup-aura-estetica-${safeDate}-${snapshot.tipo}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('[baixarBackupComoArquivoJson] Erro ao disparar download:', err);
+  }
+}
+
+/**
+ * Cria um snapshot completo de todas as coleções clínicas e financeiras
+ */
+export async function criarBackupCompleto(
+  origem: 'automatico' | 'manual' = 'manual',
+  usuario?: UsuarioEquipe | null,
+  baixarArquivo = false
+): Promise<SnapshotBackupSistema> {
+  const agoraIso = new Date().toISOString();
+  const backupId = `backup-${Date.now()}`;
+
+  // Coleta todas as coleções
+  const [
+    snapPacientes,
+    snapAgendamentos,
+    snapProcedimentos,
+    snapEstoque,
+    snapFinanceiro,
+    snapDespesas,
+    snapFornecedores,
+    snapBens,
+    snapAvisos,
+    snapUsuarios,
+    snapModelosAnamnese,
+    snapAlertasRetorno,
+    snapClinicaConfig,
+  ] = await Promise.all([
+    getDocs(collection(db, COLLECTIONS.PACIENTES)).catch(() => ({ docs: [] })),
+    getDocs(collection(db, COLLECTIONS.AGENDAMENTOS)).catch(() => ({ docs: [] })),
+    getDocs(collection(db, COLLECTIONS.PROCEDIMENTOS)).catch(() => ({ docs: [] })),
+    getDocs(collection(db, COLLECTIONS.ESTOQUE)).catch(() => ({ docs: [] })),
+    getDocs(collection(db, COLLECTIONS.TRANSACOES)).catch(() => ({ docs: [] })),
+    getDocs(collection(db, COLLECTIONS.DESPESAS_RECORRENTES)).catch(() => ({ docs: [] })),
+    getDocs(collection(db, COLLECTIONS.FORNECEDORES)).catch(() => ({ docs: [] })),
+    getDocs(collection(db, COLLECTIONS.BENS)).catch(() => ({ docs: [] })),
+    getDocs(collection(db, COLLECTIONS.AVISOS)).catch(() => ({ docs: [] })),
+    getDocs(collection(db, COLLECTIONS.USUARIOS)).catch(() => ({ docs: [] })),
+    getDocs(collection(db, COLLECTIONS.MODELOS_ANAMNESE)).catch(() => ({ docs: [] })),
+    getDocs(collection(db, COLLECTIONS.ALERTAS_RETORNO)).catch(() => ({ docs: [] })),
+    getDoc(doc(db, COLLECTIONS.CLINICA_CONFIG, 'config_principal')).catch(() => null),
+  ]);
+
+  const pacientes = (snapPacientes.docs || []).map(d => ({ id: d.id, ...d.data() })) as Paciente[];
+  const agendamentos = (snapAgendamentos.docs || []).map(d => ({ id: d.id, ...d.data() })) as Agendamento[];
+  const procedimentos = (snapProcedimentos.docs || []).map(d => ({ id: d.id, ...d.data() })) as ProcedimentoClinico[];
+  const estoque = (snapEstoque.docs || []).map(d => ({ id: d.id, ...d.data() })) as EstoqueInsumo[];
+  const financeiro = (snapFinanceiro.docs || []).map(d => ({ id: d.id, ...d.data() })) as TransacaoFinanceira[];
+  const despesasRecorrentes = (snapDespesas.docs || []).map(d => ({ id: d.id, ...d.data() })) as DespesaRecorrente[];
+  const fornecedores = (snapFornecedores.docs || []).map(d => ({ id: d.id, ...d.data() })) as Fornecedor[];
+  const bens = (snapBens.docs || []).map(d => ({ id: d.id, ...d.data() })) as BemAtivo[];
+  const avisos = (snapAvisos.docs || []).map(d => ({ id: d.id, ...d.data() })) as AvisoQuadro[];
+  const usuarios = (snapUsuarios.docs || []).map(d => ({ id: d.id, ...d.data() })) as UsuarioEquipe[];
+  const modelosAnamnese = (snapModelosAnamnese.docs || []).map(d => ({ id: d.id, ...d.data() })) as ModeloAnamnese[];
+  const alertasRetorno = (snapAlertasRetorno.docs || []).map(d => ({ id: d.id, ...d.data() })) as AlertaRetornoPos[];
+  const clinicaConfig = snapClinicaConfig?.exists()
+    ? ({ id: snapClinicaConfig.id, ...snapClinicaConfig.data() } as ClinicaConfig)
+    : ({} as ClinicaConfig);
+
+  const estatisticas: EstatisticasBackup = {
+    pacientes: pacientes.length,
+    agendamentos: agendamentos.length,
+    procedimentos: procedimentos.length,
+    estoque: estoque.length,
+    financeiro: financeiro.length,
+    despesasRecorrentes: despesasRecorrentes.length,
+    fornecedores: fornecedores.length,
+    bens: bens.length,
+    avisos: avisos.length,
+    usuarios: usuarios.length,
+    modelosAnamnese: modelosAnamnese.length,
+    alertasRetorno: alertasRetorno.length,
+  };
+
+  const totalRegistros = Object.values(estatisticas).reduce((acc, n) => acc + n, 0);
+
+  const dadosCompletos = {
+    pacientes,
+    agendamentos,
+    procedimentos,
+    estoque,
+    financeiro,
+    despesasRecorrentes,
+    fornecedores,
+    bens,
+    avisos,
+    usuarios,
+    clinicaConfig,
+    modelosAnamnese,
+    alertasRetorno,
+  };
+
+  const jsonStr = JSON.stringify(dadosCompletos);
+  const tamanhoKb = Math.round(new Blob([jsonStr]).size / 1024);
+
+  const snapshot: SnapshotBackupSistema = {
+    id: backupId,
+    dataCriacao: agoraIso,
+    tipo: origem,
+    criadoPor: usuario?.nomeCompleto || usuario?.nome || (origem === 'automatico' ? 'Rotina Automática' : 'Administrador'),
+    criadoPorEmail: usuario?.email || 'sistema@auraestetica.com',
+    versaoApp: '2.5.0',
+    totalRegistros,
+    estatisticas,
+    dados: dadosCompletos,
+    tamanhoKb,
+  };
+
+  // Salvar no Firestore se couber dentro dos limites (limite doc ~1MB)
+  // Caso o json seja maior que 850KB, salvamos os metadados com dados essenciais no Firestore
+  // e o backup completo no cache local e download
+  try {
+    const backupDocRef = doc(db, COLLECTIONS.BACKUPS, backupId);
+    let firestorePayload: any = snapshot;
+    if (tamanhoKb > 850) {
+      firestorePayload = {
+        ...snapshot,
+        dadosCompactadosAviso: 'Dados ultrapassam 850KB. Faça download local completo para arquivo JSON.',
+        dados: {
+          clinicaConfig,
+          usuarios,
+          estatisticas,
+        },
+      };
+    }
+    await setDoc(backupDocRef, sanitizeForFirestore(firestorePayload));
+
+    // Limpeza de retenção de backups no Firestore
+    const configAtual = await getConfiguracaoBackup();
+    const retencao = configAtual.retencaoDias || 15;
+    const snapBackups = await getDocs(collection(db, COLLECTIONS.BACKUPS));
+    if (snapBackups.docs.length > retencao) {
+      const docsSorted = snapBackups.docs
+        .map(d => ({ id: d.id, ...d.data() } as SnapshotBackupSistema))
+        .sort((a, b) => new Date(a.dataCriacao).getTime() - new Date(b.dataCriacao).getTime());
+
+      const excessCount = docsSorted.length - retencao;
+      for (let i = 0; i < excessCount; i++) {
+        await deleteDoc(doc(db, COLLECTIONS.BACKUPS, docsSorted[i].id)).catch(() => {});
+      }
+    }
+  } catch (err) {
+    console.warn('[criarBackupCompleto] Aviso ao salvar snapshot no Firestore:', err);
+  }
+
+  // Atualizar histórico em localStorage
+  try {
+    const rawLocal = localStorage.getItem(LOCAL_STORAGE_BACKUPS_KEY);
+    const list: SnapshotBackupSistema[] = rawLocal ? JSON.parse(rawLocal) : [];
+    // Guardar versão enxuta no localStorage para não estourar os 5MB do storage
+    const snapshotEnxuto: SnapshotBackupSistema = {
+      ...snapshot,
+      dados: undefined, // não guarda todo o payload pesado no localStorage
+    };
+    list.unshift(snapshotEnxuto);
+    localStorage.setItem(LOCAL_STORAGE_BACKUPS_KEY, JSON.stringify(list.slice(0, 30)));
+  } catch (err) {
+    console.warn('[criarBackupCompleto] Falha ao atualizar localStorage:', err);
+  }
+
+  // Atualizar status na configuração
+  await salvarConfiguracaoBackup({
+    ...(await getConfiguracaoBackup()),
+    ultimoBackupEm: agoraIso,
+    ultimoBackupStatus: 'sucesso',
+    ultimoBackupMensagem: `Backup de ${totalRegistros} registros (${tamanhoKb} KB) concluído com sucesso.`,
+  });
+
+  if (baixarArquivo) {
+    baixarBackupComoArquivoJson(snapshot);
+  }
+
+  return snapshot;
+}
+
+/**
+ * Lista todos os snapshots de backup salvos no Firestore
+ */
+export async function listarBackups(): Promise<SnapshotBackupSistema[]> {
+  try {
+    const snap = await getDocs(collection(db, COLLECTIONS.BACKUPS));
+    if (!snap.empty) {
+      const backups = snap.docs.map(d => ({ id: d.id, ...d.data() } as SnapshotBackupSistema));
+      return backups.sort((a, b) => new Date(b.dataCriacao).getTime() - new Date(a.dataCriacao).getTime());
+    }
+  } catch (err) {
+    console.warn('[listarBackups] Falha ao ler Firestore, buscando localmente:', err);
+  }
+
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_BACKUPS_KEY);
+    if (raw) {
+      return JSON.parse(raw);
+    }
+  } catch (e) {}
+
+  return [];
+}
+
+/**
+ * Exclui um snapshot de backup
+ */
+export async function excluirBackup(backupId: string): Promise<void> {
+  try {
+    await deleteDoc(doc(db, COLLECTIONS.BACKUPS, backupId));
+  } catch (err) {
+    console.warn('[excluirBackup] Falha ao excluir do Firestore:', err);
+  }
+
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_BACKUPS_KEY);
+    if (raw) {
+      const list: SnapshotBackupSistema[] = JSON.parse(raw);
+      localStorage.setItem(LOCAL_STORAGE_BACKUPS_KEY, JSON.stringify(list.filter(b => b.id !== backupId)));
+    }
+  } catch (e) {}
+}
+
+/**
+ * Restaura o banco de dados a partir de um snapshot de backup
+ */
+export async function restaurarBackup(
+  snapshot: SnapshotBackupSistema,
+  modo: 'substituir' | 'mesclar' = 'substituir'
+): Promise<{ success: boolean; message: string; detalhes: any }> {
+  if (!snapshot || !snapshot.dados) {
+    throw new Error('Snapshot inválido ou sem pacote de dados.');
+  }
+
+  const { dados } = snapshot;
+
+  // 1. Cria um backup automático de segurança antes de restaurar
+  try {
+    await criarBackupCompleto('automatico', null, false);
+  } catch (err) {
+    console.warn('[restaurarBackup] Aviso ao criar backup de segurança pré-restauração:', err);
+  }
+
+  // 2. Se for modo 'substituir', limpa as coleções antes de regravar
+  if (modo === 'substituir') {
+    await wipeDatabaseAndResetToProduction();
+  }
+
+  // 3. Função auxiliar para salvar itens em batches de até 200 docs
+  const restaurarColecao = async (nomeColecao: string, itens: any[] = []) => {
+    if (!itens || itens.length === 0) return 0;
+    const CHUNK_SIZE = 200;
+    let totalGravados = 0;
+
+    for (let i = 0; i < itens.length; i += CHUNK_SIZE) {
+      const chunk = itens.slice(i, i + CHUNK_SIZE);
+      const batch = writeBatch(db);
+
+      chunk.forEach(item => {
+        const itemId = item.id || `restored-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const docRef = doc(db, nomeColecao, itemId);
+        batch.set(docRef, sanitizeForFirestore({ ...item, id: itemId }), { merge: true });
+        totalGravados++;
+      });
+
+      await batch.commit();
+    }
+    return totalGravados;
+  };
+
+  const resultados = {
+    pacientes: await restaurarColecao(COLLECTIONS.PACIENTES, dados.pacientes),
+    agendamentos: await restaurarColecao(COLLECTIONS.AGENDAMENTOS, dados.agendamentos),
+    procedimentos: await restaurarColecao(COLLECTIONS.PROCEDIMENTOS, dados.procedimentos),
+    estoque: await restaurarColecao(COLLECTIONS.ESTOQUE, dados.estoque),
+    financeiro: await restaurarColecao(COLLECTIONS.TRANSACOES, dados.financeiro),
+    despesasRecorrentes: await restaurarColecao(COLLECTIONS.DESPESAS_RECORRENTES, dados.despesasRecorrentes),
+    fornecedores: await restaurarColecao(COLLECTIONS.FORNECEDORES, dados.fornecedores),
+    bens: await restaurarColecao(COLLECTIONS.BENS, dados.bens),
+    avisos: await restaurarColecao(COLLECTIONS.AVISOS, dados.avisos),
+    modelosAnamnese: await restaurarColecao(COLLECTIONS.MODELOS_ANAMNESE, dados.modelosAnamnese),
+    alertasRetorno: await restaurarColecao(COLLECTIONS.ALERTAS_RETORNO, dados.alertasRetorno),
+  };
+
+  // Restaura config da clínica se presente
+  if (dados.clinicaConfig && Object.keys(dados.clinicaConfig).length > 0) {
+    try {
+      const configRef = doc(db, COLLECTIONS.CLINICA_CONFIG, 'config_principal');
+      await setDoc(configRef, sanitizeForFirestore(dados.clinicaConfig), { merge: true });
+    } catch (e) {}
+  }
+
+  const totalRestaurados = Object.values(resultados).reduce((a, b) => a + b, 0);
+
+  return {
+    success: true,
+    message: `Restauração concluída com sucesso! Total de ${totalRestaurados} registros recuperados.`,
+    detalhes: resultados,
+  };
+}
+
+/**
+ * Verifica se o intervalo da rotina automática expirou e aciona o backup em segundo plano
+ */
+export async function executarVerificacaoBackupAutomatico(usuario?: UsuarioEquipe | null): Promise<boolean> {
+  try {
+    const config = await getConfiguracaoBackup();
+    if (!config.ativo) return false;
+
+    const agora = Date.now();
+    const ultimoTimestamp = config.ultimoBackupEm ? new Date(config.ultimoBackupEm).getTime() : 0;
+    const diferencaMs = agora - ultimoTimestamp;
+
+    let intervaloMs = 24 * 60 * 60 * 1000; // diário por padrão
+    if (config.frequencia === 'a_cada_12h') {
+      intervaloMs = 12 * 60 * 60 * 1000;
+    } else if (config.frequencia === 'semanal') {
+      intervaloMs = 7 * 24 * 60 * 60 * 1000;
+    }
+
+    if (diferencaMs >= intervaloMs) {
+      console.log('[Backup Automático] Intervalo atingido. Executando rotina automática de backup...');
+      await criarBackupCompleto('automatico', usuario, config.baixarArquivoJson);
+      return true;
+    }
+  } catch (err) {
+    console.warn('[executarVerificacaoBackupAutomatico] Erro na verificação:', err);
+  }
+  return false;
+}
+
+// =========================================================================
+// MÓDULO DE DUMPS AUTOMÁTICOS CLOUD FUNCTION / FIREBASE STORAGE (03:00)
+// =========================================================================
+
+export const LOCAL_STORAGE_STORAGE_DUMPS_KEY = 'aura_estetica_storage_dumps_v1';
+
+/**
+ * Dispara o dump das coleções críticas (pacientes, agendamentos, financeiro)
+ * para o Firebase Storage, usando o endpoint da Cloud Function / servidor
+ */
+export async function dispararDumpCriticoStorage(
+  tipo: 'cloud_function_03h' | 'manual_cloud_trigger' = 'manual_cloud_trigger',
+  usuario?: UsuarioEquipe | null
+): Promise<{ sucesso: boolean; metadata: FirebaseStorageDump }> {
+  try {
+    // 1. Tenta acionar via backend API
+    const resp = await fetch('/api/backups/storage/trigger-dump', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tipo })
+    });
+
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data && data.metadata) {
+        // Atualiza cache local
+        salvarDumpEmCacheLocal(data.metadata);
+        return { sucesso: true, metadata: data.metadata };
+      }
+    }
+  } catch (apiErr) {
+    console.warn('[dispararDumpCriticoStorage] API offline ou inacessível, realizando dump direto pelo cliente:', apiErr);
+  }
+
+  // 2. Fallback resiliente: extração direta via cliente Firebase SDK
+  const agora = new Date();
+  const agoraIso = agora.toISOString();
+  const timestampFormatado = agoraIso.replace(/[:.]/g, '-');
+  const backupId = `dump-storage-${timestampFormatado}`;
+  const nomeArquivo = `dump_critico_${timestampFormatado}.json`;
+  const caminhoStorage = `backups/daily/${nomeArquivo}`;
+
+  // Coleta dados das coleções críticas
+  const [snapPacientes, snapAgendamentos, snapFinanceiro, snapEstoque, snapProcedimentos] = await Promise.all([
+    getDocs(collection(db, COLLECTIONS.PACIENTES)).catch(() => ({ docs: [] })),
+    getDocs(collection(db, COLLECTIONS.AGENDAMENTOS)).catch(() => ({ docs: [] })),
+    getDocs(collection(db, COLLECTIONS.TRANSACOES)).catch(() => ({ docs: [] })),
+    getDocs(collection(db, COLLECTIONS.ESTOQUE)).catch(() => ({ docs: [] })),
+    getDocs(collection(db, COLLECTIONS.PROCEDIMENTOS)).catch(() => ({ docs: [] })),
+  ]);
+
+  const pacientes = (snapPacientes.docs || []).map(d => ({ id: d.id, ...d.data() }));
+  const agendamentos = (snapAgendamentos.docs || []).map(d => ({ id: d.id, ...d.data() }));
+  const financeiro = (snapFinanceiro.docs || []).map(d => ({ id: d.id, ...d.data() }));
+  const estoque = (snapEstoque.docs || []).map(d => ({ id: d.id, ...d.data() }));
+  const procedimentos = (snapProcedimentos.docs || []).map(d => ({ id: d.id, ...d.data() }));
+
+  const colecoesCriticas = {
+    pacientes: pacientes.length,
+    agendamentos: agendamentos.length,
+    financeiro: financeiro.length,
+    estoque: estoque.length,
+    procedimentos: procedimentos.length
+  };
+
+  const totalRegistros = pacientes.length + agendamentos.length + financeiro.length + estoque.length + procedimentos.length;
+
+  const payloadCompleto = {
+    cabecalho: {
+      id: backupId,
+      tipo,
+      versao: '2.5.0',
+      dataCriacao: agoraIso,
+      agendamento: 'Diariamente às 03:00 (America/Sao_Paulo)',
+      origem: tipo === 'cloud_function_03h' ? 'Cloud Function (03:00 BRT)' : 'Disparo Manual do Administrador',
+      caminhoStorage,
+      totalRegistros,
+      colecoesCriticas
+    },
+    dados: {
+      pacientes,
+      agendamentos,
+      financeiro,
+      estoque,
+      procedimentos
+    }
+  };
+
+  const jsonStr = JSON.stringify(payloadCompleto, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const tamanhoBytes = blob.size;
+  const tamanhoKb = Math.round(tamanhoBytes / 1024);
+
+  // Tenta salvar no Firebase Storage do cliente
+  let downloadUrl: string | undefined = undefined;
+  try {
+    const storageRef = ref(storage, caminhoStorage);
+    await uploadString(storageRef, jsonStr, 'raw', { contentType: 'application/json' });
+    downloadUrl = await getDownloadURL(storageRef).catch(() => undefined);
+    console.info(`[dispararDumpCriticoStorage] Dump salvo no Storage com sucesso: ${caminhoStorage}`);
+  } catch (storageErr) {
+    console.warn(`[dispararDumpCriticoStorage] Aviso no upload direto cliente Firebase Storage:`, storageErr);
+  }
+
+  const metadata: FirebaseStorageDump = {
+    id: backupId,
+    nomeArquivo,
+    caminhoStorage,
+    bucket: (storage.app.options.storageBucket as string) || 'focused-sonar-rlk09.firebasestorage.app',
+    dataCriacao: agoraIso,
+    tamanhoBytes,
+    tamanhoKb,
+    tipo,
+    origem: tipo === 'cloud_function_03h' ? 'Cloud Function 03:00' : 'Manual via Interface',
+    totalRegistros,
+    colecoesCriticas,
+    criadoPor: usuario?.nomeCompleto || usuario?.nome || 'Administrador',
+    status: 'concluido',
+    downloadUrl
+  };
+
+  // Salva no Firestore
+  try {
+    const docRef = doc(db, COLLECTIONS.BACKUPS, backupId);
+    await setDoc(docRef, sanitizeForFirestore({
+      ...metadata,
+      tipoRegistro: 'dump_storage_critico',
+      dadosCompactadosAviso: 'Arquivo gerado para Firebase Storage. Disponível para download manual em JSON.'
+    }), { merge: true });
+  } catch (err) {}
+
+  // Envia para o servidor local salvar em cache de disco para download instantâneo
+  try {
+    await fetch('/api/backups/storage/save-dump', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ metadata, payload: payloadCompleto })
+    });
+  } catch (e) {}
+
+  salvarDumpEmCacheLocal(metadata);
+
+  return { sucesso: true, metadata };
+}
+
+function salvarDumpEmCacheLocal(dump: FirebaseStorageDump) {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_STORAGE_DUMPS_KEY);
+    const lista: FirebaseStorageDump[] = raw ? JSON.parse(raw) : [];
+    const index = lista.findIndex(d => d.id === dump.id || d.nomeArquivo === dump.nomeArquivo);
+    if (index >= 0) {
+      lista[index] = dump;
+    } else {
+      lista.unshift(dump);
+    }
+    localStorage.setItem(LOCAL_STORAGE_STORAGE_DUMPS_KEY, JSON.stringify(lista.slice(0, 30)));
+  } catch (e) {}
+}
+
+/**
+ * Lista todos os dumps do Firebase Storage disponíveis para download
+ */
+export async function listarDumpsFirebaseStorage(): Promise<FirebaseStorageDump[]> {
+  const dumpsMap = new Map<string, FirebaseStorageDump>();
+
+  // 1. Tenta API do servidor
+  try {
+    const resp = await fetch('/api/backups/storage/list');
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data && Array.isArray(data.dumps)) {
+        data.dumps.forEach((d: FirebaseStorageDump) => {
+          dumpsMap.set(d.nomeArquivo, d);
+        });
+      }
+    }
+  } catch (e) {}
+
+  // 2. Consulta Firestore
+  try {
+    const snap = await getDocs(query(collection(db, COLLECTIONS.BACKUPS), where('tipoRegistro', '==', 'dump_storage_critico')));
+    if (!snap.empty) {
+      snap.forEach(docSnap => {
+        const item = docSnap.data() as FirebaseStorageDump;
+        if (item.nomeArquivo) {
+          dumpsMap.set(item.nomeArquivo, item);
+        }
+      });
+    }
+  } catch (e) {}
+
+  // 3. Cache Local
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_STORAGE_DUMPS_KEY);
+    if (raw) {
+      const locais: FirebaseStorageDump[] = JSON.parse(raw);
+      locais.forEach(item => {
+        if (!dumpsMap.has(item.nomeArquivo)) {
+          dumpsMap.set(item.nomeArquivo, item);
+        }
+      });
+    }
+  } catch (e) {}
+
+  const resultado = Array.from(dumpsMap.values());
+  return resultado.sort((a, b) => new Date(b.dataCriacao).getTime() - new Date(a.dataCriacao).getTime());
+}
+
+/**
+ * Realiza o download manual do arquivo JSON de backup do Storage para o computador
+ */
+export async function baixarDumpDoStorage(dump: FirebaseStorageDump): Promise<void> {
+  // 1. Tenta baixar via endpoint direto do servidor
+  try {
+    const url = `/api/backups/storage/download/${encodeURIComponent(dump.nomeArquivo)}`;
+    const resp = await fetch(url);
+    if (resp.ok) {
+      const blob = await resp.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = dump.nomeArquivo;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(downloadUrl);
+      return;
+    }
+  } catch (err) {
+    console.warn('[baixarDumpDoStorage] Erro ao baixar via API do servidor, tentando método alternativo:', err);
+  }
+
+  // 2. Tenta baixar via Firebase Storage downloadUrl
+  if (dump.downloadUrl) {
+    try {
+      const a = document.createElement('a');
+      a.href = dump.downloadUrl;
+      a.download = dump.nomeArquivo;
+      a.target = '_blank';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return;
+    } catch (e) {}
+  }
+
+  // 3. Se tudo falhar, gera download de pacote estruturado a partir do Firestore
+  try {
+    const docSnap = await getDoc(doc(db, COLLECTIONS.BACKUPS, dump.id));
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      const jsonStr = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = dump.nomeArquivo;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      return;
+    }
+  } catch (e) {
+    console.error('[baixarDumpDoStorage] Falha no fallback de download:', e);
+  }
+
+  throw new Error('Não foi possível gerar o download do arquivo de backup.');
+}
+
+/**
+ * Obtém o conteúdo JSON do dump para visualização prévia ou inspeção
+ */
+export async function obterConteudoDumpStorage(dump: FirebaseStorageDump): Promise<any> {
+  try {
+    const resp = await fetch(`/api/backups/storage/content/${encodeURIComponent(dump.nomeArquivo)}`);
+    if (resp.ok) {
+      const json = await resp.json();
+      if (json.dados) return json.dados;
+    }
+  } catch (e) {}
+
+  try {
+    const docSnap = await getDoc(doc(db, COLLECTIONS.BACKUPS, dump.id));
+    if (docSnap.exists()) {
+      return docSnap.data();
+    }
+  } catch (e) {}
+
+  return null;
+}
+
+
 

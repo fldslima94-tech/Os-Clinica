@@ -26,8 +26,10 @@ import {
   Eye,
   Lock,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  HardDrive
 } from 'lucide-react';
+import { BackupManagementView } from './BackupManagementView';
 import {
   UsuarioEquipe,
   Paciente,
@@ -79,7 +81,8 @@ type MasterCollectionType =
   | 'fornecedores'
   | 'ativos'
   | 'avisos'
-  | 'usuarios';
+  | 'usuarios'
+  | 'backups';
 
 export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
   currentUser,
@@ -480,6 +483,7 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
           { id: 'financeiro', label: 'Tabela Financeira', icon: DollarSign, count: (financeiro || []).length },
           { id: 'pacientes', label: 'Tabela Pacientes', icon: Users, count: (pacientes || []).length },
           { id: 'usuarios', label: 'Tabela Usuários/Equipe', icon: ShieldCheck, count: (usuarios || []).length },
+          { id: 'backups', label: 'Backups Automáticos & PITR', icon: HardDrive, count: 'Auto' },
         ].map(tab => {
           const Icon = tab.icon;
           const isActive = activeCollection === tab.id;
@@ -1361,6 +1365,21 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
             </table>
           </div>
         </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 9. ABA: BACKUPS AUTOMÁTICOS & RECUPERAÇÃO DE DADOS */}
+      {/* ========================================================================= */}
+      {activeCollection === 'backups' && (
+        <BackupManagementView
+          currentUser={currentUser}
+          clinicaConfig={clinicaConfig}
+          onRefreshData={onRefreshData}
+          pacientesCount={(pacientes || []).length}
+          agendamentosCount={(agendamentos || []).length}
+          financeiroCount={(financeiro || []).length}
+          estoqueCount={(estoque || []).length}
+        />
       )}
 
       {/* ========================================================================= */}

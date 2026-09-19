@@ -46,6 +46,7 @@ import {
 } from 'lucide-react';
 import { Agendamento, EstoqueInsumo, Paciente, StatusAgendamento, UsuarioEquipe, BemAtivo, TransacaoFinanceira, DespesaRecorrente } from '../types';
 import { isUserAdminLocalOrTotal } from '../services/firebaseService';
+import { MonthlyFinancialSummaryChart } from './MonthlyFinancialSummaryChart';
 
 interface DashboardViewProps {
   agendamentos: Agendamento[];
@@ -867,6 +868,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Gráfico Comparativo Mensal de Receitas x Despesas (Saúde Financeira ao Longo dos Meses) */}
+      <MonthlyFinancialSummaryChart
+        transacoes={transacoes}
+        despesasRecorrentes={despesasRecorrentes}
+        selectedMonth={selectedMonth}
+        selectedYear={selectedYear}
+        onGoToFinancial={onGoToFinancial}
+      />
 
       {/* Mini-Card de Alertas: Contas a Pagar */}
       <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">

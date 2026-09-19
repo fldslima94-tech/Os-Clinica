@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { UsuarioEquipe } from '../types';
 import { 
+  auth,
   isUserAdminTotal, 
   loginWithFirebaseGoogle, 
   loginWithFirebaseEmailPassword, 
@@ -46,11 +47,13 @@ export const LoginView: React.FC<LoginViewProps> = ({
   // Background warm-up to ensure newly created users on Firestore are instantly ready in any browser
   useEffect(() => {
     let isMounted = true;
-    fetchAllUsersFromFirestore().then((fetched) => {
-      if (isMounted && fetched && fetched.length > 0) {
-        setDbUsers(fetched);
-      }
-    });
+    if (auth.currentUser) {
+      fetchAllUsersFromFirestore().then((fetched) => {
+        if (isMounted && fetched && fetched.length > 0) {
+          setDbUsers(fetched);
+        }
+      });
+    }
     return () => {
       isMounted = false;
     };

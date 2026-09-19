@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { Agendamento, Paciente, StatusAgendamento, UsuarioEquipe } from '../types';
 import { CalendarGridView } from './CalendarGridView';
+import { GoogleCalendarSyncModal } from './GoogleCalendarSyncModal';
 import { isUserAdminTotal, isUserAdminLocalOrTotal } from '../services/firebaseService';
 
 interface AppointmentsViewProps {
@@ -72,6 +73,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
   const [search, setSearch] = useState('');
   const [appointmentToDelete, setAppointmentToDelete] = useState<Agendamento | null>(null);
   const [selectedContratoAgendamento, setSelectedContratoAgendamento] = useState<Agendamento | null>(null);
+  const [isCalendarSyncModalOpen, setIsCalendarSyncModalOpen] = useState(false);
 
   // Today filter for Balcão (00:00 to 23:59)
   const isToday = (dateStr?: string) => {
@@ -290,6 +292,15 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
               <span>Grade Semanal</span>
             </button>
           </div>
+
+          <button
+            onClick={() => setIsCalendarSyncModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-sm font-semibold transition-colors cursor-pointer shadow-2xs"
+            title="Sincronizar agendamentos com o Google Calendar"
+          >
+            <CalendarIcon className="w-4 h-4 text-blue-600" />
+            <span>Google Calendar</span>
+          </button>
 
           <button
             onClick={() => onOpenNewAppointment?.()}
@@ -1141,6 +1152,14 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* MODAL DE SINCRONIZAÇÃO COM O GOOGLE CALENDAR */}
+      <GoogleCalendarSyncModal
+        isOpen={isCalendarSyncModalOpen}
+        onClose={() => setIsCalendarSyncModalOpen(false)}
+        agendamentos={agendamentos}
+        pacientes={pacientes}
+      />
 
     </div>
   );

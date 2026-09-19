@@ -1,0 +1,35 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isSuperAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email in ['fldslima94@gmail.com', 'fabio@teste.com']
+      );
+    }
+
+    // Regras para arquivos de backup diário e dumps JSON
+    match /backups/{allPaths=**} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Regras para fotos de pacientes, antes & depois e documentos clínicos
+    match /pacientes/{allPaths=**} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Regras para imagens e anexos gerais
+    match /clinica/{allPaths=**} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Regra padrão para demais caminhos autenticados
+    match /{allPaths=**} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}

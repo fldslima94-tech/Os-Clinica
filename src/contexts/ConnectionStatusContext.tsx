@@ -28,6 +28,7 @@ interface ConnectionStatusContextType {
   syncSingleUser: (patientOrUserId: string, options?: { forceOverwrite?: boolean; onConflict?: (conflict: SyncConflict) => void }) => Promise<SyncSingleUserResult>;
   queueOfflineMutation: (params: {
     entityType: 'paciente' | 'anamnese' | 'evolucao_retorno' | 'agendamento' | 'generico';
+    collectionName?: string;
     entityId: string;
     entityTitle: string;
     action: 'create' | 'update' | 'delete';
@@ -204,6 +205,7 @@ export const ConnectionStatusProvider: React.FC<{ children: React.ReactNode }> =
   // Adicionar mutação offline
   const queueOfflineMutation = useCallback(async (params: {
     entityType: 'paciente' | 'anamnese' | 'evolucao_retorno' | 'agendamento' | 'generico';
+    collectionName?: string;
     entityId: string;
     entityTitle: string;
     action: 'create' | 'update' | 'delete';

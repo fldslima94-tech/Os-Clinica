@@ -224,21 +224,6 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-purple-200 text-purple-900 font-extrabold">2ª Tela</span>
           </button>
 
-          {/* Quick Aura Copilot AI Button */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('gemini_copilot')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-2xs ${
-              activeTab === 'gemini_copilot'
-                ? 'bg-teal-600 border-teal-700 text-white'
-                : 'bg-teal-50 hover:bg-teal-100 border-teal-200 text-teal-800'
-            }`}
-            title="Abrir Aura Copilot IA (Gemini 3.7 Flash)"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-            <span className="hidden lg:inline">Aura Copilot</span>
-          </button>
-
           {/* Status Indicator & Firestore Debug Toggle */}
           <div className="flex items-center gap-1.5 p-1 bg-slate-50 border border-slate-200 rounded-xl shadow-2xs">
             {/* Simple Connection State Indicator: Online | Syncing | Offline */}

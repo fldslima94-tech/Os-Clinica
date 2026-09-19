@@ -44,6 +44,69 @@ const MONTH_NAMES_PT = [
   'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'
 ];
 
+const formatMoney = (val: number | undefined) => {
+  return (val || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+};
+
+// Custom Recharts Tooltip Component defined outside to preserve identity across renders
+const FinancialCustomTooltip = ({ active, payload }: any) => {
+  if (!active || !payload || !payload.length) return null;
+
+  const data = payload[0]?.payload;
+  if (!data) return null;
+
+  const rec = data.receitas || 0;
+  const desp = data.despesas || 0;
+  const saldo = data.saldoLiquido || 0;
+  const margem = data.margemPercentual || 0;
+
+  return (
+    <div className="bg-slate-900 text-white p-3.5 rounded-xl shadow-2xl border border-slate-700 text-xs min-w-[210px] space-y-2">
+      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+        <span className="font-bold text-slate-200 uppercase tracking-wider">{data.label}</span>
+        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+          saldo >= 0 ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-rose-950 text-rose-300 border border-rose-800'
+        }`}>
+          {saldo >= 0 ? 'Superávit' : 'Déficit'}
+        </span>
+      </div>
+
+      <div className="space-y-1.5 font-medium">
+        <div className="flex items-center justify-between text-emerald-400">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block"></span>
+            Receitas:
+          </span>
+          <span className="font-bold">{formatMoney(rec)}</span>
+        </div>
+
+        <div className="flex items-center justify-between text-rose-400">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm bg-rose-500 inline-block"></span>
+            Despesas:
+          </span>
+          <span className="font-bold">{formatMoney(desp)}</span>
+        </div>
+
+        <div className="flex items-center justify-between pt-1.5 border-t border-slate-800 font-bold text-slate-100">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-indigo-400 inline-block"></span>
+            Resultado Líquido:
+          </span>
+          <span className={saldo >= 0 ? 'text-emerald-300' : 'text-rose-300'}>
+            {formatMoney(saldo)}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
+          <span>Margem Líquida:</span>
+          <span className="font-bold text-slate-300">{margem.toFixed(1)}%</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const FinancialEvolutionChart: React.FC<FinancialEvolutionChartProps> = ({
   transacoes = [],
   className = '',
@@ -207,65 +270,6 @@ export const FinancialEvolutionChart: React.FC<FinancialEvolutionChartProps> = (
       worstMonth: worst,
     };
   }, [transacoes, startDate, endDate]);
-
-  // Custom Recharts Tooltip
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (!active || !payload || !payload.length) return null;
-
-    const data = payload[0]?.payload;
-    if (!data) return null;
-
-    const rec = data.receitas || 0;
-    const desp = data.despesas || 0;
-    const saldo = data.saldoLiquido || 0;
-    const margem = data.margemPercentual || 0;
-
-    return (
-      <div className="bg-slate-900 text-white p-3.5 rounded-xl shadow-2xl border border-slate-700 text-xs min-w-[210px] space-y-2">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-          <span className="font-bold text-slate-200 uppercase tracking-wider">{data.label}</span>
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-            saldo >= 0 ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-rose-950 text-rose-300 border border-rose-800'
-          }`}>
-            {saldo >= 0 ? 'Superávit' : 'Déficit'}
-          </span>
-        </div>
-
-        <div className="space-y-1.5 font-medium">
-          <div className="flex items-center justify-between text-emerald-400">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block"></span>
-              Receitas:
-            </span>
-            <span className="font-bold">{formatCurrency(rec)}</span>
-          </div>
-
-          <div className="flex items-center justify-between text-rose-400">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-sm bg-rose-500 inline-block"></span>
-              Despesas:
-            </span>
-            <span className="font-bold">{formatCurrency(desp)}</span>
-          </div>
-
-          <div className="flex items-center justify-between pt-1.5 border-t border-slate-800 font-bold text-slate-100">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-indigo-400 inline-block"></span>
-              Resultado Líquido:
-            </span>
-            <span className={saldo >= 0 ? 'text-emerald-300' : 'text-rose-300'}>
-              {formatCurrency(saldo)}
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
-            <span>Margem Líquida:</span>
-            <span className="font-bold text-slate-300">{margem.toFixed(1)}%</span>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div className={`bg-white rounded-2xl border border-slate-200 shadow-xs p-5 sm:p-6 space-y-6 ${className}`}>
@@ -492,7 +496,7 @@ export const FinancialEvolutionChart: React.FC<FinancialEvolutionChartProps> = (
                 tickLine={false}
                 tickFormatter={(val) => `R$ ${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<FinancialCustomTooltip />} />
               <Legend
                 verticalAlign="top"
                 align="right"
@@ -531,7 +535,7 @@ export const FinancialEvolutionChart: React.FC<FinancialEvolutionChartProps> = (
                 tickLine={false}
                 tickFormatter={(val) => `R$ ${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<FinancialCustomTooltip />} />
               <Legend
                 verticalAlign="top"
                 align="right"
@@ -560,7 +564,7 @@ export const FinancialEvolutionChart: React.FC<FinancialEvolutionChartProps> = (
                 tickLine={false}
                 tickFormatter={(val) => `R$ ${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<FinancialCustomTooltip />} />
               <Legend
                 verticalAlign="top"
                 align="right"

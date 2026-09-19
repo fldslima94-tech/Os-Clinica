@@ -1,10 +1,11 @@
 import { db, COLLECTIONS, saveDocument, handleFirestoreError, OperationType, sanitizeForFirestore } from './firebaseService';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { Paciente, AnamneseCompleta, FichaRetornoEvolucao, Agendamento } from '../types';
 
 export interface SyncQueueItem {
   id: string;
   entityType: 'paciente' | 'anamnese' | 'evolucao_retorno' | 'agendamento' | 'generico';
+  collectionName?: string;
   entityId: string;
   entityTitle: string;
   action: 'create' | 'update' | 'delete';
@@ -22,6 +23,7 @@ export interface SyncConflict {
   id: string;
   queueItemId: string;
   entityType: 'paciente' | 'anamnese' | 'evolucao_retorno' | 'agendamento' | 'generico';
+  collectionName?: string;
   entityId: string;
   entityTitle: string;
   localData: any;
@@ -150,6 +152,7 @@ function openIndexedDB(): Promise<IDBDatabase> {
  */
 export async function enqueueSyncAction(params: {
   entityType: 'paciente' | 'anamnese' | 'evolucao_retorno' | 'agendamento' | 'generico';
+  collectionName?: string;
   entityId: string;
   entityTitle: string;
   action: 'create' | 'update' | 'delete';
@@ -166,6 +169,7 @@ export async function enqueueSyncAction(params: {
   const queueItem: SyncQueueItem = {
     id: `queue-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     entityType: params.entityType,
+    collectionName: params.collectionName,
     entityId: params.entityId,
     entityTitle: params.entityTitle,
     action: params.action,
@@ -471,11 +475,26 @@ async function processSyncItemToCloud(
   }
 
   // Sincronização padrão para entidades regulares (paciente, agendamento, etc.)
-  const collectionName = item.entityType === 'paciente' ? COLLECTIONS.PACIENTES :
+  const collectionName = item.collectionName || (
+    item.entityType === 'paciente' ? COLLECTIONS.PACIENTES :
     item.entityType === 'agendamento' ? COLLECTIONS.AGENDAMENTOS :
-    COLLECTIONS.PACIENTES;
+    COLLECTIONS.PACIENTES
+  );
 
   const docRef = doc(db, collectionName, item.entityId);
+
+  // Se for ação de exclusão, remover do Firestore e retirar da fila local
+  if (item.action === 'delete') {
+    try {
+      await deleteDoc(docRef);
+    } catch (delErr: any) {
+      // Se documento já não existia, prosseguir com sucesso
+      console.warn(`[OfflineSync] Documento ${collectionName}/${item.entityId} já não existia ao excluir:`, delErr);
+    }
+    await removeQueueItem(item.id);
+    return { success: true };
+  }
+
   const remoteSnap = await getDoc(docRef);
 
   if (remoteSnap.exists() && !options?.forceOverwrite && item.action !== 'create') {
@@ -680,9 +699,11 @@ export async function resolveSyncConflict(
       return { success: false, error: 'Conflito não encontrado ou já resolvido.' };
     }
 
-    const collectionName = conflict.entityType === 'paciente' ? COLLECTIONS.PACIENTES :
+    const collectionName = conflict.collectionName || (
+      conflict.entityType === 'paciente' ? COLLECTIONS.PACIENTES :
       conflict.entityType === 'agendamento' ? COLLECTIONS.AGENDAMENTOS :
-      COLLECTIONS.PACIENTES;
+      COLLECTIONS.PACIENTES
+    );
 
     const docRef = doc(db, collectionName, conflict.entityId);
 

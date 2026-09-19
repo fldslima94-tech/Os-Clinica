@@ -182,10 +182,99 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
     }
   }, [paciente]);
 
+  const anamnesesCompletas = (paciente?.anamneses_completas || []).filter(Boolean);
+
+  // Memoized list of all individual photos for comparing any two
+  const allAvailablePhotos: PhotoItem[] = useMemo(() => {
+    const list: PhotoItem[] = [];
+
+    (fotosList || []).forEach((foto) => {
+      if (!foto) return;
+      const urlAntes = foto.foto_antes_url || foto.foto_antes;
+      const urlDepois = foto.foto_depois_url || foto.foto_depois;
+      const proc = foto.procedimento_nome || foto.procedimento || foto.titulo || 'Procedimento Clínico';
+      const dt = foto.data ? parseDate(foto.data).toLocaleDateString('pt-BR') : '';
+
+      if (urlAntes) {
+        list.push({
+          id: `${foto.id || Math.random()}-antes`,
+          url: urlAntes,
+          label: 'Antes',
+          date: dt,
+          procedure: proc,
+          notes: foto.observacoes || (foto as any).legenda,
+        });
+      }
+
+      if (urlDepois) {
+        list.push({
+          id: `${foto.id || Math.random()}-depois`,
+          url: urlDepois,
+          label: 'Depois',
+          date: dt,
+          procedure: proc,
+          notes: foto.observacoes || (foto as any).legenda,
+        });
+      }
+    });
+
+    // Anamneses photos
+    (anamnesesCompletas || []).forEach((anamnese) => {
+      if (anamnese?.fotoPacienteUrl) {
+        list.push({
+          id: `anamnese-${anamnese.id || Math.random()}`,
+          url: anamnese.fotoPacienteUrl,
+          label: 'Anamnese',
+          date: anamnese.criadoEm ? parseDate(anamnese.criadoEm).toLocaleDateString('pt-BR') : '',
+          procedure: anamnese.procedimentoNome || 'Avaliação Inicial',
+          notes: 'Foto registrada no termo de anamnese',
+        });
+      }
+    });
+
+    // Paciente profile photo if distinct
+    if (paciente?.foto_url && !list.some(p => p.url === paciente.foto_url)) {
+      list.push({
+        id: `paciente-avatar-${paciente.id}`,
+        url: paciente.foto_url,
+        label: 'Perfil',
+        procedure: 'Cadastro Geral',
+      });
+    }
+
+    return list;
+  }, [fotosList, anamnesesCompletas, paciente]);
+
+  // Filtered photos based on search query
+  const filteredFotosList = useMemo(() => {
+    if (!fotoSearchQuery.trim()) return fotosList || [];
+    const query = fotoSearchQuery.toLowerCase();
+    return (fotosList || []).filter(f => 
+      f && (
+        (f.procedimento_nome && f.procedimento_nome.toLowerCase().includes(query)) ||
+        (f.procedimento && f.procedimento.toLowerCase().includes(query)) ||
+        (f.titulo && f.titulo.toLowerCase().includes(query)) ||
+        (f.observacoes && f.observacoes.toLowerCase().includes(query)) ||
+        (f.data && String(f.data).includes(query))
+      )
+    );
+  }, [fotosList, fotoSearchQuery]);
+
+  // Escape key listener to close modal smoothly
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isCameraModalOpen && !isDeleteModalOpen && !isComparisonModalOpen && !isAnamneseModalOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isCameraModalOpen, isDeleteModalOpen, isComparisonModalOpen, isAnamneseModalOpen, onClose]);
+
   if (!isOpen || !paciente) return null;
 
   const pacienteAgendamentos = (agendamentos || []).filter(a => a && a.paciente_id === paciente.id);
-  const anamnesesCompletas = (paciente.anamneses_completas || []).filter(Boolean);
   const idadeCalculada = paciente.data_nascimento ? calcularIdade(paciente.data_nascimento) : '';
 
   const handleSaveNovaAnamneseCompleta = (novaAnamnese: AnamneseCompleta) => {
@@ -277,82 +366,6 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
     onUpdatePatientHistory(paciente.id, historico, { fotos_antes_depois: updated });
     setSelectedPhotoIdForUpdate(null);
   };
-
-  // Memoized list of all individual photos for comparing any two
-  const allAvailablePhotos: PhotoItem[] = useMemo(() => {
-    const list: PhotoItem[] = [];
-
-    (fotosList || []).forEach((foto) => {
-      if (!foto) return;
-      const urlAntes = foto.foto_antes_url || foto.foto_antes;
-      const urlDepois = foto.foto_depois_url || foto.foto_depois;
-      const proc = foto.procedimento_nome || foto.procedimento || foto.titulo || 'Procedimento Clínico';
-      const dt = foto.data ? parseDate(foto.data).toLocaleDateString('pt-BR') : '';
-
-      if (urlAntes) {
-        list.push({
-          id: `${foto.id || Math.random()}-antes`,
-          url: urlAntes,
-          label: 'Antes',
-          date: dt,
-          procedure: proc,
-          notes: foto.observacoes || (foto as any).legenda,
-        });
-      }
-
-      if (urlDepois) {
-        list.push({
-          id: `${foto.id || Math.random()}-depois`,
-          url: urlDepois,
-          label: 'Depois',
-          date: dt,
-          procedure: proc,
-          notes: foto.observacoes || (foto as any).legenda,
-        });
-      }
-    });
-
-    // Anamneses photos
-    (anamnesesCompletas || []).forEach((anamnese) => {
-      if (anamnese?.fotoPacienteUrl) {
-        list.push({
-          id: `anamnese-${anamnese.id || Math.random()}`,
-          url: anamnese.fotoPacienteUrl,
-          label: 'Anamnese',
-          date: anamnese.criadoEm ? parseDate(anamnese.criadoEm).toLocaleDateString('pt-BR') : '',
-          procedure: anamnese.procedimentoNome || 'Avaliação Inicial',
-          notes: 'Foto registrada no termo de anamnese',
-        });
-      }
-    });
-
-    // Paciente profile photo if distinct
-    if (paciente?.foto_url && !list.some(p => p.url === paciente.foto_url)) {
-      list.push({
-        id: `paciente-avatar-${paciente.id}`,
-        url: paciente.foto_url,
-        label: 'Perfil',
-        procedure: 'Cadastro Geral',
-      });
-    }
-
-    return list;
-  }, [fotosList, anamnesesCompletas, paciente]);
-
-  // Filtered photos based on search query
-  const filteredFotosList = useMemo(() => {
-    if (!fotoSearchQuery.trim()) return fotosList || [];
-    const query = fotoSearchQuery.toLowerCase();
-    return (fotosList || []).filter(f => 
-      f && (
-        (f.procedimento_nome && f.procedimento_nome.toLowerCase().includes(query)) ||
-        (f.procedimento && f.procedimento.toLowerCase().includes(query)) ||
-        (f.titulo && f.titulo.toLowerCase().includes(query)) ||
-        (f.observacoes && f.observacoes.toLowerCase().includes(query)) ||
-        (f.data && String(f.data).includes(query))
-      )
-    );
-  }, [fotosList, fotoSearchQuery]);
 
   // Open comparison for a specific pair
   const handleOpenComparePair = (foto: FotoAntesDepois) => {
@@ -548,18 +561,6 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
     setTermoConsentimento(updatedTermo);
     onUpdatePatientHistory(paciente.id, historico, { termo_consentimento: updatedTermo });
   };
-
-  // Escape key listener to close modal smoothly
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isCameraModalOpen && !isDeleteModalOpen && !isComparisonModalOpen && !isAnamneseModalOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, isCameraModalOpen, isDeleteModalOpen, isComparisonModalOpen, isAnamneseModalOpen, onClose]);
 
   return (
     <>
