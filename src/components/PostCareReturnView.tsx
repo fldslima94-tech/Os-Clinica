@@ -24,27 +24,31 @@ import {
   User,
   X
 } from 'lucide-react';
-import { AlertaRetornoPos, Paciente, UsuarioEquipe } from '../types';
+import { AlertaRetornoPos, Paciente, UsuarioEquipe, ClinicaConfig } from '../types';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 import { isUserAdminTotal, isUserAdminLocalOrTotal } from '../services/firebaseService';
 
 interface PostCareReturnViewProps {
   alertas: AlertaRetornoPos[];
   pacientes?: Paciente[];
+  clinicaConfig?: ClinicaConfig;
   onUpdateAlertaStatus: (alertaId: string, status: 'pendente' | 'agendado' | 'contatado') => void;
   onDeleteAlerta?: (alertaId: string) => void;
   onAddAlerta?: (alerta: Partial<AlertaRetornoPos>) => void;
   onViewPatientByName?: (nome: string) => void;
+  onScheduleReturn?: (alerta: AlertaRetornoPos) => void;
   currentUser?: UsuarioEquipe;
 }
 
 export const PostCareReturnView: React.FC<PostCareReturnViewProps> = ({
   alertas,
   pacientes = [],
+  clinicaConfig,
   onUpdateAlertaStatus,
   onDeleteAlerta,
   onAddAlerta,
   onViewPatientByName,
+  onScheduleReturn,
   currentUser,
 }) => {
   const isAdmin = !currentUser || isUserAdminTotal(currentUser) || isUserAdminLocalOrTotal(currentUser) || currentUser.role === 'admin_master' || currentUser.role === 'admin_total' || currentUser.role === 'admin' || currentUser.role === 'gestor';
@@ -91,16 +95,17 @@ export const PostCareReturnView: React.FC<PostCareReturnViewProps> = ({
   const handleSendWhatsApp = (alerta: AlertaRetornoPos) => {
     const primeiroNome = alerta.paciente_nome.split(' ')[0];
     const isPosVenda = alerta.tipo === 'pos_venda' || alerta.origem_venda === 'produto';
+    const clinicName = clinicaConfig?.nome || 'AuraEstética';
     
     let text = '';
     if (isPosVenda) {
       const itemDesc = alerta.produto_nome || alerta.procedimento_origem;
       text = encodeURIComponent(
-        `Olá, ${primeiroNome}! Tudo bem? Aqui é da clínica EstéticaOS 🌸\n\nPassando para saber como está sua experiência com o produto *${itemDesc}* que você adquiriu conosco!\n\nQueremos garantir que esteja gostando dos resultados da sua rotina de home care. Teve alguma dúvida sobre o modo de uso ou gostaria de repor seus cuidados?\n\nQualquer dúvida estou à total disposição!`
+        `Olá, ${primeiroNome}! Tudo bem? Aqui é da clínica ${clinicName} 🌸\n\nPassando para saber como está sua experiência com o produto *${itemDesc}* que você adquiriu conosco!\n\nQueremos garantir que esteja gostando dos resultados da sua rotina de home care. Teve alguma dúvida sobre o modo de uso ou gostaria de repor seus cuidados?\n\nQualquer dúvida estou à total disposição!`
       );
     } else {
       text = encodeURIComponent(
-        `Olá, ${primeiroNome}! Tudo bem? Aqui é da clínica EstéticaOS 🌸\n\nNotamos que completou ${alerta.dias_apos} dias da realização do seu procedimento *${alerta.procedimento_origem}*.\n\nQueremos saber como está sua evolução e te convidar para sua consulta de revisão e avaliação: *${alerta.motivo}* com a nossa especialista.\n\nPodemos verificar os melhores horários para você esta semana?`
+        `Olá, ${primeiroNome}! Tudo bem? Aqui é da clínica ${clinicName} 🌸\n\nNotamos que completou ${alerta.dias_apos} dias da realização do seu procedimento *${alerta.procedimento_origem}*.\n\nQueremos saber como está sua evolução e te convidar para sua consulta de revisão e avaliação: *${alerta.motivo}* com a nossa especialista.\n\nPodemos verificar os melhores horários para você esta semana?`
       );
     }
 
@@ -311,9 +316,14 @@ export const PostCareReturnView: React.FC<PostCareReturnViewProps> = ({
                       {alerta.paciente_nome.substring(0, 2).toUpperCase()}
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-slate-900 leading-tight">
+                      <button
+                        type="button"
+                        onClick={() => onViewPatientByName?.(alerta.paciente_nome)}
+                        className="text-sm font-bold text-slate-900 hover:text-indigo-600 transition-colors text-left cursor-pointer hover:underline block leading-tight"
+                        title="Abrir prontuário completo deste cliente"
+                      >
                         {alerta.paciente_nome}
-                      </h4>
+                      </button>
                       <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
                         <Phone className="w-3 h-3 text-slate-400" />
                         <span>{alerta.telefone}</span>
@@ -399,16 +409,28 @@ export const PostCareReturnView: React.FC<PostCareReturnViewProps> = ({
               </div>
 
               {/* Action Buttons */}
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+              <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
                 <button
                   type="button"
                   onClick={() => handleSendWhatsApp(alerta)}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                  className="flex-1 min-w-[130px] inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
                   title="Disparar mensagem personalizada no WhatsApp"
                 >
                   <MessageCircle className="w-4 h-4" />
                   <span>{isPosVenda ? 'WhatsApp Pós-Venda' : 'WhatsApp Retorno'}</span>
                 </button>
+
+                {onScheduleReturn && alerta.status !== 'agendado' && (
+                  <button
+                    type="button"
+                    onClick={() => onScheduleReturn(alerta)}
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                    title="Agendar retorno deste paciente na agenda"
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>Agendar</span>
+                  </button>
+                )}
 
                 {alerta.status !== 'agendado' ? (
                   <button

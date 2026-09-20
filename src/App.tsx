@@ -37,7 +37,8 @@ import {
   ConfiguracaoCampos,
   PermissoesCustomizadas,
   Fornecedor,
-  AnamneseCompleta
+  AnamneseCompleta,
+  FichaRetornoEvolucao
 } from './types';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -87,7 +88,7 @@ import { AppContentSkeleton } from './components/AppContentSkeleton';
 import { ReceptionTVView } from './components/ReceptionTVView';
 import { SecondScreenModal } from './components/SecondScreenModal';
 import { useConnectionStatus } from './contexts/ConnectionStatusContext';
-import { CheckCircle2, AlertCircle, Cloud, Sparkles, Loader2 } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Cloud, Sparkles, Loader2, Settings } from 'lucide-react';
 import { 
   loadLocalAgendamentos, 
   loadLocalTransacoes, 
@@ -135,16 +136,8 @@ function getInitialTab(userRole?: string): TabType {
 
 function getInitialUser(): UsuarioEquipe {
   if (typeof window !== 'undefined') {
-    // Clear any obsolete localStorage session keys to guarantee privacy
     try {
-      localStorage.removeItem(STORAGE_AUTH_KEY);
-      localStorage.removeItem(STORAGE_USER_KEY);
-    } catch (e) {
-      // ignore
-    }
-
-    try {
-      const saved = sessionStorage.getItem(STORAGE_USER_KEY);
+      const saved = sessionStorage.getItem(STORAGE_USER_KEY) || localStorage.getItem(STORAGE_USER_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && parsed.id) {
@@ -184,9 +177,10 @@ function getInitialUser(): UsuarioEquipe {
 function getInitialAuthState(): boolean {
   if (typeof window !== 'undefined') {
     try {
-      localStorage.removeItem(STORAGE_AUTH_KEY);
-      localStorage.removeItem(STORAGE_USER_KEY);
-      return sessionStorage.getItem(STORAGE_AUTH_KEY) === 'true';
+      return (
+        sessionStorage.getItem(STORAGE_AUTH_KEY) === 'true' ||
+        localStorage.getItem(STORAGE_AUTH_KEY) === 'true'
+      );
     } catch (e) {
       return false;
     }
@@ -715,16 +709,21 @@ export default function App() {
     }
   }, [pacientes]);
 
-  // Firebase Auth real-time session listener (only keeps active if session storage is authenticated)
+  // Firebase Auth real-time session listener (keeps active and synchronizes persistent session storage)
   useEffect(() => {
     const unsubscribe = onFirebaseAuthStateChange((fbUser) => {
       setFirebaseAuthUser(fbUser);
-      const isSessionActive = typeof window !== 'undefined' && sessionStorage.getItem(STORAGE_AUTH_KEY) === 'true';
+      const isSessionActive = typeof window !== 'undefined' && (
+        sessionStorage.getItem(STORAGE_AUTH_KEY) === 'true' ||
+        localStorage.getItem(STORAGE_AUTH_KEY) === 'true' ||
+        Boolean(fbUser)
+      );
 
       if (fbUser && isSessionActive) {
         setIsAuthenticated(true);
         try {
           sessionStorage.setItem(STORAGE_AUTH_KEY, 'true');
+          localStorage.setItem(STORAGE_AUTH_KEY, 'true');
         } catch (e) {
           // ignore
         }
@@ -762,6 +761,7 @@ export default function App() {
             };
             try {
               sessionStorage.setItem(STORAGE_USER_KEY, JSON.stringify(updated));
+              localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(updated));
             } catch (e) {}
             return updated;
           });
@@ -988,6 +988,47 @@ export default function App() {
       console.warn('[Direct Save in handleSaveProcedureCompletion]', saveErr);
     }
 
+    // 4.1 Registra automaticamente a evolução clínica no prontuário permanente do paciente
+    if (patient) {
+      const insumosText = normalizedSupplies.length > 0 
+        ? `Insumos consumidos: ${normalizedSupplies.map(i => `${i.nome_item} (${i.quantidade_utilizada || i.quantidade} ${i.unidade_medida || 'un'})`).join(', ')}.`
+        : '';
+      const novaEvolucao: FichaRetornoEvolucao = {
+        id: `evo-${Date.now()}`,
+        paciente_id: targetAgendamento.paciente_id,
+        paciente_nome: patient.nome || 'Cliente',
+        agendamento_id: targetAgendamento.id,
+        data: new Date().toISOString(),
+        profissional_id: targetAgendamento.profissional_id || currentUser.id,
+        profissional_nome: targetAgendamento.profissional_nome || currentUser.nome || 'Profissional',
+        procedimento_nome: targetAgendamento.procedimento || 'Procedimento Clínico',
+        numero_sessao: targetAgendamento.numero_sessao || 1,
+        relato_paciente: 'Atendimento realizado no consultório.',
+        evolucao_clinica: `Procedimento concluído com sucesso. ${pagamento.observacao ? `Obs: ${pagamento.observacao}. ` : ''}${insumosText}`.trim(),
+        parametros_tecnicos: insumosText || undefined,
+        criado_em: new Date().toISOString(),
+      };
+
+      const existingEvolucoes = patient.evolucoes_retornos || [];
+      const dataFormatada = new Date().toLocaleDateString('pt-BR');
+      const entradaHistorico = `[${dataFormatada}: ${targetAgendamento.procedimento} realizado por ${targetAgendamento.profissional_nome || currentUser.nome}]`;
+      const historicoAtualizado = `${patient.historico_clinico || ''}\n${entradaHistorico}`.trim();
+
+      const updatedPatient: Paciente = {
+        ...patient,
+        evolucoes_retornos: [novaEvolucao, ...existingEvolucoes],
+        historico_clinico: historicoAtualizado,
+        atualizado_em: new Date().toISOString(),
+      };
+
+      setPacientes(prev => prev.map(p => p.id === updatedPatient.id ? updatedPatient : p));
+      saveDocument(COLLECTIONS.PACIENTES, updatedPatient);
+
+      if (selectedPatientForDetails?.id === updatedPatient.id) {
+        setSelectedPatientForDetails(updatedPatient);
+      }
+    }
+
     // 5. Executa transação atômica adicional no Firestore (opcional/auxiliar)
     try {
       await executeAtomicCheckout({
@@ -1165,6 +1206,14 @@ export default function App() {
 
     saveDocument(COLLECTIONS.AGENDAMENTOS, createdAgendamento);
 
+    // Se houver alerta de retorno/pós-venda pendente para este paciente, marca como agendado
+    const matchingAlerta = alertasRetorno.find(a => 
+      a.paciente_id === createdAgendamento.paciente_id && (a.status === 'pendente' || a.status === 'contatado')
+    );
+    if (matchingAlerta) {
+      handleUpdateAlertaStatus(matchingAlerta.id, 'agendado');
+    }
+
     showToast(`Agendamento de "${patientObj?.nome || 'Paciente'}" registrado e sincronizado no banco de dados!`);
   };
 
@@ -1172,6 +1221,41 @@ export default function App() {
     if (!novo.nome || !novo.telefone) {
       showToast('Nome e Telefone são obrigatórios para o cadastro.', 'info');
       return;
+    }
+
+    if (novo.id) {
+      const existing = pacientes.find(p => p.id === novo.id);
+      if (existing) {
+        const updatedPatient: Paciente = {
+          ...existing,
+          ...novo,
+          nome: novo.nome.trim(),
+          telefone: novo.telefone.trim(),
+          atualizado_em: new Date().toISOString(),
+          // Preserve existing arrays and objects if not explicitly provided in novo
+          fotos_antes_depois: novo.fotos_antes_depois || existing.fotos_antes_depois || [],
+          evolucoes_retornos: novo.evolucoes_retornos || existing.evolucoes_retornos || [],
+          anamneses_completas: novo.anamneses_completas || existing.anamneses_completas || [],
+          termo_consentimento: novo.termo_consentimento || existing.termo_consentimento || { assinado: false },
+        };
+
+        setPacientes(prev => prev.map(p => p.id === updatedPatient.id ? updatedPatient : p));
+        queueOfflineMutation({
+          entityType: 'paciente',
+          entityId: updatedPatient.id,
+          entityTitle: `Atualização de Cliente: ${updatedPatient.nome}`,
+          action: 'update',
+          payload: updatedPatient,
+        });
+        saveDocument(COLLECTIONS.PACIENTES, updatedPatient);
+
+        if (selectedPatientForDetails?.id === updatedPatient.id) {
+          setSelectedPatientForDetails(updatedPatient);
+        }
+
+        showToast(`Ficha do cliente "${updatedPatient.nome}" atualizada com sucesso!`);
+        return;
+      }
     }
 
     const createdPatient: Paciente = {
@@ -1189,10 +1273,10 @@ export default function App() {
       alergias: novo.alergias?.trim() || undefined,
       medicacoes: novo.medicacoes?.trim() || undefined,
       fototipo: novo.fototipo || 'Fototipo III',
-      fotos_antes_depois: [],
-      evolucoes_retornos: [],
+      fotos_antes_depois: novo.fotos_antes_depois || [],
+      evolucoes_retornos: novo.evolucoes_retornos || [],
       anamneses_completas: novo.anamneses_completas || [],
-      termo_consentimento: { assinado: false },
+      termo_consentimento: novo.termo_consentimento || { assinado: false },
     };
 
     setPacientes(prev => [createdPatient, ...prev]);
@@ -1260,9 +1344,28 @@ export default function App() {
       const sg = novaAnamnese.saudeGeral || ({} as any);
       const dataFormatada = novaAnamnese.criadoEm ? new Date(novaAnamnese.criadoEm).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
 
+      const existingPhotos = target.fotos_antes_depois || [];
+      const updatedPhotos = novaAnamnese.fotoPacienteUrl ? [
+        {
+          id: `foto-${Date.now()}`,
+          titulo: `Foto Anamnese (${novaAnamnese.procedimentoNome || 'Avaliação'})`,
+          data: new Date().toISOString().split('T')[0],
+          foto_antes_url: novaAnamnese.fotoPacienteUrl,
+          procedimento_nome: novaAnamnese.procedimentoNome || 'Avaliação',
+        },
+        ...existingPhotos
+      ] : existingPhotos;
+
       const updated: Paciente = {
         ...target,
+        nome: dp.nomeCompleto ? dp.nomeCompleto.trim() : target.nome,
+        telefone: dp.telefone ? dp.telefone.trim() : target.telefone,
+        email: dp.email ? dp.email.trim() : target.email,
+        cpf: dp.cpf ? dp.cpf.trim() : target.cpf,
+        data_nascimento: dp.dataNascimento || target.data_nascimento,
+        foto_url: novaAnamnese.fotoPacienteUrl || target.foto_url,
         anamneses_completas: [novaAnamnese, ...existing],
+        fotos_antes_depois: updatedPhotos,
         alergias: sg.possuiAlergias ? sg.detalhesAlergias : target.alergias,
         medicacoes: sg.usoAcidos ? sg.detalhesAcidos : target.medicacoes,
         profissao: dp.profissao || target.profissao,
@@ -1276,6 +1379,7 @@ export default function App() {
           nome_paciente_declarado: dp.nomeCompleto || target.nome,
           cpf_declarado: dp.cpf || target.cpf,
         },
+        atualizado_em: new Date().toISOString(),
       };
 
       setPacientes(prev => prev.map(p => p.id === target.id ? updated : p));
@@ -1694,6 +1798,20 @@ export default function App() {
     showToast(`Alerta de retorno excluído com sucesso.`);
   };
 
+  const handleScheduleReturnFromAlert = (alerta: AlertaRetornoPos) => {
+    const matchedPatient = pacientes.find(p => p.id === alerta.paciente_id) ||
+      pacientes.find(p => (p.nome || '').toLowerCase().trim() === (alerta.paciente_nome || '').toLowerCase().trim());
+
+    setAppointmentInitialData({
+      paciente_id: alerta.paciente_id,
+      paciente: matchedPatient,
+      procedimento: `Retorno: ${alerta.procedimento_origem || 'Revisão Clínica'}`,
+      data_hora: alerta.data_ideal_retorno ? `${alerta.data_ideal_retorno.slice(0, 10)}T09:00:00` : undefined,
+      observacoes: `Retorno pós-atendimento agendado via painel de pós-venda. Motivo: ${alerta.motivo}`,
+    });
+    setIsNewAppointmentOpen(true);
+  };
+
   // Procedures Catalog Handlers
   const handleSaveProcedure = (novo: Partial<ProcedimentoClinico>, idToEdit?: string) => {
     const targetId = idToEdit || procedureToEdit?.id;
@@ -1945,8 +2063,8 @@ export default function App() {
     try {
       sessionStorage.setItem(STORAGE_AUTH_KEY, 'true');
       sessionStorage.setItem(STORAGE_USER_KEY, JSON.stringify(userToSet));
-      localStorage.removeItem(STORAGE_AUTH_KEY);
-      localStorage.removeItem(STORAGE_USER_KEY);
+      localStorage.setItem(STORAGE_AUTH_KEY, 'true');
+      localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(userToSet));
     } catch (e) {
       // ignore
     }
@@ -2362,10 +2480,12 @@ export default function App() {
             <PostCareReturnView
               alertas={alertasRetorno}
               pacientes={pacientes}
+              clinicaConfig={clinicaConfig}
               onUpdateAlertaStatus={handleUpdateAlertaStatus}
               onDeleteAlerta={handleDeleteAlertaRetorno}
               onAddAlerta={handleSaveAlertaRetorno}
               currentUser={currentUser}
+              onScheduleReturn={handleScheduleReturnFromAlert}
               onViewPatientByName={(nome) => {
                 const searchN = (nome || '').toLowerCase().trim();
                 const found = searchN ? pacientes.find(p => (p.nome || '').toLowerCase().trim() === searchN) : undefined;
@@ -2469,6 +2589,27 @@ export default function App() {
                 showToast('Perfil atualizado com sucesso!');
               }}
             />
+          )}
+
+          {activeTab === 'configuracoes' && (
+            <div className="max-w-xl mx-auto p-6 bg-white rounded-2xl border border-slate-200 shadow-sm text-center space-y-4">
+              <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto">
+                <Settings className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-slate-900">Configurações da Clínica</h3>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                Personalize os dados da clínica, logotipo, WhatsApp, horários de funcionamento, regras de cancelamento e modelo de IA.
+              </p>
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsClinicSettingsOpen(true)}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+                >
+                  Abrir Painel de Configurações
+                </button>
+              </div>
+            </div>
           )}
 
           {activeTab === 'supabase_guide' && (currentUser.role === 'admin_total' || currentUser.role === 'admin_local' || currentUser.role === 'admin' || currentUser.role === 'gestor') && (

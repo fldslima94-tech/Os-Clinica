@@ -120,6 +120,7 @@ export interface FirestoreErrorInfo {
     email?: string | null;
     emailVerified?: boolean | null;
     isAnonymous?: boolean | null;
+    tenantId?: string | null;
     providerInfo?: {
       providerId?: string | null;
       email?: string | null;
@@ -134,11 +135,6 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     console.info(`[Firestore Offline] Sincronização em segundo plano/modo local ativo para ${operationType} em ${path || 'coleção'}.`);
     return;
   }
-  // Graceful handling for permission errors to prevent breaking the UI
-  if (errMsg.includes('permission-denied') || errMsg.includes('Missing or insufficient permissions') || errMsg.includes('insufficient permissions')) {
-    console.warn(`[Firestore Permissão] Acesso restrito ou pendente de autenticação para ${operationType} em ${path || 'coleção'}. Operação tratada com segurança.`);
-    return;
-  }
   const errInfo: FirestoreErrorInfo = {
     error: errMsg,
     authInfo: {
@@ -146,6 +142,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
       email: auth.currentUser?.email,
       emailVerified: auth.currentUser?.emailVerified,
       isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
       providerInfo: auth.currentUser?.providerData?.map(provider => ({
         providerId: provider.providerId,
         email: provider.email,
@@ -154,7 +151,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path
   };
-  console.warn(`[Firestore Info - ${operationType}] em ${path}:`, errInfo.error);
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
 }
 
 // Helper to remove undefined properties and sanitize objects recursively for Firestore compatibility

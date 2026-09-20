@@ -406,6 +406,7 @@ export interface Paciente {
   data_nascimento: string;
   historico_clinico: string;
   criado_em: string;
+  atualizado_em?: string;
   email?: string;
   cpf?: string;
   endereco?: string;

@@ -345,6 +345,10 @@
     "/backups_sistema/{backupId}": {
       "schema": "SnapshotBackupSistema",
       "description": "Snapshots de backups automáticos e manuais do sistema"
+    },
+    "/test/{testId}": {
+      "schema": "ClinicaConfig",
+      "description": "Verificação de conectividade e integridade do Firestore"
     }
   }
 }

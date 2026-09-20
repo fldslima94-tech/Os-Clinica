@@ -16,6 +16,14 @@ service cloud.firestore {
     }
 
     // ==========================================
+    // 0. HEALTH CHECK & CONEXÃO TESTE
+    // ==========================================
+    match /test/{testId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // ==========================================
     // 1. CONFIGURAÇÕES DA CLÍNICA & PROCEDIMENTOS (Catálogo Público)
     // ==========================================
     match /clinica_config/{configId} {
