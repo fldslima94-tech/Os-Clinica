@@ -2288,8 +2288,6 @@ export default function App() {
               pacientes={pacientes}
               bens={bensPatrimoniais}
               profissionais={usuarios}
-              transacoes={transacoes}
-              despesasRecorrentes={despesasRecorrentes}
               currentUser={currentUser}
               onOpenNewAppointment={() => {
                 setAppointmentInitialData(null);
@@ -2301,7 +2299,6 @@ export default function App() {
               onViewPatient={(p) => handleOpenPatientDetails(p)}
               onGoToEstoque={() => setActiveTab('estoque')}
               onGoToBens={() => setActiveTab('bens')}
-              onGoToFinancial={() => setActiveTab('financeiro')}
               onOpenCompleteModal={(ag) => setAppointmentToComplete(ag)}
               onOpenCheckInModal={(ag) => setAppointmentToCheckIn(ag)}
               onOpenSecondScreenModal={() => setIsSecondScreenModalOpen(true)}
