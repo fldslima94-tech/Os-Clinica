@@ -19,160 +19,154 @@ service cloud.firestore {
     // 0. HEALTH CHECK & CONEXÃO TESTE
     // ==========================================
     match /test/{testId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // ==========================================
-    // 1. CONFIGURAÇÕES DA CLÍNICA & PROCEDIMENTOS (Catálogo Público)
+    // 1. CONFIGURAÇÕES DA CLÍNICA & PROCEDIMENTOS (Catálogo Público e Gestão)
     // ==========================================
     match /clinica_config/{configId} {
-      allow read: if true; // Leitura pública dos dados e identidade da clínica
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /clinicas/{clinicaId}/config/{configId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /procedimentos/{procedimentoId} {
-      allow read: if true; // Leitura pública do catálogo de serviços para agendamento e portal
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // ==========================================
-    // 2. ORÇAMENTOS & PRÉ-AVALIAÇÕES (Envio Público + Gestão Autenticada)
+    // 2. ORÇAMENTOS & PRÉ-AVALIAÇÕES
     // ==========================================
     match /solicitacoes_orcamento/{orcamentoId} {
-      allow create: if true; // Permite envio por pacientes/visitantes no portal
-      allow read, update, delete: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /orcamentos_solicitacoes/{orcamentoId} {
-      allow create: if true;
-      allow read, update, delete: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // ==========================================
     // 3. AGENDAMENTOS
     // ==========================================
     match /agendamentos/{agendamentoId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // ==========================================
     // 4. PACIENTES & PRONTUÁRIOS
     // ==========================================
     match /pacientes/{pacienteId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /fichas_clientes/{fichaId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /fichas_retorno/{fichaId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // ==========================================
     // 5. USUÁRIOS & PERFIS DA EQUIPE
     // ==========================================
     match /usuarios/{usuarioId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /perfis/{perfilId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // ==========================================
     // 6. FINANCEIRO & FLUXO DE CAIXA
     // ==========================================
     match /transacoes/{transacaoId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /fluxo_caixa/{fluxoId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /despesas_recorrentes/{despesaId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // ==========================================
     // 7. ESTOQUE & INSUMOS
     // ==========================================
     match /estoque/{insumoId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /estoque_insumos/{insumoId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // ==========================================
     // 8. BENS & PATRIMÔNIO ATIVO
     // ==========================================
     match /bens/{bemId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /bens_ativos/{bemId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // ==========================================
     // 9. FORNECEDORES & PARCEIROS
     // ==========================================
     match /fornecedores/{fornecedorId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // ==========================================
     // 10. AVISOS & COMUNICAÇÃO INTERNA
     // ==========================================
     match /avisos/{avisoId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /comunicados_internos/{avisoId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /alertas_retorno/{alertaId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // ==========================================
     // 11. MODELOS DE ANAMNESE & CONTRATOS
     // ==========================================
     match /modelos_anamnese/{modeloId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /modelos_contratos/{modeloId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // ==========================================
     // 12. CONFIGURAÇÕES DE CAMPOS & SISTEMA
     // ==========================================
     match /configuracoes_campos/{configId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /configuracoes_sistema/{configId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // ==========================================
     // 13. BACKUPS DO SISTEMA
     // ==========================================
     match /backups_sistema/{backupId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // Bloqueio por padrão para qualquer outro caminho não declarado

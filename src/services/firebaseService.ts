@@ -833,14 +833,6 @@ export function subscribeToCollection<T extends { id?: string }>(
   fallbackData: T[] = [],
   clinicaId?: string
 ): () => void {
-  const isPublicCollection = collectionName === COLLECTIONS.CLINICA_CONFIG || collectionName === COLLECTIONS.PROCEDIMENTOS;
-
-  // Garante que listeners de coleções privadas só sejam disparados se o usuário estiver autenticado no Firebase Auth
-  if (!isPublicCollection && !auth.currentUser) {
-    onData(fallbackData || []);
-    return () => {};
-  }
-
   try {
     const colRef = collection(db, collectionName);
     const q = clinicaId ? query(colRef, where('clinicaId', '==', clinicaId)) : colRef;
@@ -850,7 +842,7 @@ export function subscribeToCollection<T extends { id?: string }>(
         // Envia os documentos da coleção diretamente (array vazio [] se não houver documentos)
         const items = snapshot.docs.map(d => ({ ...d.data(), id: d.id }) as T);
         onData(items);
-        // Salva silenciosamente no cache local IndexedDB para carregamento instantâneo nas próximas sessões
+        // Salva no cache local IndexedDB para redundância e carregamento instantâneo
         saveLocalCollection(collectionName, items).catch(() => {});
       },
       (error: any) => {
@@ -875,10 +867,6 @@ export function subscribeToCollection<T extends { id?: string }>(
 
 // Fetch documents filtered by clinicaId
 export async function getClinicaDocs<T>(collectionName: string, clinicaId?: string): Promise<T[]> {
-  const isPublicCollection = collectionName === COLLECTIONS.CLINICA_CONFIG || collectionName === COLLECTIONS.PROCEDIMENTOS;
-  if (!isPublicCollection && !auth.currentUser) {
-    return [];
-  }
   try {
     const colRef = collection(db, collectionName);
     const q = clinicaId ? query(colRef, where('clinicaId', '==', clinicaId)) : colRef;
@@ -981,7 +969,7 @@ export function onFirebaseAuthStateChange(callback: (user: FirebaseUser | null) 
  */
 export async function fetchUserFromFirestoreByEmail(email: string): Promise<UsuarioEquipe | null> {
   const cleanEmail = email.trim().toLowerCase();
-  if (!cleanEmail || !auth.currentUser) return null;
+  if (!cleanEmail) return null;
 
   try {
     // 1. Busca direta na coleção principal de usuários
@@ -1013,9 +1001,6 @@ export async function fetchUserFromFirestoreByEmail(email: string): Promise<Usua
  * Carrega todos os usuários salvos no Firestore de forma direta e síncrona
  */
 export async function fetchAllUsersFromFirestore(): Promise<UsuarioEquipe[]> {
-  if (!auth.currentUser) {
-    return [];
-  }
   try {
     const snap = await getDocs(collection(db, COLLECTIONS.USUARIOS));
     if (!snap.empty) {
@@ -1257,9 +1242,6 @@ export function canAccessFinancials(user?: UsuarioEquipe | null): boolean {
  * Auto-cura e garantia de existência do Super Admin no Firestore
  */
 export async function ensureSuperAdminInFirestore(): Promise<void> {
-  if (!auth.currentUser) {
-    return;
-  }
   try {
     const superAdminData: UsuarioEquipe = {
       id: 'user-super-admin',

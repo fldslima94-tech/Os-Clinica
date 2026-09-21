@@ -32,8 +32,10 @@ import {
   Layers,
   ArrowLeftRight,
   Filter,
-  ArrowLeft
+  ArrowLeft,
+  Download
 } from 'lucide-react';
+import { downloadIcsFile } from '../services/calendarExportService';
 import { 
   Paciente, 
   Agendamento, 
@@ -1577,6 +1579,17 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
                   <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
                     Histórico Completo de Agendamentos & Sessões ({pacienteAgendamentos.length})
                   </h4>
+                  {pacienteAgendamentos.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => downloadIcsFile(pacienteAgendamentos, [paciente], clinicaConfig, `consultas_${paciente.nome.replace(/\s+/g, '_')}.ics`)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors border border-indigo-200/70 cursor-pointer"
+                      title="Exportar todas as consultas deste paciente em arquivo .ICS para Google/Apple Agenda"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Exportar Sessões (.ICS)</span>
+                    </button>
+                  )}
                 </div>
                 {pacienteAgendamentos.length === 0 ? (
                   <div className="text-center py-8 text-slate-400 text-xs bg-slate-50 rounded-2xl border border-dashed border-slate-200">
@@ -1602,14 +1615,24 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
                               </span>
                             </div>
                           </div>
-                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold capitalize ${
-                            ag.status === 'concluido' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                            ag.status === 'confirmado' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                            ag.status === 'cancelado' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
-                            'bg-amber-50 text-amber-700 border border-amber-200'
-                          }`}>
-                            {ag.status}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold capitalize ${
+                              ag.status === 'concluido' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                              ag.status === 'confirmado' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                              ag.status === 'cancelado' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
+                              'bg-amber-50 text-amber-700 border border-amber-200'
+                            }`}>
+                              {ag.status}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => downloadIcsFile(ag, [paciente], clinicaConfig)}
+                              className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                              title="Exportar este agendamento para Google Agenda ou Apple Calendar (.ICS)"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       );
                     })}

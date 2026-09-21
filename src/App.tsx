@@ -316,9 +316,9 @@ export default function App() {
   const [appointmentInitialData, setAppointmentInitialData] = useState<Partial<Agendamento> | null>(null);
 
   // Toast notifications
-  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
+  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'warning' | 'error' } | null>(null);
 
-  const showToast = (text: string, type: 'success' | 'info' = 'success') => {
+  const showToast = (text: string, type: 'success' | 'info' | 'warning' | 'error' = 'success') => {
     setToastMessage({ text, type });
     setTimeout(() => {
       setToastMessage(null);
@@ -412,13 +412,8 @@ export default function App() {
     };
   }, []);
 
-  // 2. Sincronização de Coleções Protegidas (disparada exclusivamente após autenticação confirmada)
+  // 2. Sincronização de Coleções com o Firestore (iniciada logo após o login no sistema)
   useEffect(() => {
-    // Evita disparos de onSnapshot com auth.currentUser === null para garantir segurança e eliminar erros de permissão
-    if (!firebaseAuthUser && !auth.currentUser) {
-      return;
-    }
-
     if (!isAuthenticated) {
       return;
     }
@@ -1963,7 +1958,7 @@ export default function App() {
   };
 
   // User Management Handlers
-  const handleSaveUser = (novo: Omit<UsuarioEquipe, 'id' | 'created_at'>) => {
+  const handleSaveUser = async (novo: Omit<UsuarioEquipe, 'id' | 'created_at'>) => {
     const cleanEmail = (novo.email || '').trim().toLowerCase();
     const created: UsuarioEquipe = {
       ...novo,
@@ -1973,23 +1968,41 @@ export default function App() {
       ultimo_acesso: 'Agora',
     };
     setUsuarios(prev => [created, ...prev]);
-    saveDocument(COLLECTIONS.USUARIOS, created);
-    saveDocument(COLLECTIONS.PERFIS, created);
-    showToast(`Novo usuário ${created.nome} cadastrado e sincronizado no banco de dados!`);
+    try {
+      const res = await saveDocument(COLLECTIONS.USUARIOS, created);
+      await saveDocument(COLLECTIONS.PERFIS, created);
+      if (res.success) {
+        showToast(`Novo usuário ${created.nome} cadastrado e salvo no banco de dados Firebase!`);
+      } else {
+        showToast(`Usuário salvo localmente. Aviso ao sincronizar com banco: ${res.error || 'Verifique conexão'}`, 'warning');
+      }
+    } catch (err: any) {
+      console.error('[handleSaveUser] Erro ao gravar usuário no Firestore:', err);
+      showToast(`Erro ao gravar usuário no banco: ${err?.message || err}`, 'error');
+    }
   };
 
-  const handleUpdateUser = (updated: UsuarioEquipe) => {
+  const handleUpdateUser = async (updated: UsuarioEquipe) => {
     const cleanEmail = (updated.email || '').trim().toLowerCase();
     const sanitized = { ...updated, email: cleanEmail };
     setUsuarios(prev =>
       prev.map(u => (u.id === sanitized.id ? sanitized : u))
     );
-    saveDocument(COLLECTIONS.USUARIOS, sanitized);
-    saveDocument(COLLECTIONS.PERFIS, sanitized);
     if (currentUser.id === sanitized.id) {
       setCurrentUser(sanitized);
     }
-    showToast(`Dados de ${sanitized.nome} atualizados e sincronizados!`);
+    try {
+      const res = await saveDocument(COLLECTIONS.USUARIOS, sanitized);
+      await saveDocument(COLLECTIONS.PERFIS, sanitized);
+      if (res.success) {
+        showToast(`Dados de ${sanitized.nome} atualizados e sincronizados no Firebase!`);
+      } else {
+        showToast(`Atualizado localmente. Aviso ao sincronizar: ${res.error}`, 'warning');
+      }
+    } catch (err: any) {
+      console.error('[handleUpdateUser] Erro ao sincronizar atualização:', err);
+      showToast(`Erro ao salvar atualização no banco: ${err?.message || err}`, 'error');
+    }
   };
 
   const handleRequestSwitchUser = (targetUser?: UsuarioEquipe) => {
@@ -2311,6 +2324,7 @@ export default function App() {
               agendamentos={agendamentos}
               pacientes={pacientes}
               profissionais={usuarios}
+              clinicaConfig={clinicaConfig}
               onOpenNewAppointment={(initialData) => {
                 setAppointmentInitialData(initialData || null);
                 setIsNewAppointmentOpen(true);

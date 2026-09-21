@@ -24,17 +24,21 @@ import {
   RotateCcw,
   Check,
   Hourglass,
-  AlertTriangle
+  AlertTriangle,
+  Download
 } from 'lucide-react';
-import { Agendamento, Paciente, StatusAgendamento, UsuarioEquipe } from '../types';
+import { Agendamento, ClinicaConfig, Paciente, StatusAgendamento, UsuarioEquipe } from '../types';
 import { CalendarGridView } from './CalendarGridView';
 import { GoogleCalendarSyncModal } from './GoogleCalendarSyncModal';
+import { ExportAppointmentModal } from './ExportAppointmentModal';
+import { downloadIcsFile } from '../services/calendarExportService';
 import { isUserAdminTotal, isUserAdminLocalOrTotal } from '../services/firebaseService';
 
 interface AppointmentsViewProps {
   agendamentos: Agendamento[];
   pacientes: Paciente[];
   profissionais?: UsuarioEquipe[];
+  clinicaConfig?: ClinicaConfig;
   onOpenNewAppointment: (initialData?: Partial<Agendamento>) => void;
   onUpdateStatus: (id: string, status: StatusAgendamento) => void;
   onViewPatient: (paciente: Paciente) => void;
@@ -55,6 +59,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
   agendamentos,
   pacientes,
   profissionais = [],
+  clinicaConfig,
   onOpenNewAppointment,
   onUpdateStatus,
   onViewPatient,
@@ -74,6 +79,9 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
   const [appointmentToDelete, setAppointmentToDelete] = useState<Agendamento | null>(null);
   const [selectedContratoAgendamento, setSelectedContratoAgendamento] = useState<Agendamento | null>(null);
   const [isCalendarSyncModalOpen, setIsCalendarSyncModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [selectedExportAgendamento, setSelectedExportAgendamento] = useState<Agendamento | null>(null);
+  const [exportBatchConfig, setExportBatchConfig] = useState<{ agendamentos: Agendamento[]; titulo: string } | null>(null);
 
   // Today filter for Balcão (00:00 to 23:59)
   const isToday = (dateStr?: string) => {
@@ -303,6 +311,22 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
           </button>
 
           <button
+            onClick={() => {
+              setSelectedExportAgendamento(null);
+              setExportBatchConfig({
+                titulo: 'Exportar Agendamentos Filtrados (.ICS)',
+                agendamentos: filtered
+              });
+              setIsExportModalOpen(true);
+            }}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-indigo-50/50 text-indigo-700 border border-indigo-200 rounded-lg text-sm font-semibold transition-colors cursor-pointer shadow-2xs"
+            title="Exportar agendamentos em formato universal .ICS (Apple Calendar / Google Agenda / Outlook)"
+          >
+            <Download className="w-4 h-4 text-indigo-600" />
+            <span>Exportar .ICS</span>
+          </button>
+
+          <button
             onClick={() => onOpenNewAppointment?.()}
             className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-lg text-sm font-semibold transition-colors cursor-pointer shadow-sm"
           >
@@ -335,6 +359,22 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setSelectedExportAgendamento(null);
+                  setExportBatchConfig({
+                    titulo: 'Exportar Balcão do Dia (.ICS)',
+                    agendamentos: balcaoAgendamentos
+                  });
+                  setIsExportModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl transition-all border border-white/20 cursor-pointer"
+                title="Exportar todas as consultas de hoje em arquivo .ICS para celular ou Google/Apple Agenda"
+              >
+                <Download className="w-3.5 h-3.5 text-indigo-200" />
+                <span>Exportar Hoje (.ICS)</span>
+              </button>
+
               <button
                 onClick={() => onOpenNewAppointment?.()}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
@@ -624,6 +664,19 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                                 </button>
                               )}
 
+                              {/* EXPORTAR AGENDAMENTO (.ICS) */}
+                              <button
+                                onClick={() => {
+                                  setSelectedExportAgendamento(ag);
+                                  setExportBatchConfig(null);
+                                  setIsExportModalOpen(true);
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors cursor-pointer"
+                                title="Exportar Agendamento (.ics para Apple Calendar / Google Agenda)"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                              </button>
+
                               {/* EXCLUIR AGENDAMENTO (ADMIN / MASTER) */}
                               {isAdmin && onDeleteAppointment && (
                                 <button
@@ -650,11 +703,25 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
           agendamentos={filtered}
           pacientes={pacientes}
           profissionais={profissionais}
+          clinicaConfig={clinicaConfig}
           onOpenNewAppointment={onOpenNewAppointment}
           onSelectAgendamento={(ag) => handleConcludeClick(ag)}
           onViewPatient={onViewPatient}
           onUpdateStatus={onUpdateStatus}
           onRescheduleAppointment={onRescheduleAppointment}
+          onExportAgendamento={(ag) => {
+            setSelectedExportAgendamento(ag);
+            setExportBatchConfig(null);
+            setIsExportModalOpen(true);
+          }}
+          onExportBatch={(batch, titulo) => {
+            setSelectedExportAgendamento(null);
+            setExportBatchConfig({
+              titulo,
+              agendamentos: batch
+            });
+            setIsExportModalOpen(true);
+          }}
         />
       ) : viewFormat === 'profissionais' ? (
         /* VISÃO SEPARADA POR PROFISSIONAL (COLUNAS / ABAS) */
@@ -713,9 +780,27 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                       </div>
                     </div>
 
-                    <span className="text-xs bg-indigo-50 text-indigo-700 font-bold px-2 py-1 rounded-md border border-indigo-200/60 shrink-0">
-                      {profAgendamentos.length} horários
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-xs bg-indigo-50 text-indigo-700 font-bold px-2 py-1 rounded-md border border-indigo-200/60">
+                        {profAgendamentos.length} horários
+                      </span>
+                      {profAgendamentos.length > 0 && (
+                        <button
+                          onClick={() => {
+                            setSelectedExportAgendamento(null);
+                            setExportBatchConfig({
+                              titulo: `Exportar Agenda: ${prof.nome} (.ICS)`,
+                              agendamentos: profAgendamentos
+                            });
+                            setIsExportModalOpen(true);
+                          }}
+                          className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-white rounded transition-colors cursor-pointer"
+                          title={`Exportar toda a agenda de ${prof.nome} (.ics)`}
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Appointments for this professional */}
@@ -821,6 +906,18 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                                 ) : (
                                   <span className="text-[11px] text-slate-400 font-medium italic">Atendimento Finalizado</span>
                                 )}
+
+                                <button
+                                  onClick={() => {
+                                    setSelectedExportAgendamento(ag);
+                                    setExportBatchConfig(null);
+                                    setIsExportModalOpen(true);
+                                  }}
+                                  className="p-1 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 rounded transition-colors cursor-pointer"
+                                  title="Exportar Agendamento (.ics para Apple Calendar / Google Agenda)"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                </button>
 
                                 {isAdmin && onDeleteAppointment && (
                                   <button
@@ -1060,6 +1157,17 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                           <XCircle className="w-4 h-4" />
                         </button>
                       )}
+                      <button
+                        onClick={() => {
+                          setSelectedExportAgendamento(ag);
+                          setExportBatchConfig(null);
+                          setIsExportModalOpen(true);
+                        }}
+                        className="p-1.5 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 rounded-md transition-colors cursor-pointer"
+                        title="Exportar Agendamento (.ics para Apple Calendar / Google Agenda)"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
                       {isAdmin && onDeleteAppointment && (
                         <button
                           onClick={() => setAppointmentToDelete(ag)}
@@ -1159,6 +1267,21 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
         onClose={() => setIsCalendarSyncModalOpen(false)}
         agendamentos={agendamentos}
         pacientes={pacientes}
+      />
+
+      {/* MODAL DE EXPORTAÇÃO .ICS (GOOGLE AGENDA & APPLE CALENDAR) */}
+      <ExportAppointmentModal
+        isOpen={isExportModalOpen}
+        onClose={() => {
+          setIsExportModalOpen(false);
+          setSelectedExportAgendamento(null);
+          setExportBatchConfig(null);
+        }}
+        agendamento={selectedExportAgendamento}
+        agendamentosEmLote={exportBatchConfig?.agendamentos || (selectedExportAgendamento ? undefined : filtered)}
+        pacientes={pacientes}
+        clinicaConfig={clinicaConfig}
+        tituloLote={exportBatchConfig?.titulo || 'Exportar Agendamentos Filtrados (.ICS)'}
       />
 
     </div>

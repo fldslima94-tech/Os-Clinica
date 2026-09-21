@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, User, Shield, Mail, Phone, Award, CheckCircle2, Lock, UserCheck, Crown, Building2, UserCircle, Sparkles, Stethoscope, Percent } from 'lucide-react';
+import { X, User, Shield, Mail, Phone, Award, CheckCircle2, Lock, UserCheck, Crown, Building2, UserCircle, Sparkles } from 'lucide-react';
 import { UsuarioEquipe, UserRole, PermissoesUsuario } from '../types';
 
 interface NewUserModalProps {
@@ -24,9 +24,7 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
   const [role, setRole] = useState<UserRole>('usuario');
   const [telefone, setTelefone] = useState('');
   const [senha, setSenha] = useState('');
-  const [registroProfissional, setRegistroProfissional] = useState('');
-  const [especialidade, setEspecialidade] = useState('');
-  const [comissaoPercent, setComissaoPercent] = useState<number | string>(30);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Default permissions based on role
   const [permissoes, setPermissoes] = useState<PermissoesUsuario>({
@@ -80,7 +78,7 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nome.trim() || !email.trim()) return;
 
@@ -93,83 +91,83 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
     const cleanRole = role === 'admin_master' ? 'admin_total' : role;
     const isMasterOrGestor = cleanRole === 'admin_total' || cleanRole === 'admin_local';
 
-    if (saveHandler) {
-      saveHandler({
-        nome: nome.trim(),
-        nomeCompleto: nome.trim(),
-        email: cleanEmail,
-        senha: senha.trim() || defaultPass,
-        cargo: cargo.trim() || (
-          cleanRole === 'admin_total' ? 'Admin Master' :
-          cleanRole === 'admin_local' ? 'Admin Local' :
-          cleanRole === 'cliente' ? 'Cliente' : 'Profissional da Equipe'
-        ),
-        role: cleanRole,
-        telefone: telefone.trim(),
-        registro_profissional: registroProfissional.trim() || undefined,
-        especialidade: especialidade.trim() || undefined,
-        porcentagem_comissao: Number(comissaoPercent) || 0,
-        status: 'ativo',
-        permissoes,
-        permissoesCustomizadas: {
-          financeiro: {
-            verEntradas: permissoes.ver_financeiro_completo || isMasterOrGestor,
-            verSaidas: permissoes.ver_financeiro_completo || isMasterOrGestor,
-            verRecorrentes: permissoes.ver_financeiro_completo || isMasterOrGestor,
-            excluir: cleanRole === 'admin_total',
-            verRelatorios: permissoes.ver_financeiro_completo || isMasterOrGestor,
-          },
-          clientes: {
-            criar: true,
-            editar: true,
-            excluir: cleanRole === 'admin_total' || cleanRole === 'admin_local',
-            verHistorico: true,
-            preencherAnamnese: true,
-          },
-          agenda: {
-            verTodos: true,
-            verPropria: true,
-            criar: true,
-            cancelar: true,
-            finalizar: true,
-          },
-          procedimentos: {
-            verCustos: permissoes.ver_financeiro_completo || isMasterOrGestor,
-            verMargem: permissoes.ver_financeiro_completo || isMasterOrGestor,
-            criar: isMasterOrGestor,
-            excluir: cleanRole === 'admin_total',
-            ajustarEstoque: true,
-          },
-          bens: {
-            visualizar: true,
-            cadastrar: isMasterOrGestor,
-            editar: isMasterOrGestor,
-            gerenciar: isMasterOrGestor,
-            excluir: cleanRole === 'admin_total',
-            manutencao: true,
-          },
-          estoque: {
-            ajustar: true,
-            excluir: cleanRole === 'admin_total',
-          },
-          orcamentos: {
-            verTodos: true,
-            responder: true,
-            verEmails: true,
+    setIsSubmitting(true);
+    try {
+      if (saveHandler) {
+        await Promise.resolve(saveHandler({
+          nome: nome.trim(),
+          nomeCompleto: nome.trim(),
+          email: cleanEmail,
+          senha: senha.trim() || defaultPass,
+          cargo: cargo.trim() || (
+            cleanRole === 'admin_total' ? 'Admin Master' :
+            cleanRole === 'admin_local' ? 'Admin Local' :
+            cleanRole === 'cliente' ? 'Cliente' : 'Profissional da Equipe'
+          ),
+          role: cleanRole,
+          telefone: telefone.trim(),
+          status: 'ativo',
+          permissoes,
+          permissoesCustomizadas: {
+            financeiro: {
+              verEntradas: permissoes.ver_financeiro_completo || isMasterOrGestor,
+              verSaidas: permissoes.ver_financeiro_completo || isMasterOrGestor,
+              verRecorrentes: permissoes.ver_financeiro_completo || isMasterOrGestor,
+              excluir: cleanRole === 'admin_total',
+              verRelatorios: permissoes.ver_financeiro_completo || isMasterOrGestor,
+            },
+            clientes: {
+              criar: true,
+              editar: true,
+              excluir: cleanRole === 'admin_total' || cleanRole === 'admin_local',
+              verHistorico: true,
+              preencherAnamnese: true,
+            },
+            agenda: {
+              verTodos: true,
+              verPropria: true,
+              criar: true,
+              cancelar: true,
+              finalizar: true,
+            },
+            procedimentos: {
+              verCustos: permissoes.ver_financeiro_completo || isMasterOrGestor,
+              verMargem: permissoes.ver_financeiro_completo || isMasterOrGestor,
+              criar: isMasterOrGestor,
+              excluir: cleanRole === 'admin_total',
+              ajustarEstoque: true,
+            },
+            bens: {
+              visualizar: true,
+              cadastrar: isMasterOrGestor,
+              editar: isMasterOrGestor,
+              gerenciar: isMasterOrGestor,
+              excluir: cleanRole === 'admin_total',
+              manutencao: true,
+            },
+            estoque: {
+              ajustar: true,
+              excluir: cleanRole === 'admin_total',
+            },
+            orcamentos: {
+              verTodos: true,
+              responder: true,
+              verEmails: true,
+            }
           }
-        }
-      });
-    }
+        }));
+      }
 
-    // Reset and close
-    setNome('');
-    setEmail('');
-    setSenha('');
-    setCargo('Usuário da Equipe');
-    setTelefone('');
-    setRegistroProfissional('');
-    setEspecialidade('');
-    onClose();
+      // Reset and close
+      setNome('');
+      setEmail('');
+      setSenha('');
+      setCargo('Usuário da Equipe');
+      setTelefone('');
+      onClose();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -184,7 +182,7 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900">Novo Cadastro de Usuário / Profissional</h2>
-              <p className="text-xs text-slate-500">Cadastre profissionais reais, recepcionistas e gestores com comissões</p>
+              <p className="text-xs text-slate-500">Cadastre profissionais reais, recepcionistas e gestores</p>
             </div>
           </div>
           <button
@@ -322,47 +320,6 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
             </div>
           </div>
 
-          {/* Registro Profissional e Especialidade */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Conselho / Registro (CRM, CRBM...)</label>
-              <input
-                type="text"
-                value={registroProfissional}
-                onChange={(e) => setRegistroProfissional(e.target.value)}
-                placeholder="Ex: CRBM 42.190 / CRM 189.200"
-                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Especialidade Clínica</label>
-              <input
-                type="text"
-                value={especialidade}
-                onChange={(e) => setEspecialidade(e.target.value)}
-                placeholder="Ex: Harmonização Facial, Laser..."
-                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                <Percent className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Comissão (%)</span>
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={comissaoPercent}
-                onChange={(e) => setComissaoPercent(e.target.value)}
-                placeholder="Ex: 30"
-                className="w-full px-3 py-2 text-xs bg-white border border-emerald-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 font-bold text-emerald-800"
-              />
-            </div>
-          </div>
-
           {/* Email, Senha e Telefone */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
@@ -454,17 +411,28 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
           <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
             <button
               type="button"
+              disabled={isSubmitting}
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+              disabled={isSubmitting}
+              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-75"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Salvar Cadastro de Profissional</span>
+              {isSubmitting ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Salvando no Banco...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Salvar Cadastro de Profissional</span>
+                </>
+              )}
             </button>
           </div>
 

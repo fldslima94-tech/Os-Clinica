@@ -13,14 +13,17 @@ import {
   Move,
   ArrowRightLeft,
   Sparkles,
-  Lock
+  Lock,
+  Download
 } from 'lucide-react';
-import { Agendamento, Paciente, StatusAgendamento, UsuarioEquipe } from '../types';
+import { Agendamento, ClinicaConfig, Paciente, StatusAgendamento, UsuarioEquipe } from '../types';
+import { downloadIcsFile } from '../services/calendarExportService';
 
 interface CalendarGridViewProps {
   agendamentos: Agendamento[];
   pacientes: Paciente[];
   profissionais?: UsuarioEquipe[];
+  clinicaConfig?: ClinicaConfig;
   onOpenNewAppointment: (initialData?: Partial<Agendamento>) => void;
   onSelectAgendamento: (agendamento: Agendamento) => void;
   onViewPatient: (paciente: Paciente) => void;
@@ -31,6 +34,8 @@ interface CalendarGridViewProps {
     profissionalId?: string, 
     profissionalNome?: string
   ) => void;
+  onExportAgendamento?: (agendamento: Agendamento) => void;
+  onExportBatch?: (agendamentos: Agendamento[], titulo: string) => void;
 }
 
 const HOURS = [
@@ -42,11 +47,14 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
   agendamentos,
   pacientes,
   profissionais = [],
+  clinicaConfig,
   onOpenNewAppointment,
   onSelectAgendamento,
   onViewPatient,
   onUpdateStatus,
   onRescheduleAppointment,
+  onExportAgendamento,
+  onExportBatch,
 }) => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<'semana' | 'dia'>('semana');
@@ -287,6 +295,45 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
           </div>
 
           <button
+            onClick={() => {
+              const visible = agendamentos.filter(ag => {
+                try {
+                  if (selectedProfissionalId !== 'todos') {
+                    if (ag.profissional_id !== selectedProfissionalId) return false;
+                  }
+                  const d = new Date(ag.data_hora);
+                  if (isNaN(d.getTime())) return false;
+                  if (viewMode === 'semana') {
+                    return weekDays.some(wd => isSameDay(wd, d));
+                  } else {
+                    return isSameDay(selectedDate, d);
+                  }
+                } catch {
+                  return false;
+                }
+              });
+
+              const title = viewMode === 'semana' ? 'Exportar Agendamentos da Semana (.ICS)' : 'Exportar Agendamentos do Dia (.ICS)';
+
+              if (onExportBatch) {
+                onExportBatch(visible, title);
+              } else {
+                downloadIcsFile(
+                  visible, 
+                  pacientes, 
+                  clinicaConfig, 
+                  viewMode === 'semana' ? 'agenda_semana.ics' : 'agenda_dia.ics'
+                );
+              }
+            }}
+            className="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-indigo-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+            title="Exportar agendamentos visíveis para Apple Calendar / Google Agenda (.ICS)"
+          >
+            <Download className="w-3.5 h-3.5 text-indigo-600" />
+            <span className="hidden sm:inline">Exportar .ICS</span>
+          </button>
+
+          <button
             onClick={() => onOpenNewAppointment()}
             className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
           >
@@ -431,11 +478,28 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
                                     </p>
                                   )}
 
-                                  {ag.valor_estimado ? (
-                                    <p className="text-[10px] font-mono font-bold mt-0.5 text-slate-800 pl-3.5">
-                                      R$ {ag.valor_estimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                    </p>
-                                  ) : null}
+                                  <div className="flex items-center justify-between mt-1 pl-3.5 pt-1 border-t border-black/5">
+                                    {ag.valor_estimado ? (
+                                      <p className="text-[10px] font-mono font-bold text-slate-800">
+                                        R$ {ag.valor_estimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                      </p>
+                                    ) : <span />}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (onExportAgendamento) {
+                                          onExportAgendamento(ag);
+                                        } else {
+                                          downloadIcsFile(ag, pacientes, clinicaConfig);
+                                        }
+                                      }}
+                                      className="p-0.5 text-slate-400 hover:text-indigo-600 hover:bg-white/80 rounded transition-colors cursor-pointer"
+                                      title="Exportar agendamento (.ics)"
+                                    >
+                                      <Download className="w-3 h-3" />
+                                    </button>
+                                  </div>
                                 </div>
                               );
                             })}
@@ -568,6 +632,20 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
                               </div>
 
                               <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (onExportAgendamento) {
+                                      onExportAgendamento(ag);
+                                    } else {
+                                      downloadIcsFile(ag, pacientes, clinicaConfig);
+                                    }
+                                  }}
+                                  className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                                  title="Exportar agendamento (.ics para Apple Calendar / Google Agenda)"
+                                >
+                                  <Download className="w-4 h-4" />
+                                </button>
                                 {patient && (
                                   <button
                                     onClick={() => onViewPatient(patient)}
