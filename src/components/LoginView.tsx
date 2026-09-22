@@ -13,7 +13,7 @@ import {
   Building2,
   LockKeyhole
 } from 'lucide-react';
-import { UsuarioEquipe } from '../types';
+import { UsuarioEquipe, ClinicaConfig } from '../types';
 import { 
   auth,
   isUserAdminTotal, 
@@ -28,11 +28,13 @@ import {
 interface LoginViewProps {
   usuarios: UsuarioEquipe[];
   onLoginSuccess: (usuario: UsuarioEquipe) => void;
+  clinicaConfig?: ClinicaConfig;
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({
   usuarios,
   onLoginSuccess,
+  clinicaConfig,
 }) => {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
@@ -346,17 +348,27 @@ export const LoginView: React.FC<LoginViewProps> = ({
       {/* Top Header Branding */}
       <header className="max-w-6xl w-full mx-auto flex items-center justify-between py-2 relative z-10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-600 border border-indigo-400/40 flex items-center justify-center text-white shadow-lg shadow-indigo-600/20">
-            <Sparkles className="w-5 h-5" />
-          </div>
+          {clinicaConfig?.logomarca_url ? (
+            <img
+              src={clinicaConfig.logomarca_url}
+              alt={clinicaConfig.nome || 'Logo da Clínica'}
+              className="w-10 h-10 rounded-2xl object-cover border border-slate-700/80 shadow-lg"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-2xl bg-indigo-600 border border-indigo-400/40 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-indigo-600/20">
+              {(clinicaConfig?.nome || 'A').charAt(0).toUpperCase()}
+            </div>
+          )}
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xl font-bold tracking-tight text-white font-serif">EstéticaOS</span>
+              <span className="text-xl font-bold tracking-tight text-white font-serif">
+                {clinicaConfig?.nome || 'AuraEstética Studio'}
+              </span>
               <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-400/30">
-                v2.5
+                Sistema
               </span>
             </div>
-            <p className="text-xs text-slate-400">Sistema de Gestão & Balcão de Recepção</p>
+            <p className="text-xs text-slate-400">Portal de Acesso & Gestão da Clínica</p>
           </div>
         </div>
 
@@ -540,7 +552,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
       {/* Footer */}
       <footer className="max-w-6xl w-full mx-auto text-center py-2 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-slate-800/80 pt-4 relative z-10">
         <div>
-          <span>EstéticaOS • Sistema de Gestão Clínica</span>
+          <span>{clinicaConfig?.nome || 'AuraEstética Studio'} • Sistema de Gestão Clínica</span>
         </div>
         <div className="flex items-center gap-4 text-slate-400">
           <span>Termos de Uso</span>

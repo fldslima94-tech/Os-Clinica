@@ -22,9 +22,13 @@ import {
   SlidersHorizontal,
   Info,
   Calendar,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Images,
+  ChevronLeft,
+  ChevronRight,
+  X as CloseIcon
 } from 'lucide-react';
-import { EstoqueInsumo, ProcedimentoClinico, UsuarioEquipe } from '../types';
+import { EstoqueInsumo, ProcedimentoClinico, UsuarioEquipe, CATEGORIAS_PROCEDIMENTOS_PERMITIDAS } from '../types';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 import { isUserAdminTotal } from '../services/firebaseService';
 
@@ -60,6 +64,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [filterMode, setFilterMode] = useState<'todos' | 'criticos' | 'vencimento' | 'ok'>('todos');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [itemToDelete, setItemToDelete] = useState<EstoqueInsumo | null>(null);
+  const [galleryPreviewProc, setGalleryPreviewProc] = useState<ProcedimentoClinico | null>(null);
+  const [galleryPreviewIndex, setGalleryPreviewIndex] = useState(0);
 
   // Helper to check validity status
   const getValidadeStatus = (validadeStr?: string) => {
@@ -77,8 +83,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     return { status: 'ok', label: 'Validade OK', color: 'text-emerald-700 bg-emerald-50 border-emerald-200' };
   };
 
-  // Categories present in procedures
-  const procedureCategories = ['todos', ...Array.from(new Set(procedimentos.map(p => p.categoria)))];
+  // Categories present in procedures (prioritizing the official allowed categories)
+  const procedureCategories = [
+    'todos',
+    ...CATEGORIAS_PROCEDIMENTOS_PERMITIDAS,
+    ...Array.from(new Set(procedimentos.map(p => p.categoria))).filter(
+      c => c && !CATEGORIAS_PROCEDIMENTOS_PERMITIDAS.includes(c as any)
+    )
+  ];
 
   // Insumos filtering
   const filteredInsumos = estoque.filter(item => {
@@ -128,7 +140,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     <div className="space-y-6">
       
       {/* Top Banner & Module Selector */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5 mb-1">
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
@@ -210,7 +222,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         <div className="space-y-6">
           
           {/* Filters & Search */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          <div className="bg-white p-4 rounded-3xl border border-slate-200/90 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
@@ -218,7 +230,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 placeholder="Buscar por nome do procedimento, categoria, benefício..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="w-full pl-9 pr-4 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               />
             </div>
 
@@ -248,43 +260,95 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               return (
                 <div
                   key={proc.id}
-                  className={`bg-white rounded-2xl border transition-all duration-200 shadow-sm overflow-hidden flex flex-col justify-between ${
-                    !proc.ativo ? 'opacity-70 bg-slate-50/70 border-slate-200' : 'border-slate-200 hover:border-indigo-300 hover:shadow-md'
+                  className={`bg-white rounded-3xl border transition-all duration-200 shadow-sm hover:shadow-md overflow-hidden flex flex-col justify-between ${
+                    !proc.ativo ? 'opacity-70 bg-slate-50/70 border-slate-200' : 'border-slate-200/90 hover:border-indigo-300'
                   }`}
                 >
                   {/* Card Header & Image if exists */}
                   <div>
-                    {proc.imagem_url && (
-                      <div className="h-36 w-full relative overflow-hidden bg-slate-100">
-                        <img
-                          src={proc.imagem_url}
-                          alt={proc.nome}
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-linear-to-t from-slate-950/60 to-transparent" />
-                        <div className="absolute bottom-2 left-3 right-3 flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-white uppercase tracking-wider bg-slate-900/80 px-2 py-0.5 rounded backdrop-blur-xs">
-                            {proc.categoria}
-                          </span>
-                          <span className="text-xs font-bold text-white bg-indigo-600 px-2 py-0.5 rounded">
-                            {proc.duracao_minutos} min
-                          </span>
+                    {(() => {
+                      const coverImg = (proc.imagens_galeria && proc.imagens_galeria.length > 0)
+                        ? proc.imagens_galeria[0]
+                        : proc.imagem_url;
+                      const hasGallery = proc.imagens_galeria && proc.imagens_galeria.length > 0;
+                      const totalImgs = proc.imagens_galeria?.length || (proc.imagem_url ? 1 : 0);
+
+                      if (!coverImg) {
+                        return (
+                          <div className="p-5 pb-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
+                                {proc.categoria}
+                              </span>
+                              <span className="text-xs font-semibold text-slate-500 flex items-center gap-1">
+                                <Clock className="w-3.5 h-3.5 text-slate-400" />
+                                {proc.duracao_minutos} min
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div>
+                          <div className="h-36 w-full relative overflow-hidden bg-slate-100 group">
+                            <img
+                              src={coverImg}
+                              alt={proc.nome}
+                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            />
+                            <div className="absolute inset-0 bg-linear-to-t from-slate-950/70 via-slate-950/20 to-transparent" />
+                            
+                            {hasGallery && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setGalleryPreviewProc(proc);
+                                  setGalleryPreviewIndex(0);
+                                }}
+                                className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-slate-900/80 hover:bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-xs shadow-xs transition-colors cursor-pointer"
+                                title="Ver mostruário completo de fotos"
+                              >
+                                <Images className="w-3 h-3 text-amber-300" />
+                                <span>{totalImgs} fotos</span>
+                              </button>
+                            )}
+
+                            <div className="absolute bottom-2 left-3 right-3 flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-white uppercase tracking-wider bg-slate-900/80 px-2 py-0.5 rounded backdrop-blur-xs">
+                                {proc.categoria}
+                              </span>
+                              <span className="text-xs font-bold text-white bg-indigo-600 px-2 py-0.5 rounded">
+                                {proc.duracao_minutos} min
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Mini thumbnails strip if multiple images */}
+                          {hasGallery && proc.imagens_galeria && proc.imagens_galeria.length > 1 && (
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50/90 border-b border-slate-100 overflow-x-auto">
+                              <span className="text-[10px] text-slate-400 font-semibold shrink-0">Mostruário:</span>
+                              {proc.imagens_galeria.map((img, idx) => (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  onClick={() => {
+                                    setGalleryPreviewProc(proc);
+                                    setGalleryPreviewIndex(idx);
+                                  }}
+                                  className="w-6 h-6 rounded border border-slate-200 hover:border-indigo-500 overflow-hidden shrink-0 transition-transform active:scale-95 cursor-pointer"
+                                  title={`Foto ${idx + 1}`}
+                                >
+                                  <img src={img} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     <div className="p-5 space-y-3">
-                      {!proc.imagem_url && (
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
-                            {proc.categoria}
-                          </span>
-                          <span className="text-xs font-semibold text-slate-500 flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5 text-slate-400" />
-                            {proc.duracao_minutos} min
-                          </span>
-                        </div>
-                      )}
 
                       <div>
                         <h3 className="text-base font-bold text-slate-900 leading-snug">
@@ -404,7 +468,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           </div>
 
           {filteredProcedimentos.length === 0 && (
-            <div className="bg-white p-12 text-center rounded-2xl border border-slate-200">
+            <div className="bg-white p-12 text-center rounded-3xl border border-slate-200/90 shadow-sm">
               <Sparkles className="w-12 h-12 text-slate-300 mx-auto mb-3" />
               <h3 className="text-base font-bold text-slate-800">Nenhum procedimento encontrado</h3>
               <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
@@ -420,7 +484,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       {currentTab === 'insumos' && (
         <div className="space-y-6">
           {/* Filter and Stats */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
+          <div className="bg-white p-4 rounded-3xl border border-slate-200/90 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
             <div className="relative w-full md:w-80">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
@@ -428,7 +492,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 placeholder="Buscar por nome do insumo ou lote..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="w-full pl-9 pr-4 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               />
             </div>
 
@@ -490,12 +554,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               return (
                 <div
                   key={item.id}
-                  className={`bg-white rounded-xl border p-5 shadow-sm transition-colors flex flex-col justify-between ${
+                  className={`bg-white rounded-3xl border p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between ${
                     valStatus.status === 'expired' 
                       ? 'border-rose-300 ring-1 ring-rose-200/50 bg-rose-50/10' 
                       : isCritical 
                         ? 'border-amber-300 ring-1 ring-amber-200/50' 
-                        : 'border-slate-200 hover:border-slate-300'
+                        : 'border-slate-200/90 hover:border-slate-300'
                   }`}
                 >
                   <div>
@@ -650,7 +714,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           </div>
 
           {filteredInsumos.length === 0 && (
-            <div className="bg-white p-12 text-center rounded-2xl border border-slate-200">
+            <div className="bg-white p-12 text-center rounded-3xl border border-slate-200/90 shadow-sm">
               <Package className="w-12 h-12 text-slate-300 mx-auto mb-3" />
               <h3 className="text-base font-bold text-slate-800">Nenhum insumo ou produto encontrado</h3>
               <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
@@ -667,6 +731,112 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Modal de Visualização de Mostruário / Galeria de Fotos */}
+      {galleryPreviewProc && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setGalleryPreviewProc(null)}
+        >
+          <div 
+            className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl flex flex-col text-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-4 px-5 border-b border-slate-800 flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full">
+                    {galleryPreviewProc.categoria}
+                  </span>
+                  <span className="text-xs text-slate-400">
+                    Foto {galleryPreviewIndex + 1} de {galleryPreviewProc.imagens_galeria?.length || 1}
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-white mt-0.5">
+                  {galleryPreviewProc.nome}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setGalleryPreviewProc(null)}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Fechar"
+              >
+                <CloseIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Main Picture */}
+            <div className="relative bg-black flex items-center justify-center min-h-[300px] max-h-[60vh] overflow-hidden group">
+              {(() => {
+                const photos = galleryPreviewProc.imagens_galeria && galleryPreviewProc.imagens_galeria.length > 0
+                  ? galleryPreviewProc.imagens_galeria
+                  : galleryPreviewProc.imagem_url ? [galleryPreviewProc.imagem_url] : [];
+                const currentPhoto = photos[galleryPreviewIndex] || photos[0];
+
+                if (!currentPhoto) return null;
+
+                return (
+                  <>
+                    <img
+                      src={currentPhoto}
+                      alt={`${galleryPreviewProc.nome} - Foto ${galleryPreviewIndex + 1}`}
+                      className="max-h-[60vh] w-auto max-w-full object-contain"
+                    />
+
+                    {/* Pagination arrows if > 1 */}
+                    {photos.length > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setGalleryPreviewIndex((prev) => (prev === 0 ? photos.length - 1 : prev - 1));
+                          }}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-slate-900/70 hover:bg-indigo-600 text-white backdrop-blur-xs transition-colors cursor-pointer"
+                          title="Foto anterior"
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setGalleryPreviewIndex((prev) => (prev === photos.length - 1 ? 0 : prev + 1));
+                          }}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-slate-900/70 hover:bg-indigo-600 text-white backdrop-blur-xs transition-colors cursor-pointer"
+                          title="Próxima foto"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Thumbnail Strip */}
+            {galleryPreviewProc.imagens_galeria && galleryPreviewProc.imagens_galeria.length > 1 && (
+              <div className="p-3 bg-slate-950 border-t border-slate-800 flex items-center justify-center gap-2 overflow-x-auto">
+                {galleryPreviewProc.imagens_galeria.map((img, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setGalleryPreviewIndex(idx)}
+                    className={`w-12 h-12 rounded-xl overflow-hidden border-2 transition-all cursor-pointer shrink-0 ${
+                      galleryPreviewIndex === idx ? 'border-indigo-500 scale-105 shadow-md' : 'border-slate-800 opacity-60 hover:opacity-100'
+                    }`}
+                  >
+                    <img src={img} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

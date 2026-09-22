@@ -272,7 +272,7 @@ export const FinancialEvolutionChart: React.FC<FinancialEvolutionChartProps> = (
   }, [transacoes, startDate, endDate]);
 
   return (
-    <div className={`bg-white rounded-2xl border border-slate-200 shadow-xs p-5 sm:p-6 space-y-6 ${className}`}>
+    <div className={`bg-white rounded-3xl border border-slate-200/90 shadow-sm p-5 sm:p-6 space-y-6 ${className}`}>
       
       {/* Header with Title & Filter Controls */}
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-100 pb-5">

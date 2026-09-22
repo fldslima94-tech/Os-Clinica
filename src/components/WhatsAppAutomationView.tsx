@@ -13,24 +13,27 @@ import {
   RefreshCw,
   Sliders
 } from 'lucide-react';
-import { Agendamento, Paciente } from '../types';
+import { Agendamento, Paciente, ClinicaConfig } from '../types';
 
 interface WhatsAppAutomationViewProps {
   agendamentos: Agendamento[];
   pacientes: Paciente[];
   onMarkReminderSent: (agendamentoId: string) => void;
+  clinicaConfig?: ClinicaConfig;
 }
 
 export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
   agendamentos,
   pacientes,
   onMarkReminderSent,
+  clinicaConfig,
 }) => {
   const [activeTemplate, setActiveTemplate] = useState<'confirmacao' | 'pre_cuidados' | 'pos_cuidados' | 'retorno'>('confirmacao');
   const [selectedFilter, setSelectedFilter] = useState<'todos' | 'hoje' | 'amanha'>('todos');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const formatMessage = (ag: Agendamento, templateType: string) => {
+    const clinicName = clinicaConfig?.nome || 'nossa clínica';
     const patient = ag.paciente || pacientes.find(p => p.id === ag.paciente_id);
     const patientName = patient?.nome.split(' ')[0] || 'Paciente';
     const dateObj = new Date(ag.data_hora);
@@ -38,11 +41,11 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
     const timeStr = dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
     if (templateType === 'confirmacao') {
-      return `Olá, *${patientName}*! Tudo bem? ✨\n\nPassando para lembrar do seu agendamento de *${ag.procedimento}* na *EstéticaOS*:\n🗓 *Data:* ${dateStr}\n⏰ *Horário:* ${timeStr}\n\nPor gentileza, responda:\n*1* para *Confirmar presença*\n*2* para *Remarcar horário*\n\nEstamos ansiosos para recebê-lo(a)!`;
+      return `Olá, *${patientName}*! Tudo bem? ✨\n\nPassando para lembrar do seu agendamento de *${ag.procedimento}* na *${clinicName}*:\n🗓 *Data:* ${dateStr}\n⏰ *Horário:* ${timeStr}\n\nPor gentileza, responda:\n*1* para *Confirmar presença*\n*2* para *Remarcar horário*\n\nEstamos ansiosos para recebê-lo(a)!`;
     }
 
     if (templateType === 'pre_cuidados') {
-      return `Olá, *${patientName}*! Tudo bem? ✨\n\nSeu procedimento de *${ag.procedimento}* está chegando (${dateStr} às ${timeStr}).\n\n📌 *Orientações Importantes Pré-Procedimento:*\n• Evite bebidas alcoólicas e anti-inflamatórios 24h antes.\n• Venha com a pele limpa e sem maquiagem pesada.\n• Em caso de sintomas gripais ou herpes ativa, avise nossa equipe.\n\nAté breve na EstéticaOS!`;
+      return `Olá, *${patientName}*! Tudo bem? ✨\n\nSeu procedimento de *${ag.procedimento}* está chegando (${dateStr} às ${timeStr}).\n\n📌 *Orientações Importantes Pré-Procedimento:*\n• Evite bebidas alcoólicas e anti-inflamatórios 24h antes.\n• Venha com a pele limpa e sem maquiagem pesada.\n• Em caso de sintomas gripais ou herpes ativa, avise nossa equipe.\n\nAté breve na ${clinicName}!`;
     }
 
     if (templateType === 'pos_cuidados') {

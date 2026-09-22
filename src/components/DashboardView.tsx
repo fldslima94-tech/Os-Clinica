@@ -207,38 +207,40 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   return (
     <div className="space-y-6">
       
-      {/* Top Welcome & Reception Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1">
-              <Calendar className="w-3 h-3" />
-              Balcão do Dia (Hoje)
-            </span>
-            <span className="text-xs text-slate-400 font-medium">
-              {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
-            </span>
-          </div>
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight mt-1">
-            Painel de Recepção & Balcão de Atendimento
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
+            Balcão do Dia
           </h2>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">
-            Filtragem estrita dos atendimentos do dia. Lista otimizada sem exposição de telefones ou valores na recepção.
+          <p className="text-xs sm:text-sm text-slate-500 capitalize mt-0.5">
+            {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 flex-wrap">
           <button
             onClick={() => setModoDetalhado(!modoDetalhado)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-colors cursor-pointer shadow-2xs"
           >
-            {modoDetalhado ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            {modoDetalhado ? <EyeOff className="w-3.5 h-3.5 text-slate-500" /> : <Eye className="w-3.5 h-3.5 text-slate-500" />}
             <span>{modoDetalhado ? 'Ocultar Detalhes' : 'Ver Detalhes'}</span>
           </button>
 
+          {onOpenSecondScreenModal && (
+            <button
+              type="button"
+              onClick={onOpenSecondScreenModal}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200/80 rounded-xl transition-colors cursor-pointer"
+            >
+              <Tv className="w-3.5 h-3.5 text-purple-600" />
+              <span>Transmitir TV</span>
+            </button>
+          )}
+
           <button
             onClick={onOpenNewAppointment}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-sm font-semibold transition-all shadow-sm cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-xs cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Novo Agendamento</span>
@@ -246,117 +248,58 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Real-time Queue Banner */}
-      {(inWaitingRoom > 0 || inProcedure > 0) && (
-        <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 text-white rounded-2xl p-4 sm:p-5 shadow-lg border border-indigo-700 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0">
-              <DoorOpen className="w-5 h-5 text-indigo-300" />
-            </div>
-            <div>
-              <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">
-                Fluxo de Recepção & Salas no Momento
-              </h3>
-              <p className="text-xs text-indigo-200 font-normal mt-0.5">
-                {inWaitingRoom} cliente(s) aguardando no sofá da recepção e {inProcedure} em procedimento na sala.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Painel Operacional do Balcão e Recepção */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
-        <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shrink-0">
-              <Tv className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base sm:text-lg font-bold text-white tracking-tight font-display">
-                  Painel Operacional do Balcão
-                </h3>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-                  Recepção Ativa
-                </span>
-              </div>
-              <p className="text-xs text-indigo-200 font-medium mt-0.5">
-                Acompanhe a fila de chegada, salas de atendimento e espelhe o balcão do dia para a TV da recepção.
-              </p>
-            </div>
-          </div>
-
-          {onOpenSecondScreenModal && (
-            <button
-              type="button"
-              onClick={onOpenSecondScreenModal}
-              className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-bold flex items-center gap-2 transition cursor-pointer shadow-md"
-            >
-              <Tv className="w-4 h-4" />
-              <span>Transmitir para TV Recepção (2ª Tela)</span>
-            </button>
-          )}
-        </div>
-      </div>
-
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-            <span>Total Agendado Hoje</span>
-            <Clock className="w-4 h-4 text-indigo-600" />
+            <span>Total Hoje</span>
+            <Clock className="w-4 h-4 text-slate-400" />
           </div>
-          <p className="text-2xl font-bold text-slate-900 mt-2">{totalToday}</p>
-          <p className="text-[11px] text-slate-400 mt-1">Horários do dia</p>
+          <p className="text-3xl font-bold text-slate-900 mt-3">{totalToday}</p>
         </div>
 
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-amber-200 bg-amber-50/20 shadow-xs">
-          <div className="flex items-center justify-between text-amber-800 text-xs font-medium">
-            <span>Na Recepção (Aguardando)</span>
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping" />
+        <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+            <span>Na Recepção</span>
+            <span className={`w-2 h-2 rounded-full ${inWaitingRoom > 0 ? 'bg-amber-500 animate-pulse' : 'bg-slate-300'}`} />
           </div>
-          <p className="text-2xl font-bold text-amber-900 mt-2">{inWaitingRoom}</p>
-          <p className="text-[11px] text-amber-700 mt-1">Prontos para entrar em sala</p>
+          <p className="text-3xl font-bold text-amber-600 mt-3">{inWaitingRoom}</p>
         </div>
 
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-indigo-200 bg-indigo-50/20 shadow-xs">
-          <div className="flex items-center justify-between text-indigo-800 text-xs font-medium">
-            <span>Em Sala (Atendimento)</span>
-            <DoorOpen className="w-4 h-4 text-indigo-600" />
+        <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+            <span>Em Atendimento</span>
+            <DoorOpen className="w-4 h-4 text-indigo-500" />
           </div>
-          <p className="text-2xl font-bold text-indigo-900 mt-2">{inProcedure}</p>
-          <p className="text-[11px] text-indigo-700 mt-1">Sendo atendidos agora</p>
+          <p className="text-3xl font-bold text-indigo-600 mt-3">{inProcedure}</p>
         </div>
 
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-emerald-200 bg-emerald-50/20 shadow-xs">
-          <div className="flex items-center justify-between text-emerald-800 text-xs font-medium">
-            <span>Concluídos Hoje</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+        <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+            <span>Concluídos</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
           </div>
-          <p className="text-2xl font-bold text-emerald-900 mt-2">{completedToday}</p>
-          <p className="text-[11px] text-emerald-700 mt-1">Finalizados com sucesso</p>
+          <p className="text-3xl font-bold text-emerald-600 mt-3">{completedToday}</p>
         </div>
       </div>
 
       {/* Filter and Table Container */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden">
         
         {/* Filter Bar */}
-        <div className="p-4 border-b border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div className="p-4 border-b border-slate-100 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-slate-400" />
-            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-              Filtro por Profissional:
+            <span className="text-xs font-medium text-slate-500">
+              Profissional:
             </span>
             <select
               value={selectedProfissional}
               onChange={(e) => setSelectedProfissional(e.target.value)}
-              className="px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              className="px-3 py-1.5 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             >
               <option value="todos">Todos os Profissionais</option>
               {profissionais.map(p => (
-                <option key={p.id} value={p.nome}>{p.nome} ({p.cargo})</option>
+                <option key={p.id} value={p.nome}>{p.nome}</option>
               ))}
             </select>
           </div>
@@ -365,32 +308,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
             <button
               onClick={() => setStatusFilter('todos')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                statusFilter === 'todos' ? 'bg-indigo-600 text-white shadow-2xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${
+                statusFilter === 'todos' ? 'bg-slate-900 text-white shadow-2xs font-semibold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
               Todos ({totalToday})
             </button>
             <button
               onClick={() => setStatusFilter('em_espera')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                statusFilter === 'em_espera' ? 'bg-amber-500 text-white shadow-2xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${
+                statusFilter === 'em_espera' ? 'bg-amber-600 text-white shadow-2xs font-semibold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
               Recepção ({inWaitingRoom})
             </button>
             <button
               onClick={() => setStatusFilter('em_atendimento')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                statusFilter === 'em_atendimento' ? 'bg-indigo-700 text-white shadow-2xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${
+                statusFilter === 'em_atendimento' ? 'bg-indigo-600 text-white shadow-2xs font-semibold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              Em Sala ({inProcedure})
+              Em Atendimento ({inProcedure})
             </button>
             <button
               onClick={() => setStatusFilter('concluido')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                statusFilter === 'concluido' ? 'bg-slate-700 text-white shadow-2xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${
+                statusFilter === 'concluido' ? 'bg-emerald-600 text-white shadow-2xs font-semibold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
               Concluídos ({completedToday})
@@ -606,38 +549,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Maintenance Preventive Alerts (6.1) */}
+      {/* Maintenance Preventive Alerts */}
       {totalAlertasManutencao > 0 && (
-        <div className="bg-gradient-to-r from-amber-50 via-rose-50 to-indigo-50 border border-amber-200/90 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs">
+        <div className="bg-white border border-amber-200 rounded-3xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
-              <Wrench className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center shrink-0">
+              <Wrench className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h4 className="text-xs sm:text-sm font-bold text-slate-900">
-                  Engenharia Clínica: {totalAlertasManutencao} equipamento(s) requerem atenção
+                <h4 className="text-xs sm:text-sm font-semibold text-slate-900">
+                  Manutenção preventiva necessária ({totalAlertasManutencao} equipamentos)
                 </h4>
-                {equipamentosManutVencida.length > 0 && (
-                  <span className="px-2 py-0.5 text-[10px] font-extrabold bg-rose-600 text-white rounded-full animate-pulse">
-                    {equipamentosManutVencida.length} VENCIDA(S)
-                  </span>
-                )}
               </div>
-              <p className="text-[11px] text-slate-600 mt-1">
+              <p className="text-xs text-slate-500 mt-0.5">
                 {equipamentosManutVencida.length > 0 && (
-                  <span className="text-rose-700 font-semibold mr-2">
-                    🚨 Vencidas: {equipamentosManutVencida.map(e => e.nome).slice(0, 2).join(', ')}
+                  <span className="text-rose-600 font-medium mr-2">
+                    Vencidas: {equipamentosManutVencida.map(e => e.nome).slice(0, 2).join(', ')}
                   </span>
                 )}
                 {equipamentosManutProxima.length > 0 && (
-                  <span className="text-amber-800 font-medium mr-2">
-                    ⚠️ Próximas (15d): {equipamentosManutProxima.map(e => e.nome).slice(0, 2).join(', ')}
-                  </span>
-                )}
-                {equipamentosEmManutencao.length > 0 && (
-                  <span className="text-sky-800 font-medium">
-                    🛠️ Na Assistência: {equipamentosEmManutencao.map(e => e.nome).slice(0, 2).join(', ')}
+                  <span className="text-amber-700 font-medium">
+                    Próximas: {equipamentosManutProxima.map(e => e.nome).slice(0, 2).join(', ')}
                   </span>
                 )}
               </p>
@@ -647,10 +580,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {onGoToBens && (
             <button
               onClick={onGoToBens}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer flex items-center gap-1.5"
+              className="px-3.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl text-xs font-semibold transition-colors shrink-0 cursor-pointer"
             >
-              <Wrench className="w-3.5 h-3.5" />
-              <span>Gerenciar Manutenções</span>
+              Ver Equipamentos
             </button>
           )}
         </div>
@@ -658,23 +590,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Low Stock Warning Alert */}
       {lowStockItems.length > 0 && (
-        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-center justify-between gap-4">
+        <div className="bg-white border border-rose-200 rounded-3xl p-5 flex items-center justify-between gap-4 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
-              <AlertTriangle className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-4 h-4" />
             </div>
             <div>
-              <h4 className="text-xs sm:text-sm font-bold text-rose-900">
-                {lowStockItems.length} insumo(s) abaixo do estoque mínimo
+              <h4 className="text-xs sm:text-sm font-semibold text-slate-900">
+                {lowStockItems.length} insumos com estoque baixo
               </h4>
-              <p className="text-[11px] text-rose-700">
+              <p className="text-xs text-slate-500 mt-0.5">
                 {lowStockItems.map(i => i.nome_item).slice(0, 3).join(', ')}
               </p>
             </div>
           </div>
           <button
             onClick={onGoToEstoque}
-            className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+            className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
           >
             Ver Estoque
           </button>

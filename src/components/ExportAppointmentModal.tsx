@@ -103,7 +103,7 @@ export const ExportAppointmentModal: React.FC<ExportAppointmentModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden my-6">
+      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xl w-full max-w-lg overflow-hidden my-6">
         
         {/* Modal Header */}
         <div className="p-5 border-b border-slate-100 bg-gradient-to-r from-indigo-50/70 via-white to-slate-50 flex items-center justify-between">

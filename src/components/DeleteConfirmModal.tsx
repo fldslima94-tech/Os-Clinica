@@ -54,7 +54,7 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="bg-white rounded-2xl border border-red-100 shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-150">
+      <div className="bg-white rounded-3xl border border-red-100 shadow-xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-150">
         
         {/* Header */}
         <div className="p-5 bg-red-50/70 border-b border-red-100 flex items-start justify-between gap-3">

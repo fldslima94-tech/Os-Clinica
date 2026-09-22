@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   Sparkles, 
@@ -12,9 +12,13 @@ import {
   Package, 
   Image as ImageIcon,
   Check,
-  FileText
+  FileText,
+  Upload,
+  Star,
+  Loader2
 } from 'lucide-react';
-import { ProcedimentoClinico, EstoqueInsumo, UnidadeMedida } from '../types';
+import { ProcedimentoClinico, EstoqueInsumo, UnidadeMedida, CATEGORIAS_PROCEDIMENTOS_PERMITIDAS } from '../types';
+import { compressImageFile } from '../lib/image-utils';
 import { useConnectionStatus } from '../hooks/useConnectionStatus';
 import { Wifi, WifiOff, Database, CloudCheck } from 'lucide-react';
 
@@ -26,15 +30,7 @@ interface ProcedureModalProps {
   estoqueDisponivel?: EstoqueInsumo[];
 }
 
-const CATEGORIAS_PADRAO = [
-  'Injetáveis & Harmonização',
-  'Bioestimuladores & Fios',
-  'Laser & Fototerapia',
-  'Tratamentos Faciais & Peelings',
-  'Corporal & Alta Tecnologia',
-  'Consultas & Avaliações',
-  'Outros Procedimentos',
-];
+const CATEGORIAS_PADRAO = CATEGORIAS_PROCEDIMENTOS_PERMITIDAS;
 
 interface ModeloProcedimento {
   nome: string;
@@ -51,76 +47,100 @@ interface ModeloProcedimento {
 
 const MODELOS_PROCEDIMENTOS: ModeloProcedimento[] = [
   {
-    nome: 'Toxina Botulínica (Botox Completo)',
-    categoria: 'Injetáveis & Harmonização',
+    nome: 'Micropigmentação Labial (Aquarela Lips)',
+    categoria: 'Micropigmentação',
+    duracao_minutos: 90,
+    dias_retorno: 30,
+    valor_tabela: 850,
+    descricao: 'Técnica exclusiva de revitalização e cor labial com efeito translúcido e natural, definindo bordas e uniformizando tons arroxeados ou pálidos.',
+    areas: 'Lábio Superior, Lábio Inferior',
+    indicacoes: 'Lábios desvitalizados, Perda de contorno labial, Correção de assimetria sutil',
+    contraindicacoes: 'Gestantes, Infecção labial ativa (Herpes ativa), Doenças autoimunes descompensadas',
+    cuidados_pos: 'Aplicar pomada cicatrizante recomendada 3 a 5 vezes ao dia. Não retirar as casquinhas durante o processo de cicatrização. Evitar alimentos muito ácidos ou quentes nos primeiros 3 dias.',
+  },
+  {
+    nome: 'Micropigmentação de Sobrancelhas (Shadow Line)',
+    categoria: 'Micropigmentação',
+    duracao_minutos: 90,
+    dias_retorno: 30,
+    valor_tabela: 750,
+    descricao: 'Preenchimento e sombreamento de efeito pó translúcido para sobrancelhas com falhas ou com pouca densidade de pelos.',
+    areas: 'Sobrancelha Direita, Sobrancelha Esquerda',
+    indicacoes: 'Falhas nas sobrancelhas, Falta de desenho, Sobrancelhas ralas',
+    contraindicacoes: 'Dermatites na área, Quelóides ativos, Gestação sem liberação médica',
+    cuidados_pos: 'Higienizar com soro fisiológico, não esfregar a região, evitar piscina e exposição solar durante 10 dias.',
+  },
+  {
+    nome: 'Extensão de Cílios (Volume Russo & Híbrido)',
+    categoria: 'Cilios',
+    duracao_minutos: 120,
+    dias_retorno: 20,
+    valor_tabela: 220,
+    descricao: 'Aplicação de leques e fios ultrafinos de seda, modelando o olhar com leveza, curvatura e densidade personalizada.',
+    areas: 'Cílios Superiores (Olho Direito e Esquerdo)',
+    indicacoes: 'Cílios curtos, Cílios retos, Praticidade no dia a dia sem rímel',
+    contraindicacoes: 'Blefarite ativa, Conjuntivite, Alergia a cianoacrilato',
+    cuidados_pos: 'Não molhar os olhos nas primeiras 24 horas. Evitar demaquilantes oleosos e não esfregar os olhos com força.',
+  },
+  {
+    nome: 'Design de Sombrancelhas com Henna & Mapeamento',
+    categoria: 'Sombrancelhas',
     duracao_minutos: 45,
     dias_retorno: 15,
-    valor_tabela: 1350,
-    descricao: 'Aplicação de toxina botulínica tipo A para atenuação de rugas de expressão, linhas na testa, glabela (entre as sobrancelhas) e pés de galinha.',
-    areas: 'Testa, Glabela, Pés de Galinha, Código de Barras',
-    indicacoes: 'Rugas dinâmicas, Linhas de expressão, Hiperidrose',
-    contraindicacoes: 'Gestantes, Lactantes, Doenças neuromusculares (ex: Miastenia Gravis), Infecção ativa no local',
-    cuidados_pos: 'Não deitar ou abaixar a cabeça por 4 horas. Não praticar exercícios intensos nas primeiras 24h. Não massagear as regiões tratadas.',
+    valor_tabela: 85,
+    descricao: 'Mapeamento facial através de paquímetro e linha, epilação precisa com pinça e aplicação de pigmento natural à base de henna.',
+    areas: 'Arcadas Ciliares e Sobrancelhas',
+    indicacoes: 'Harmonização do olhar, Limpeza de pelos excessivos, Destaque da cor',
+    contraindicacoes: 'Feridas abertas na região, Alergia conhecida a henna',
+    cuidados_pos: 'Evitar lavar a região com sabonete adstringente nas primeiras 8 horas para maior durabilidade da henna.',
   },
   {
-    nome: 'Preenchimento Labial com Ácido Hialurônico (1ml)',
-    categoria: 'Injetáveis & Harmonização',
-    duracao_minutos: 60,
-    dias_retorno: 15,
-    valor_tabela: 1500,
-    descricao: 'Escultura e hidratação labial com ácido hialurônico de alta pureza, definindo contorno, arco do cupido e volume harmônico.',
-    areas: 'Lábio Superior, Lábio Inferior, Arco do Cupido',
-    indicacoes: 'Assimetria labial, Perda de volume, Contorno indefinido, Hidratação profunda',
-    contraindicacoes: 'Gestantes, Infecção labial ativa (Herpes ativa), Doenças autoimunes descompensadas',
-    cuidados_pos: 'Aplicar compressas frias se houver edema leve. Evitar exposição solar direta e bebidas excessivamente quentes nas primeiras 48h.',
-  },
-  {
-    nome: 'Bioestimulador de Colágeno Facial (Sculptra / Elleva)',
-    categoria: 'Bioestimuladores & Fios',
+    nome: 'Limpesa de Pele Profunda + Peeling Ultrassônico & LED',
+    categoria: 'Limpesa de pele',
     duracao_minutos: 60,
     dias_retorno: 30,
-    valor_tabela: 2800,
-    descricao: 'Aplicação subdérmica de ácido poli-L-lático (PLLA) para estímulo biológico progressivo de colágeno novo, restauração da firmeza e combate à flacidez.',
-    areas: 'Terço Médio Facial, Terço Inferior, Linha Mandibular',
-    indicacoes: 'Flacidez tissular, Perda de sustentação, Afinamento cutâneo',
-    contraindicacoes: 'Gestantes, Lactantes, Lesões ativas de pele, Alergia conhecida aos componentes',
-    cuidados_pos: 'Realizar a massagem da regra do 5 (5 vezes ao dia por 5 minutos durante 5 dias). Usar protetor solar diariamente.',
-  },
-  {
-    nome: 'Fios de Sustentação de PDO (Tração e Espiculados)',
-    categoria: 'Bioestimuladores & Fios',
-    duracao_minutos: 75,
-    dias_retorno: 21,
-    valor_tabela: 3200,
-    descricao: 'Inserção de fios de polidioxanona espiculados para efeito lifting não cirúrgico imediato e sustentação tecidual de longo prazo.',
-    areas: 'Malar, Mandíbula, Terço Médio, Papada',
-    indicacoes: 'Queda do contorno facial, Jowls, Sulco nasogeniano marcado, Flacidez facial moderada',
-    contraindicacoes: 'Infecções cutâneas ativas, Doenças autoimunes ativas, Gestação',
-    cuidados_pos: 'Evitar movimentos mastigatórios bruscos ou excessivos por 7 dias. Dormir preferencialmente de barriga para cima. Não massagear o rosto.',
-  },
-  {
-    nome: 'Limpeza de Pele Profunda + Peeling Ultrassônico',
-    categoria: 'Tratamentos Faciais & Peelings',
-    duracao_minutos: 60,
-    dias_retorno: 30,
-    valor_tabela: 250,
-    descricao: 'Higienização profunda, emoliência com vapor de ozônio, extração de comedões por sucção e espátula ultrassônica, finalizando com máscara calmante e LEDterapia.',
-    areas: 'Face Completa, Pescoço',
-    indicacoes: 'Acne grau I e II, Cravos e miliuns, Poros dilatados, Excesso de oleosidade',
-    contraindicacoes: 'Dermatites agudas ativas, Queimaduras de sol recentes, Rosácea em crise inflamatória aguda',
+    valor_tabela: 220,
+    descricao: 'Higienização profunda, emoliência com vapor de ozônio, extração indolor de comedões por sucção e espátula ultrassônica, finalizando com máscara calmante e fototerapia LED.',
+    areas: 'Face Completa, Pescoço, Colo',
+    indicacoes: 'Cravos e miliuns, Poros dilatados, Excesso de oleosidade e células mortas',
+    contraindicacoes: 'Dermatites agudas em crise, Queimaduras solares recentes, Rosácea ativa grave',
     cuidados_pos: 'Não aplicar maquiagem pesada por 12h. Usar protetor solar com FPS 50+ reaplicando a cada 3h.',
   },
   {
-    nome: 'Microagulhamento Robótico / Dermaroller + Drug Delivery',
-    categoria: 'Tratamentos Faciais & Peelings',
-    duracao_minutos: 50,
+    nome: 'Terapia Capilar & Reconstrução dos Fios',
+    categoria: 'Cabelo',
+    duracao_minutos: 75,
     dias_retorno: 30,
-    valor_tabela: 850,
-    descricao: 'Indução percutânea de colágeno com microagulhas estéreis associada à infusão de fatores de crescimento e clareadores dermatológicos.',
-    areas: 'Face, Colo, Pescoço',
-    indicacoes: 'Cicatrizes de acne, Melasma refratário, Poros abertos, Rejuvenescimento',
-    contraindicacoes: 'Uso recente de isotretinoína, Herpes ativa, Tendência a queloide',
-    cuidados_pos: 'Não lavar o rosto nas primeiras 4 horas. Aplicar apenas o sérum regenerador indicado. Evitar calor e sol por 7 dias.',
+    valor_tabela: 250,
+    descricao: 'Desintoxicação do couro cabeludo, aplicação de alta frequência para oxigenação capilar e reposição profunda de massa lipídica e aminoácidos.',
+    areas: 'Couro Cabeludo, Haste Capilar',
+    indicacoes: 'Fios ressecados ou quebradiços, Queda por tração ou estresse, Pós-química',
+    contraindicacoes: 'Lesões abertas no couro cabeludo, Sensibilidade extrema ao calor',
+    cuidados_pos: 'Utilizar produtos home care sem sulfatos pesados e manter hidratação semanal.',
+  },
+  {
+    nome: 'Penteado Social / Noiva / Eventos Especiais',
+    categoria: 'penteado',
+    duracao_minutos: 60,
+    dias_retorno: 30,
+    valor_tabela: 190,
+    descricao: 'Produção capilar completa com preparação térmica, escovação, fixação profissional, tranças decorativas, coques modernos ou semipresos para ocasiões comemorativas.',
+    areas: 'Cabelos e Penteado',
+    indicacoes: 'Casamentos, Formaturas, Festas, Sessões fotográficas',
+    contraindicacoes: 'Nenhuma contraindicação clínica',
+    cuidados_pos: 'Para desmontar o penteado, soltar os grampos com cuidado e desembaraçar as mechas das pontas para a raiz utilizando óleo reparador.',
+  },
+  {
+    nome: 'Drenagem Linfática Facial / Procedimento Estético',
+    categoria: 'procedimento estetico',
+    duracao_minutos: 50,
+    dias_retorno: 15,
+    valor_tabela: 160,
+    descricao: 'Manobras manuais especializadas para drenagem de líquidos intersticiais retidos, desinchaço facial imediato, alívio de tensões e tonificação tecidual.',
+    areas: 'Face, Papada, Linha Mandibular e Pescoço',
+    indicacoes: 'Retenção hídrica facial, Bolsas periorbiculares, Pós-procedimentos estéticos não invasivos',
+    contraindicacoes: 'Processos infecciosos febris, Trombose recente, Neoplasias ativas sem liberação oncológica',
+    cuidados_pos: 'Manter ingestão adequada de água ao longo do dia para potencializar a eliminação natural de toxinas.',
   }
 ];
 
@@ -133,21 +153,27 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
 }) => {
   const { isOnline, pendingCount, isSyncing } = useConnectionStatus();
   const [nome, setNome] = useState('');
-  const [categoria, setCategoria] = useState(CATEGORIAS_PADRAO[0]);
+  const [categoria, setCategoria] = useState<string>(CATEGORIAS_PADRAO[0]);
   const [duracaoMinutos, setDuracaoMinutos] = useState(45);
   const [diasRetorno, setDiasRetorno] = useState(15);
-  const [valorTabela, setValorTabela] = useState<number | string>(1200);
+  const [valorTabela, setValorTabela] = useState<number | string>(850);
   const [valorPromocional, setValorPromocional] = useState<string>('');
   const [descricao, setDescricao] = useState('');
   const [areasInput, setAreasInput] = useState('');
   const [indicacoesInput, setIndicacoesInput] = useState('');
   const [contraindicacoesInput, setContraindicacoesInput] = useState('');
   const [cuidadosPos, setCuidadosPos] = useState('');
-  const [imagemUrl, setImagemUrl] = useState('');
   const [destaquePortal, setDestaquePortal] = useState(true);
   const [ativo, setAtivo] = useState(true);
   const [exigeContrato, setExigeContrato] = useState(true);
   const [contratoPadrao, setContratoPadrao] = useState('');
+
+  // Imagens do mostruário (até 5 fotos da galeria)
+  const [imagensGaleria, setImagensGaleria] = useState<string[]>([]);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [manualUrlInput, setManualUrlInput] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Insumos vinculados (receita padrão)
   const [insumosVinculados, setInsumosVinculados] = useState<{
@@ -170,7 +196,16 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
       setIndicacoesInput(procedimentoToEdit.indicacoes ? procedimentoToEdit.indicacoes.join(', ') : '');
       setContraindicacoesInput(procedimentoToEdit.contraindicacoes ? (Array.isArray(procedimentoToEdit.contraindicacoes) ? procedimentoToEdit.contraindicacoes.join(', ') : procedimentoToEdit.contraindicacoes) : '');
       setCuidadosPos(procedimentoToEdit.cuidados_pos || procedimentoToEdit.instrucoes_cuidados || '');
-      setImagemUrl(procedimentoToEdit.imagem_url || '');
+      
+      // Carregar imagens do mostruário
+      const loadedImages: string[] = [];
+      if (procedimentoToEdit.imagens_galeria && procedimentoToEdit.imagens_galeria.length > 0) {
+        loadedImages.push(...procedimentoToEdit.imagens_galeria.slice(0, 5));
+      } else if (procedimentoToEdit.imagem_url) {
+        loadedImages.push(procedimentoToEdit.imagem_url);
+      }
+      setImagensGaleria(loadedImages);
+
       setDestaquePortal(procedimentoToEdit.destaque_portal ?? true);
       setAtivo(procedimentoToEdit.ativo ?? true);
       setExigeContrato(procedimentoToEdit.exige_contrato ?? true);
@@ -181,14 +216,16 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
       setCategoria(CATEGORIAS_PADRAO[0]);
       setDuracaoMinutos(45);
       setDiasRetorno(15);
-      setValorTabela(1200);
+      setValorTabela(850);
       setValorPromocional('');
       setDescricao('');
       setAreasInput('');
       setIndicacoesInput('');
       setContraindicacoesInput('');
       setCuidadosPos('');
-      setImagemUrl('');
+      setImagensGaleria([]);
+      setShowUrlInput(false);
+      setManualUrlInput('');
       setDestaquePortal(true);
       setAtivo(true);
       setExigeContrato(true);
@@ -210,6 +247,58 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
     setIndicacoesInput(modelo.indicacoes);
     setContraindicacoesInput(modelo.contraindicacoes);
     setCuidadosPos(modelo.cuidados_pos);
+  };
+
+  const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const files = Array.from(e.target.files);
+    const remainingSlots = 5 - imagensGaleria.length;
+    if (remainingSlots <= 0) return;
+
+    const toProcess = files.slice(0, remainingSlots);
+    setIsUploadingImages(true);
+    try {
+      const processed: string[] = [];
+      for (const file of toProcess) {
+        if (!file.type.startsWith('image/')) continue;
+        const base64 = await compressImageFile(file, {
+          maxWidth: 900,
+          maxHeight: 900,
+          quality: 0.78,
+          targetMaxKB: 40,
+          mimeType: 'image/webp'
+        });
+        processed.push(base64);
+      }
+      setImagensGaleria(prev => [...prev, ...processed].slice(0, 5));
+    } catch (err) {
+      console.error('Erro ao processar imagem da galeria:', err);
+    } finally {
+      setIsUploadingImages(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleAddManualUrl = () => {
+    if (!manualUrlInput.trim()) return;
+    if (imagensGaleria.length >= 5) return;
+    setImagensGaleria(prev => [...prev, manualUrlInput.trim()].slice(0, 5));
+    setManualUrlInput('');
+    setShowUrlInput(false);
+  };
+
+  const handleRemoveImage = (indexToRemove: number) => {
+    setImagensGaleria(prev => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  const handleSetPrimaryImage = (indexToPrimary: number) => {
+    setImagensGaleria(prev => {
+      const target = prev[indexToPrimary];
+      const others = prev.filter((_, idx) => idx !== indexToPrimary);
+      return [target, ...others];
+    });
   };
 
   const handleAddInsumo = (insumoId: string) => {
@@ -254,6 +343,8 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
       .map(s => s.trim())
       .filter(Boolean);
 
+    const primaryImage = imagensGaleria[0] || undefined;
+
     const dataToSave: Partial<ProcedimentoClinico> = {
       nome: nome.trim(),
       categoria,
@@ -268,7 +359,8 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
       contraindicacoes: contraindicacoesInput.trim() || undefined,
       cuidados_pos: cuidadosPos.trim() || undefined,
       instrucoes_cuidados: cuidadosPos.trim() || undefined,
-      imagem_url: imagemUrl.trim() || undefined,
+      imagem_url: primaryImage,
+      imagens_galeria: imagensGaleria.length > 0 ? imagensGaleria : (primaryImage ? [primaryImage] : undefined),
       destaque_portal: destaquePortal,
       ativo,
       insumos_vinculados: insumosVinculados.length > 0 ? insumosVinculados : undefined,
@@ -282,72 +374,43 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white w-full max-w-3xl rounded-2xl shadow-xl border border-slate-200 overflow-hidden my-6 animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-white w-full max-w-3xl rounded-3xl shadow-xl border border-slate-200/90 overflow-hidden my-6 animate-in fade-in zoom-in-95 duration-150">
         
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70">
+        <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600/10 text-indigo-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                {procedimentoToEdit ? 'Editar Procedimento' : 'Cadastrar Novo Procedimento'}
-              </h2>
-              <p className="text-xs text-slate-500">
-                Defina o preço único, duração, descrição e insumos consumidos.
+              <h3 className="text-lg font-bold text-slate-800">
+                {procedimentoToEdit ? 'Editar Procedimento' : 'Novo Procedimento'}
+              </h3>
+              <p className="text-xs text-slate-500 font-medium">
+                Defina detalhes clínicos, mostruário de fotos, categoria e contrato
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {/* Status de Sincronização & Rede */}
-            <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border ${
-              !isOnline 
-                ? 'bg-amber-500/10 text-amber-700 border-amber-300' 
-                : 'bg-emerald-500/10 text-emerald-700 border-emerald-300'
-            }`}>
-              {!isOnline ? <WifiOff className="w-3.5 h-3.5 text-amber-600" /> : <CloudCheck className="w-3.5 h-3.5 text-emerald-600" />}
-              <span>{!isOnline ? 'Offline (IndexedDB)' : 'Nuvem Conectada'}</span>
-              {pendingCount > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 bg-amber-200 text-amber-900 rounded-full text-[10px]">
-                  {pendingCount} pendente{pendingCount > 1 ? 's' : ''}
-                </span>
-              )}
-            </div>
-
-            <button
-              onClick={onClose}
-              className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        {/* Banner de Aviso de Fila Local quando Offline */}
-        {!isOnline && (
-          <div className="mx-6 mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between gap-2.5 text-amber-800 text-xs shrink-0">
-            <div className="flex items-center gap-2">
-              <Database className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>
-                <strong>Modo Offline Ativo:</strong> As alterações neste procedimento / protocolo clínico serão guardadas localmente no IndexedDB e sincronizadas com a nuvem automaticamente quando a internet for restabelecida.
-              </span>
-            </div>
-            <span className="px-2 py-0.5 bg-amber-200/70 text-amber-900 rounded-md font-bold text-[10px] uppercase shrink-0">
-              Fila Local
-            </span>
-          </div>
-        )}
-
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[78vh] overflow-y-auto">
-          
-          {/* Sugestões de Modelos Prontos */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+
+          {/* Modelos Prontos para Acelerar */}
           {!procedimentoToEdit && (
-            <div className="bg-indigo-50/70 p-3 rounded-xl border border-indigo-100">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-900 mb-2">
-                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                <span>Preenchimento Rápido com Modelos Clínicos Prontos:</span>
+            <div className="bg-indigo-50/50 border border-indigo-100/80 rounded-2xl p-4 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5 uppercase tracking-wider">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                  Modelos Prontos por Categoria
+                </span>
+                <span className="text-[10px] text-indigo-600 font-medium">Clique para preencher automaticamente</span>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {MODELOS_PROCEDIMENTOS.map((mod, idx) => (
@@ -355,25 +418,25 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
                     key={idx}
                     type="button"
                     onClick={() => handleApplyModelo(mod)}
-                    className="px-2.5 py-1 text-[11px] font-medium bg-white hover:bg-indigo-600 hover:text-white text-indigo-900 rounded-lg border border-indigo-200 transition-colors cursor-pointer shadow-2xs"
+                    className="text-xs px-2.5 py-1 bg-white hover:bg-indigo-600 hover:text-white text-indigo-800 rounded-lg border border-indigo-200/60 font-medium transition-all shadow-2xs"
                   >
-                    + {mod.nome.split(' (')[0]}
+                    {mod.nome}
                   </button>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Nome e Categoria */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="sm:col-span-2 space-y-1">
+          {/* Identificação Básica */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                 Nome do Procedimento *
               </label>
               <input
                 type="text"
                 required
-                placeholder="Ex: Toxina Botulínica (Botox) ou Preenchimento Labial"
+                placeholder="Ex: Micropigmentação Labial Aquarela"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
@@ -382,7 +445,7 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
 
             <div className="space-y-1">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Categoria
+                Categoria *
               </label>
               <select
                 value={categoria}
@@ -415,7 +478,7 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
                     required
                     min={0}
                     step="0.01"
-                    placeholder="1200.00"
+                    placeholder="850.00"
                     value={valorTabela}
                     onChange={(e) => setValorTabela(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono font-bold text-slate-900"
@@ -433,7 +496,7 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
                     type="number"
                     min={0}
                     step="0.01"
-                    placeholder="Ex: 990.00"
+                    placeholder="Ex: 750.00"
                     value={valorPromocional}
                     onChange={(e) => setValorPromocional(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono text-slate-700"
@@ -458,9 +521,11 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">
+            {/* Retorno Clínico */}
+            <div className="pt-1">
+              <div className="space-y-1 sm:w-1/2">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-indigo-600" />
                   Retorno Clínico Recomendado (dias)
                 </label>
                 <input
@@ -473,19 +538,185 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
                   placeholder="Ex: 15"
                 />
               </div>
+            </div>
+          </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">
-                  URL da Imagem / Foto (Opcional)
-                </label>
+          {/* Galeria de Fotos / Mostruário (Até 5 imagens) */}
+          <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200/90 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <ImageIcon className="w-4 h-4 text-pink-600" />
+                  Fotos do Mostruário (Galeria de Resultados)
+                </h4>
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Adicione até 5 fotos da galeria para o mostruário de resultados do procedimento.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
+                  imagensGaleria.length >= 5 
+                    ? 'bg-amber-50 text-amber-700 border-amber-200' 
+                    : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                }`}>
+                  {imagensGaleria.length} de 5 fotos
+                </span>
+
+                {imagensGaleria.length < 5 && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingImages}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                  >
+                    {isUploadingImages ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Otimizando...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-3.5 h-3.5" />
+                        Abrir Galeria
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Input escondido para selecionar fotos da galeria */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleFilesSelected}
+              className="hidden"
+            />
+
+            {/* Toggle para link manual */}
+            <div className="flex items-center justify-between text-xs pt-1">
+              <button
+                type="button"
+                onClick={() => setShowUrlInput(!showUrlInput)}
+                className="text-pink-600 hover:text-pink-700 font-semibold underline underline-offset-2 flex items-center gap-1 cursor-pointer"
+              >
+                {showUrlInput ? 'Ocultar inserção por link URL' : 'Ou colar link direto de foto URL'}
+              </button>
+              {isUploadingImages && (
+                <span className="text-indigo-600 font-medium animate-pulse text-[11px]">
+                  Comprimindo fotos da galeria para carregamento instantâneo...
+                </span>
+              )}
+            </div>
+
+            {/* Formulário de URL manual */}
+            {showUrlInput && (
+              <div className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-slate-200">
                 <input
                   type="url"
-                  placeholder="https://..."
-                  value={imagemUrl}
-                  onChange={(e) => setImagemUrl(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg font-medium"
+                  placeholder="Cole o link da foto (https://...)"
+                  value={manualUrlInput}
+                  onChange={(e) => setManualUrlInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddManualUrl();
+                    }
+                  }}
+                  className="flex-1 px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-pink-500"
                 />
+                <button
+                  type="button"
+                  onClick={handleAddManualUrl}
+                  disabled={!manualUrlInput.trim() || imagensGaleria.length >= 5}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold disabled:opacity-40 cursor-pointer"
+                >
+                  Adicionar Link
+                </button>
               </div>
+            )}
+
+            {/* Grid dos 5 Slots de Mostruário */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1">
+              {imagensGaleria.map((imgUrl, idx) => (
+                <div 
+                  key={idx} 
+                  className={`relative group rounded-xl overflow-hidden border-2 transition-all aspect-square bg-slate-100 flex items-center justify-center ${
+                    idx === 0 ? 'border-pink-500 ring-2 ring-pink-500/20 shadow-xs' : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <img
+                    src={imgUrl}
+                    alt={`Mostruário ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&auto=format&fit=crop&q=80';
+                    }}
+                  />
+                  {/* Badges */}
+                  <div className="absolute top-1.5 left-1.5">
+                    {idx === 0 ? (
+                      <span className="bg-pink-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-xs flex items-center gap-0.5">
+                        <Star className="w-2.5 h-2.5 fill-current" /> Capa
+                      </span>
+                    ) : (
+                      <span className="bg-slate-900/70 backdrop-blur-xs text-white text-[10px] font-medium px-1.5 py-0.5 rounded">
+                        Foto {idx + 1}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Ações ao passar o mouse / toque */}
+                  <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 p-2">
+                    {idx !== 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleSetPrimaryImage(idx)}
+                        className="w-full py-1 px-1.5 bg-pink-600 hover:bg-pink-700 text-white rounded text-[10px] font-bold shadow-xs cursor-pointer"
+                        title="Definir como foto de capa principal"
+                      >
+                        Tornar Capa
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveImage(idx)}
+                      className="w-full py-1 px-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-[10px] font-bold shadow-xs flex items-center justify-center gap-1 cursor-pointer"
+                      title="Excluir do mostruário"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Excluir
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {/* Slots Vazios */}
+              {Array.from({ length: Math.max(0, 5 - imagensGaleria.length) }).map((_, slotIdx) => {
+                const currentSlotNum = imagensGaleria.length + slotIdx + 1;
+                return (
+                  <button
+                    key={`slot-${slotIdx}`}
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingImages}
+                    className="aspect-square rounded-xl border-2 border-dashed border-slate-300 hover:border-pink-400 bg-white hover:bg-pink-50/30 transition-all flex flex-col items-center justify-center p-2 text-center group cursor-pointer disabled:opacity-50"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-slate-100 group-hover:bg-pink-100 flex items-center justify-center text-slate-400 group-hover:text-pink-600 mb-1 transition-colors">
+                      <Plus className="w-4 h-4" />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-500 group-hover:text-pink-700">
+                      Foto {currentSlotNum}
+                    </span>
+                    <span className="text-[9px] text-slate-400">
+                      {currentSlotNum === 1 ? 'Foto de Capa' : 'Mostruário'}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -511,7 +742,7 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
                 </label>
                 <input
                   type="text"
-                  placeholder="Ex: Glabela, Testa, Pés de Galinha"
+                  placeholder="Ex: Face, Lábios, Sobrancelhas..."
                   value={areasInput}
                   onChange={(e) => setAreasInput(e.target.value)}
                   className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg font-medium"
@@ -520,11 +751,11 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
 
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Indicações Clínicas (separadas por vírgula)
+                  Principais Indicações (separadas por vírgula)
                 </label>
                 <input
                   type="text"
-                  placeholder="Ex: Rugas dinâmicas, Linhas de expressão"
+                  placeholder="Ex: Realce do olhar, Harmonização..."
                   value={indicacoesInput}
                   onChange={(e) => setIndicacoesInput(e.target.value)}
                   className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg font-medium"
@@ -532,172 +763,193 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
               </div>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Cuidados Pós-Procedimento / Orientações ao Paciente
-              </label>
-              <textarea
-                rows={2}
-                placeholder="Ex: Não deitar por 4 horas, evitar exercícios físicos intensos por 24h, aplicar protetor solar..."
-                value={cuidadosPos}
-                onChange={(e) => setCuidadosPos(e.target.value)}
-                className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg font-medium resize-none"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Contraindicações
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: Gestantes, Infecção ativa no local..."
+                  value={contraindicacoesInput}
+                  onChange={(e) => setContraindicacoesInput(e.target.value)}
+                  className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg font-medium"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Orientações Pós-Procedimento
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: Aplicar pomada 3x ao dia..."
+                  value={cuidadosPos}
+                  onChange={(e) => setCuidadosPos(e.target.value)}
+                  className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg font-medium"
+                />
+              </div>
             </div>
           </div>
 
-          {/* Insumos de Estoque Vinculados (Receita Padrão) */}
+          {/* Insumos Vinculados (Receita Padrão) */}
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                   <Package className="w-4 h-4 text-indigo-600" />
-                  Insumos Vinculados (Débito Automático de Estoque)
+                  Receita Padrão de Insumos (Baixa Automática)
                 </h4>
                 <p className="text-[11px] text-slate-500">
-                  Os itens listados abaixo serão sugeridos para baixa automática de estoque ao concluir o atendimento.
+                  Estes itens serão deduzidos do estoque sempre que o procedimento for realizado
                 </p>
               </div>
+
+              {estoqueDisponivel.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <select
+                    id="select-add-insumo"
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleAddInsumo(e.target.value);
+                        e.target.value = '';
+                      }
+                    }}
+                    className="text-xs px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg font-medium text-slate-700 focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="">+ Vincular Insumo do Estoque</option>
+                    {estoqueDisponivel
+                      .filter(i => !insumosVinculados.some(v => v.insumo_id === i.id))
+                      .map(ins => (
+                        <option key={ins.id} value={ins.id}>
+                          {ins.nome_item} ({ins.unidade_medida})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
             </div>
 
-            {/* Adicionar Insumo */}
-            {estoqueDisponivel.length > 0 && (
-              <div className="flex gap-2">
-                <select
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      handleAddInsumo(e.target.value);
-                      e.target.value = '';
-                    }
-                  }}
-                  defaultValue=""
-                  className="flex-1 px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg font-medium cursor-pointer"
-                >
-                  <option value="" disabled>+ Selecionar insumo do estoque...</option>
-                  {estoqueDisponivel
-                    .filter(item => !insumosVinculados.some(iv => iv.insumo_id === item.id))
-                    .map(item => (
-                      <option key={item.id} value={item.id}>
-                        {item.nome_item} (Disponível: {item.quantidade} {item.unidade_medida})
-                      </option>
-                    ))}
-                </select>
+            {insumosVinculados.length === 0 ? (
+              <div className="text-center py-4 border border-dashed border-slate-200 rounded-lg bg-white">
+                <Package className="w-6 h-6 text-slate-300 mx-auto mb-1" />
+                <p className="text-xs text-slate-400">Nenhum insumo vinculado a este procedimento.</p>
+                <p className="text-[10px] text-slate-400">Vincule materiais para ter controle automático de custo e estoque.</p>
               </div>
-            )}
-
-            {/* Lista de Insumos Vinculados */}
-            {insumosVinculados.length > 0 ? (
+            ) : (
               <div className="space-y-2">
                 {insumosVinculados.map((insumo) => (
                   <div 
                     key={insumo.insumo_id}
-                    className="flex items-center justify-between gap-3 p-2.5 bg-white rounded-lg border border-slate-200 shadow-2xs"
+                    className="flex items-center justify-between bg-white p-2.5 rounded-lg border border-slate-200 text-xs"
                   >
-                    <span className="text-xs font-bold text-slate-800 flex-1 truncate">
-                      {insumo.nome_item}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-slate-500">Qtd por sessão:</span>
-                      <input
-                        type="number"
-                        min="0.1"
-                        step="0.1"
-                        value={insumo.quantidade}
-                        onChange={(e) => handleUpdateInsumoQuantity(insumo.insumo_id, parseFloat(e.target.value) || 1)}
-                        className="w-16 px-2 py-1 text-xs bg-slate-50 border border-slate-200 rounded font-mono font-bold text-center"
-                      />
-                      <span className="text-xs font-semibold text-slate-600 min-w-[36px]">
-                        {insumo.unidade_medida}
-                      </span>
+                    <div className="flex items-center gap-2 flex-1">
+                      <span className="font-semibold text-slate-800">{insumo.nome_item}</span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-slate-400 text-[11px]">Qtd:</span>
+                        <input
+                          type="number"
+                          min={0.01}
+                          step={0.1}
+                          value={insumo.quantidade}
+                          onChange={(e) => handleUpdateInsumoQuantity(insumo.insumo_id, Number(e.target.value))}
+                          className="w-16 px-2 py-1 bg-slate-50 border border-slate-200 rounded text-center font-bold text-slate-800"
+                        />
+                        <span className="text-slate-500 text-[11px] font-medium">{insumo.unidade_medida}</span>
+                      </div>
+
                       <button
                         type="button"
                         onClick={() => handleRemoveInsumo(insumo.insumo_id)}
-                        className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                        className="text-slate-400 hover:text-red-600 p-1 transition-colors"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
                 ))}
               </div>
-            ) : (
-              <p className="text-xs text-slate-400 italic py-1 text-center bg-white rounded-lg border border-dashed border-slate-200">
-                Nenhum insumo vinculado a este procedimento ainda.
-              </p>
             )}
           </div>
 
-          {/* Termo e Contrato Padrão */}
-          <div className="space-y-3">
+          {/* Termo de Consentimento & Contrato Específico */}
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
             <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-xs font-bold text-slate-800 uppercase tracking-wider cursor-pointer">
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-indigo-600" />
+                Contrato & Termo de Consentimento Específico
+              </h4>
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700">
                 <input
                   type="checkbox"
                   checked={exigeContrato}
                   onChange={(e) => setExigeContrato(e.target.checked)}
-                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded text-indigo-600 focus:ring-indigo-500"
                 />
-                <span>Exigir Termo de Consentimento / Contrato Assinado</span>
+                Exigir Assinatura do Contrato no Atendimento
               </label>
             </div>
 
             {exigeContrato && (
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-slate-600 flex items-center gap-1">
-                  <FileText className="w-3.5 h-3.5 text-slate-400" />
-                  Minuta do Contrato / Termo de Esclarecimento:
-                </label>
+                <p className="text-[11px] text-slate-500">
+                  Texto contratual exibido ao paciente para assinatura digital na finalização do procedimento:
+                </p>
                 <textarea
                   rows={4}
                   value={contratoPadrao}
                   onChange={(e) => setContratoPadrao(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg font-mono leading-relaxed"
-                  placeholder="Texto do termo de consentimento..."
+                  className="w-full p-2.5 text-xs bg-white border border-slate-200 rounded-lg font-mono text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  placeholder="Insira o texto das cláusulas e termos deste procedimento..."
                 />
               </div>
             )}
           </div>
 
-          {/* Opções e Visibilidade */}
-          <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-4">
+          {/* Configurações Finais */}
+          <div className="flex items-center justify-between pt-2 border-t border-slate-100">
             <div className="flex items-center gap-6">
-              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={ativo}
-                  onChange={(e) => setAtivo(e.target.checked)}
-                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                />
-                <span>Procedimento Ativo no Catálogo</span>
-              </label>
-
-              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700">
                 <input
                   type="checkbox"
                   checked={destaquePortal}
                   onChange={(e) => setDestaquePortal(e.target.checked)}
-                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded text-indigo-600 focus:ring-indigo-500"
                 />
-                <span>Exibir no Portal do Paciente / Agendamento Online</span>
+                Exibir com Destaque no Catálogo de Procedimentos
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={ativo}
+                  onChange={(e) => setAtivo(e.target.checked)}
+                  className="rounded text-indigo-600 focus:ring-indigo-500"
+                />
+                Procedimento Ativo para Agendamento
               </label>
             </div>
           </div>
 
-          {/* Footer Actions */}
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+          {/* Botões do Rodapé */}
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-600/20 cursor-pointer flex items-center gap-1.5"
+              disabled={isUploadingImages}
+              className="px-5 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition-all hover:shadow-indigo-500/20 disabled:opacity-50 cursor-pointer flex items-center gap-2"
             >
               <Check className="w-4 h-4" />
-              <span>{procedimentoToEdit ? 'Salvar Alterações' : 'Cadastrar Procedimento'}</span>
+              {procedimentoToEdit ? 'Salvar Alterações' : 'Cadastrar Procedimento'}
             </button>
           </div>
 

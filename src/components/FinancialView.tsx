@@ -294,7 +294,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
     <div className="space-y-6">
       
       {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm">
         <div>
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -337,61 +337,69 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
         {/* Total Entradas */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-            <span>Total de Entradas (Receitas)</span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <ArrowUpRight className="w-4 h-4" />
+        <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+              <span>Total de Entradas (Receitas)</span>
+              <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <ArrowUpRight className="w-4 h-4" />
+              </div>
             </div>
+            <p className="text-2xl font-bold text-emerald-700 mt-2">
+              {formatCurrency(totalEntradas)}
+            </p>
           </div>
-          <p className="text-2xl font-bold text-emerald-700 mt-2">
-            {formatCurrency(totalEntradas)}
-          </p>
-          <p className="text-[11px] text-slate-400 mt-1">
+          <p className="text-[11px] text-slate-400 mt-2">
             {entradas.length} atendimentos e vendas pagos
           </p>
         </div>
 
         {/* Total Saídas */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-            <span>Total de Saídas (Despesas)</span>
-            <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
-              <ArrowDownRight className="w-4 h-4" />
+        <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+              <span>Total de Saídas (Despesas)</span>
+              <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+                <ArrowDownRight className="w-4 h-4" />
+              </div>
             </div>
+            <p className="text-2xl font-bold text-rose-700 mt-2">
+              {formatCurrency(totalSaidas)}
+            </p>
           </div>
-          <p className="text-2xl font-bold text-rose-700 mt-2">
-            {formatCurrency(totalSaidas)}
-          </p>
-          <p className="text-[11px] text-slate-400 mt-1">
+          <p className="text-[11px] text-slate-400 mt-2">
             {saidas.length} compras e comissões pagas
           </p>
         </div>
 
         {/* Saldo Líquido de Caixa */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-            <span>Saldo Líquido em Caixa</span>
-            <DollarSign className="w-4 h-4 text-indigo-600" />
+        <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+              <span>Saldo Líquido em Caixa</span>
+              <DollarSign className="w-4 h-4 text-indigo-600" />
+            </div>
+            <p className={`text-2xl font-bold mt-2 ${saldoLiquidoCaixa >= 0 ? 'text-indigo-900' : 'text-rose-600'}`}>
+              {formatCurrency(saldoLiquidoCaixa)}
+            </p>
           </div>
-          <p className={`text-2xl font-bold mt-2 ${saldoLiquidoCaixa >= 0 ? 'text-indigo-900' : 'text-rose-600'}`}>
-            {formatCurrency(saldoLiquidoCaixa)}
-          </p>
-          <p className="text-[11px] text-slate-400 mt-1">
+          <p className="text-[11px] text-slate-400 mt-2">
             Entradas quitadas menos saídas
           </p>
         </div>
 
         {/* Despesas Recorrentes Fixas */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-            <span>Despesas Recorrentes / Mês</span>
-            <RefreshCw className="w-4 h-4 text-amber-600" />
+        <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+              <span>Despesas Recorrentes / Mês</span>
+              <RefreshCw className="w-4 h-4 text-amber-600" />
+            </div>
+            <p className="text-2xl font-bold text-amber-900 mt-2">
+              {formatCurrency(totalRecorrenteMensal)}
+            </p>
           </div>
-          <p className="text-2xl font-bold text-amber-900 mt-2">
-            {formatCurrency(totalRecorrenteMensal)}
-          </p>
-          <p className="text-[11px] text-slate-400 mt-1">
+          <p className="text-[11px] text-slate-400 mt-2">
             {despesasRecorrentes.filter(d => d.status === 'ativo').length} contas fixas ativas
           </p>
         </div>
@@ -403,7 +411,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
       )}
 
       {/* 3 Main Tabs: Entradas, Saídas, Despesas Recorrentes */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden">
         
         <div className="p-4 border-b border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
           {/* Navigation Pills */}
@@ -660,14 +668,14 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
               {despesasRecorrentes.map((desp) => (
                 <div 
                   key={desp.id}
-                  className="bg-slate-50 rounded-2xl border border-slate-200 p-4 flex flex-col justify-between hover:shadow-xs transition-shadow"
+                  className="bg-slate-50 rounded-3xl border border-slate-200/90 p-5 flex flex-col justify-between shadow-sm hover:shadow-md transition-all"
                 >
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-white text-slate-700 border border-slate-200">
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white text-slate-700 border border-slate-200">
                         {desp.categoria.toUpperCase()}
                       </span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                         desp.status === 'ativo' 
                           ? 'bg-emerald-100 text-emerald-800' 
                           : 'bg-slate-200 text-slate-600'
@@ -740,7 +748,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
       {/* Edit Recurring Expense Modal */}
       {editingDespesa && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95">
+          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95">
             <div className="p-5 border-b border-slate-100 bg-indigo-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Edit3 className="w-5 h-5 text-indigo-300" />
@@ -911,7 +919,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
       {/* Delete Recurring Expense Confirmation Modal */}
       {despesaToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full border border-slate-200 shadow-2xl animate-in fade-in zoom-in-95">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-200/90 shadow-xl animate-in fade-in zoom-in-95">
             <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mb-4">
               <Trash2 className="w-6 h-6" />
             </div>
@@ -947,7 +955,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
       {/* Mandatory Soft Delete Audit Modal */}
       {txToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full border border-slate-200 shadow-2xl animate-in fade-in zoom-in-95">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-200/90 shadow-xl animate-in fade-in zoom-in-95">
             <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mb-4">
               <AlertTriangle className="w-6 h-6" />
             </div>
@@ -1006,7 +1014,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
       {/* New Transaction Modal */}
       {isNewTxModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95">
+          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95">
             <div className="p-5 border-b border-slate-100 bg-slate-900 text-white flex items-center justify-between">
               <h3 className="text-base font-bold">Novo Lançamento no Caixa</h3>
               <button onClick={() => setIsNewTxModalOpen(false)} className="text-slate-400 hover:text-white">
@@ -1144,7 +1152,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
       {/* New Recurring Expense Modal */}
       {isNewRecorrenteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95">
+          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95">
             <div className="p-5 border-b border-slate-100 bg-amber-900 text-white flex items-center justify-between">
               <h3 className="text-base font-bold">Nova Despesa Fixa Recorrente</h3>
               <button onClick={() => setIsNewRecorrenteModalOpen(false)} className="text-amber-200 hover:text-white">

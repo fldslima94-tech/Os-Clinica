@@ -82,7 +82,7 @@ export const UrgentAlertPopupModal: React.FC<UrgentAlertPopupModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-200">
       <div 
-        className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200"
+        className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-xl border border-slate-200/90 animate-in zoom-in-95 duration-200"
         role="alertdialog"
         aria-modal="true"
       >

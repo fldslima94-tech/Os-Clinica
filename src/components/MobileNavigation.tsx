@@ -14,10 +14,12 @@ import {
   LogOut, 
   Globe, 
   Megaphone,
-  KeyRound
+  KeyRound,
+  Smartphone
 } from 'lucide-react';
-import { TabType, UsuarioEquipe } from '../types';
+import { TabType, UsuarioEquipe, ClinicaConfig } from '../types';
 import { isUserAdminTotal } from '../services/firebaseService';
+import { Settings } from 'lucide-react';
 
 interface MobileNavigationProps {
   activeTab: TabType;
@@ -28,6 +30,9 @@ interface MobileNavigationProps {
   unreadNoticesCount?: number;
   onRequestSwitchUser?: () => void;
   onLogout?: () => void;
+  clinicaConfig?: ClinicaConfig;
+  onOpenClinicSettings?: () => void;
+  onOpenPWAInstall?: () => void;
 }
 
 export const MobileNavigation: React.FC<MobileNavigationProps> = ({
@@ -39,6 +44,9 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
   unreadNoticesCount = 0,
   onRequestSwitchUser,
   onLogout,
+  clinicaConfig,
+  onOpenClinicSettings,
+  onOpenPWAInstall,
 }) => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const isAdminTotal = isUserAdminTotal(currentUser);
@@ -57,6 +65,11 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
     : 'Cliente';
 
   const handleTabClick = (tab: TabType) => {
+    if (tab === 'configuracoes' && onOpenClinicSettings) {
+      onOpenClinicSettings();
+      setIsDrawerOpen(false);
+      return;
+    }
     setActiveTab(tab);
     setIsDrawerOpen(false);
   };
@@ -75,6 +88,43 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
           label: 'Mural',
           icon: Megaphone,
           badge: unreadNoticesCount > 0 ? unreadNoticesCount : undefined,
+        },
+        {
+          id: 'perfil' as TabType,
+          label: 'Perfil',
+          icon: Users,
+        },
+      ];
+    }
+
+    if (isGestor) {
+      return [
+        {
+          id: 'dashboard' as TabType,
+          label: 'Balcão',
+          icon: LayoutDashboard,
+          badge: pendingCount > 0 ? pendingCount : undefined,
+        },
+        {
+          id: 'agendamentos' as TabType,
+          label: 'Agenda',
+          icon: CalendarDays,
+        },
+        {
+          id: 'pacientes' as TabType,
+          label: 'Pacientes',
+          icon: Users,
+        },
+        {
+          id: 'financeiro' as TabType,
+          label: 'Financeiro',
+          icon: DollarSign,
+        },
+        {
+          id: 'estoque' as TabType,
+          label: 'Estoque',
+          icon: PackageCheck,
+          badge: lowStockCount > 0 ? '!' : undefined,
         },
       ];
     }
@@ -102,12 +152,6 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
         icon: PackageCheck,
         badge: lowStockCount > 0 ? '!' : undefined,
       },
-      {
-        id: 'quadro_avisos' as TabType,
-        label: 'Avisos',
-        icon: Megaphone,
-        badge: unreadNoticesCount > 0 ? unreadNoticesCount : undefined,
-      },
     ];
   };
 
@@ -120,6 +164,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
       items: [
         { id: 'portal_paciente' as TabType, label: 'Portal do Paciente & Orçamentos', icon: Globe, badge: 'Principal' },
         { id: 'quadro_avisos' as TabType, label: 'Mural & Comunicados da Clínica', icon: Megaphone, badge: unreadNoticesCount > 0 ? `${unreadNoticesCount} novo` : undefined },
+        { id: 'perfil' as TabType, label: 'Meu Perfil & Senha', icon: Users },
       ]
     }
   ] : [
@@ -160,6 +205,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
     {
       title: 'Configurações & Segurança',
       items: [
+        ...(isGestor ? [{ id: 'configuracoes' as TabType, label: 'Configurações & Logomarca da Clínica', icon: Settings, badge: 'Clínica' }] : []),
         ...(isAdminTotal ? [{ id: 'permissoes' as TabType, label: 'Permissões Granulares & Campos', icon: UserCheck, badge: 'Master' }] : []),
         ...(isGestor ? [{ id: 'usuarios' as TabType, label: 'Equipe & Usuários', icon: UserCheck }] : []),
         { id: 'perfil' as TabType, label: 'Meu Perfil & Senha', icon: Users },
@@ -171,7 +217,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
   return (
     <>
       {/* Fixed Bottom Navigation Bar on Mobile/Tablet (< lg) */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-2 py-1 shadow-lg">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 px-1 py-1 shadow-lg pb-[max(env(safe-area-inset-bottom),0.35rem)]">
         <div className="flex items-center justify-around">
           {bottomBarItems.map((item) => {
             const Icon = item.icon;
@@ -181,7 +227,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
               <button
                 key={item.id}
                 onClick={() => handleTabClick(item.id)}
-                className={`relative flex flex-col items-center justify-center py-1.5 px-2 min-w-[56px] min-h-[48px] rounded-xl transition-all cursor-pointer ${
+                className={`relative flex flex-col items-center justify-center py-1 px-1.5 min-w-[50px] min-h-[46px] rounded-xl transition-all cursor-pointer ${
                   isActive ? 'text-indigo-600 font-bold' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
@@ -206,7 +252,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
           {/* Drawer Menu Button */}
           <button
             onClick={() => setIsDrawerOpen(true)}
-            className="flex flex-col items-center justify-center py-1.5 px-2 min-w-[56px] min-h-[48px] rounded-xl text-slate-500 hover:text-slate-800 transition-all cursor-pointer"
+            className="flex flex-col items-center justify-center py-1 px-1.5 min-w-[50px] min-h-[46px] rounded-xl text-slate-500 hover:text-slate-800 transition-all cursor-pointer"
           >
             <Menu className="w-5 h-5" />
             <span className="text-[10px] tracking-tight mt-0.5">Módulos</span>
@@ -226,21 +272,43 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
           {/* Drawer Content */}
           <div className="relative w-full max-w-xs bg-white h-full flex flex-col shadow-2xl z-10 animate-in slide-in-from-right duration-200">
             
-            {/* Drawer Header */}
+            {/* Drawer Header with Clinic Logo & Name (Clickable to open settings) */}
             <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white font-bold flex items-center justify-center">
-                  E
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDrawerOpen(false);
+                  onOpenClinicSettings && onOpenClinicSettings();
+                }}
+                className="flex items-center gap-2.5 text-left group cursor-pointer hover:opacity-90 transition-opacity min-w-0"
+                title="Configurações e Logomarca da Clínica"
+              >
+                {clinicaConfig?.logomarca_url ? (
+                  <img
+                    src={clinicaConfig.logomarca_url}
+                    alt={clinicaConfig.nome || 'Logo'}
+                    className="w-9 h-9 rounded-xl object-cover border border-slate-200 shadow-2xs group-hover:ring-2 ring-indigo-500/40 transition-all shrink-0"
+                  />
+                ) : (
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-slate-900 text-white font-bold flex items-center justify-center text-sm shadow-2xs shrink-0">
+                    {(clinicaConfig?.nome || 'A').charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <h3 className="font-bold text-slate-900 text-sm truncate max-w-[160px] group-hover:text-indigo-600 transition-colors">
+                    {clinicaConfig?.nome || 'AuraEstética Studio'}
+                  </h3>
+                  <p className="text-[10px] text-slate-500 flex items-center gap-1">
+                    <span>Configurações & Logo</span>
+                    <Settings className="w-2.5 h-2.5 text-slate-400" />
+                  </p>
                 </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 text-sm">EstéticaOS</h3>
-                  <p className="text-[10px] text-slate-500">Módulos da Clínica</p>
-                </div>
-              </div>
+              </button>
 
               <button
                 onClick={() => setIsDrawerOpen(false)}
-                className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors"
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors cursor-pointer"
+                aria-label="Fechar menu"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -313,6 +381,22 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
                 </div>
               ))}
             </div>
+
+            {/* PWA Install Action */}
+            {onOpenPWAInstall && (
+              <div className="p-3 border-t border-slate-100 bg-indigo-50/50">
+                <button
+                  onClick={() => {
+                    setIsDrawerOpen(false);
+                    onOpenPWAInstall();
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold text-indigo-700 hover:bg-indigo-100/80 border border-indigo-200 transition-colors cursor-pointer shadow-xs bg-white"
+                >
+                  <Smartphone className="w-4 h-4 text-indigo-600" />
+                  <span>Instalar no Celular (Android / iOS)</span>
+                </button>
+              </div>
+            )}
 
             {/* Logout button in drawer */}
             {onLogout && (

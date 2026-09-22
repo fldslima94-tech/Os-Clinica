@@ -71,22 +71,22 @@ export const ConnectionSyncStatusWidget: React.FC = () => {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all shadow-2xs cursor-pointer ${
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer ${
           conflictsCount > 0
-            ? 'bg-rose-50 border-rose-300 text-rose-800 hover:bg-rose-100 animate-pulse'
+            ? 'bg-rose-50 border-rose-200 text-rose-800 hover:bg-rose-100 animate-pulse'
             : !isOnline
-            ? 'bg-amber-50 border-amber-300 text-amber-900 hover:bg-amber-100'
+            ? 'bg-amber-50 border-amber-200 text-amber-900 hover:bg-amber-100'
             : isSyncing
-            ? 'bg-indigo-50 border-indigo-300 text-indigo-800 hover:bg-indigo-100'
+            ? 'bg-indigo-50 border-indigo-200 text-indigo-800 hover:bg-indigo-100'
             : pendingCount > 0
             ? 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100'
-            : 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100'
+            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
         }`}
-        title="Status da Conexão e Sincronização IndexedDB / Firestore"
+        title="Status da Conexão e Sincronização"
       >
         {/* Ícone Dinâmico */}
         {conflictsCount > 0 ? (
-          <AlertOctagon className="w-3.5 h-3.5 text-rose-600 animate-bounce" />
+          <AlertOctagon className="w-3.5 h-3.5 text-rose-600" />
         ) : !isOnline ? (
           <CloudOff className="w-3.5 h-3.5 text-amber-600" />
         ) : isSyncing ? (
@@ -94,11 +94,11 @@ export const ConnectionSyncStatusWidget: React.FC = () => {
         ) : pendingCount > 0 ? (
           <Database className="w-3.5 h-3.5 text-amber-600" />
         ) : (
-          <CloudCheck className="w-3.5 h-3.5 text-emerald-600" />
+          <span className="w-2 h-2 rounded-full bg-emerald-500" />
         )}
 
         {/* Rótulo Dinâmico */}
-        <span className="hidden sm:inline">
+        <span className="hidden xl:inline">
           {conflictsCount > 0
             ? `Conflito (${conflictsCount})`
             : !isOnline
@@ -107,13 +107,13 @@ export const ConnectionSyncStatusWidget: React.FC = () => {
             ? 'Sincronizando...'
             : pendingCount > 0
             ? `Pendente (${pendingCount})`
-            : 'Nuvem OK'}
+            : 'Sincronizado'}
         </span>
 
         {/* Badge do contador se houver pendências */}
         {(pendingCount > 0 || conflictsCount > 0) && (
           <span
-            className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+            className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
               conflictsCount > 0
                 ? 'bg-rose-600 text-white'
                 : 'bg-amber-600 text-white'
@@ -123,12 +123,12 @@ export const ConnectionSyncStatusWidget: React.FC = () => {
           </span>
         )}
 
-        <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
+        <ChevronDown className="w-3 h-3 text-slate-400 ml-0.5" />
       </button>
 
       {/* Popover Detalhado de Conexão & Sincronização */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-84 sm:w-96 bg-white rounded-2xl border border-slate-200 shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed sm:absolute right-3 sm:right-0 left-3 sm:left-auto mt-2 sm:w-96 max-w-sm sm:max-w-none bg-white rounded-2xl border border-slate-200 shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
           
           {/* Header do Popover */}
           <div className="p-4 bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex items-center justify-between">

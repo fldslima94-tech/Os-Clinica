@@ -232,67 +232,62 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
     <div className="space-y-6">
       
       {/* Header Bar */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
-              Gestão de Agendamentos & Agenda por Profissional
-            </h2>
-            <span className="text-[11px] bg-indigo-50 text-indigo-700 font-bold px-2 py-0.5 rounded-full border border-indigo-200">
-              Multi-Profissional
-            </span>
-          </div>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">
-            Visualize por profissional, cards gerais ou grade semanal, confirme chegadas com pagamento e retorno.
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+            Agendamentos
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            Gerencie atendimentos, grade semanal e controle de recepção.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Toggle Views */}
-          <div className="flex flex-wrap bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-semibold">
+          <div className="flex flex-wrap bg-slate-100 p-1 rounded-xl text-xs font-semibold">
             <button
               onClick={() => setViewFormat('balcao')}
-              className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer ${
                 viewFormat === 'balcao'
-                  ? 'bg-indigo-600 text-white shadow-2xs font-bold'
+                  ? 'bg-white text-slate-900 shadow-2xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Store className="w-3.5 h-3.5" />
-              <span>Balcão do Dia</span>
+              <span>Balcão</span>
               <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                viewFormat === 'balcao' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-800'
+                viewFormat === 'balcao' ? 'bg-indigo-100 text-indigo-800 font-bold' : 'bg-slate-200 text-slate-700'
               }`}>
                 {balcaoAgendamentos.length}
               </span>
             </button>
             <button
               onClick={() => setViewFormat('cards')}
-              className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer ${
                 viewFormat === 'cards'
-                  ? 'bg-white text-indigo-700 shadow-2xs font-bold'
+                  ? 'bg-white text-slate-900 shadow-2xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <List className="w-3.5 h-3.5" />
-              <span>Geral (Cards)</span>
+              <span>Lista</span>
             </button>
             <button
               onClick={() => setViewFormat('profissionais')}
-              className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer ${
                 viewFormat === 'profissionais'
-                  ? 'bg-white text-indigo-700 shadow-2xs font-bold'
+                  ? 'bg-white text-slate-900 shadow-2xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Columns className="w-3.5 h-3.5" />
-              <span>Por Profissional</span>
+              <span>Profissionais</span>
             </button>
             <button
               onClick={() => setViewFormat('calendario')}
-              className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer ${
                 viewFormat === 'calendario'
-                  ? 'bg-white text-indigo-700 shadow-2xs font-bold'
+                  ? 'bg-white text-slate-900 shadow-2xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -303,10 +298,10 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
 
           <button
             onClick={() => setIsCalendarSyncModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-sm font-semibold transition-colors cursor-pointer shadow-2xs"
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
             title="Sincronizar agendamentos com o Google Calendar"
           >
-            <CalendarIcon className="w-4 h-4 text-blue-600" />
+            <CalendarIcon className="w-3.5 h-3.5 text-blue-600" />
             <span>Google Calendar</span>
           </button>
 
@@ -319,16 +314,16 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
               });
               setIsExportModalOpen(true);
             }}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-indigo-50/50 text-indigo-700 border border-indigo-200 rounded-lg text-sm font-semibold transition-colors cursor-pointer shadow-2xs"
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-indigo-700 border border-slate-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
             title="Exportar agendamentos em formato universal .ICS (Apple Calendar / Google Agenda / Outlook)"
           >
-            <Download className="w-4 h-4 text-indigo-600" />
+            <Download className="w-3.5 h-3.5 text-indigo-600" />
             <span>Exportar .ICS</span>
           </button>
 
           <button
             onClick={() => onOpenNewAppointment?.()}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-lg text-sm font-semibold transition-colors cursor-pointer shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer shadow-2xs"
           >
             <Plus className="w-4 h-4" />
             <span>Novo Agendamento</span>
@@ -340,51 +335,6 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
       {viewFormat === 'balcao' ? (
         /* VISÃO BALCÃO DO DIA (RECEPÇÃO RESUMIDA: 00:00 ÀS 23:59) */
         <div className="space-y-4">
-          <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 text-white p-5 rounded-2xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-indigo-300">
-                <Store className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base font-bold">Balcão da Recepção — Atendimentos de Hoje</h3>
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                    Vigência: 00:00 às 23:59
-                  </span>
-                </div>
-                <p className="text-xs text-indigo-200 mt-0.5">
-                  Painel operacional em tempo real para controle de recepção, chamada para sala e checkout de procedimentos.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  setSelectedExportAgendamento(null);
-                  setExportBatchConfig({
-                    titulo: 'Exportar Balcão do Dia (.ICS)',
-                    agendamentos: balcaoAgendamentos
-                  });
-                  setIsExportModalOpen(true);
-                }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl transition-all border border-white/20 cursor-pointer"
-                title="Exportar todas as consultas de hoje em arquivo .ICS para celular ou Google/Apple Agenda"
-              >
-                <Download className="w-3.5 h-3.5 text-indigo-200" />
-                <span>Exportar Hoje (.ICS)</span>
-              </button>
-
-              <button
-                onClick={() => onOpenNewAppointment?.()}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Novo Agendamento Hoje</span>
-              </button>
-            </div>
-          </div>
-
           {/* Status Filter Bar for Balcão */}
           <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-1.5">
@@ -449,7 +399,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
           </div>
 
           {balcaoAgendamentos.length === 0 ? (
-            <div className="bg-white rounded-2xl p-12 border border-slate-200 text-center shadow-xs">
+            <div className="bg-white rounded-3xl p-12 border border-slate-200 text-center shadow-sm">
               <Clock className="w-10 h-10 text-slate-300 mx-auto mb-3" />
               <h4 className="text-base font-bold text-slate-800">Nenhum atendimento para hoje neste filtro</h4>
               <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">
@@ -475,7 +425,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
               )}
             </div>
           ) : (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
@@ -726,7 +676,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
       ) : viewFormat === 'profissionais' ? (
         /* VISÃO SEPARADA POR PROFISSIONAL (COLUNAS / ABAS) */
         <div className="space-y-4">
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Users className="w-5 h-5 text-indigo-600" />
               <div>
@@ -742,7 +692,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                 placeholder="Buscar paciente ou procedimento..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               />
             </div>
           </div>
@@ -762,10 +712,10 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
               });
 
               return (
-                <div key={prof.id} className="bg-slate-50/70 rounded-xl border border-slate-200 p-4 flex flex-col h-full shadow-2xs">
+                <div key={prof.id} className="bg-slate-50/70 rounded-3xl border border-slate-200/90 p-5 flex flex-col h-full shadow-sm">
                   
                   {/* Column Header */}
-                  <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-200 bg-white -mx-4 -mt-4 p-4 rounded-t-xl mb-3 shadow-2xs">
+                  <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-200 bg-white -mx-5 -mt-5 p-5 rounded-t-3xl mb-3 shadow-2xs">
                     <div className="flex items-center gap-2.5">
                       <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-xs shrink-0 border border-indigo-200">
                         {prof.nome.split(' ').map(n => n[0]).slice(0, 2).join('')}
@@ -944,7 +894,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
         /* VISÃO EM CARDS COM FILTRO */
         <>
           {/* Filters Bar */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
+          <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
             <div className="relative w-full md:w-72">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
@@ -952,7 +902,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                 placeholder="Filtrar por paciente, procedimento ou profissional..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="w-full pl-9 pr-4 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               />
             </div>
 
@@ -965,7 +915,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
               <select
                 value={filterProfissional}
                 onChange={(e) => setFilterProfissional(e.target.value)}
-                className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+                className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
               >
                 <option value="todos">Todos os Profissionais</option>
                 {allProfissionaisList.map(p => (
@@ -994,7 +944,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
 
           {/* Grid of Appointments */}
           {filtered.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center">
+            <div className="bg-white rounded-3xl border border-dashed border-slate-300 p-12 text-center shadow-sm">
               <CalendarIcon className="w-12 h-12 text-slate-300 mx-auto mb-3" />
               <h3 className="text-base font-semibold text-slate-800">Nenhum agendamento encontrado</h3>
               <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
@@ -1017,7 +967,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
               return (
                 <div 
                   key={ag.id}
-                  className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:border-slate-300 transition-colors flex flex-col justify-between"
+                  className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
                 >
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-3">
@@ -1190,8 +1140,8 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
       {/* Modal Visualizador de Contrato */}
       {selectedContratoAgendamento && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-4 border-b border-slate-100 bg-purple-50 flex items-center justify-between">
+          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-5 border-b border-slate-100 bg-purple-50 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-purple-700" />
                 <h3 className="font-bold text-slate-900 text-sm">
@@ -1205,20 +1155,20 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                 ✕
               </button>
             </div>
-            <div className="p-5 space-y-3 text-xs text-slate-700 max-h-[60vh] overflow-y-auto">
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1">
+            <div className="p-6 space-y-3 text-xs text-slate-700 max-h-[60vh] overflow-y-auto">
+              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-1">
                 <p><strong>Paciente:</strong> {selectedContratoAgendamento.paciente?.nome}</p>
                 <p><strong>Procedimento:</strong> {selectedContratoAgendamento.procedimento}</p>
                 <p><strong>Profissional:</strong> {selectedContratoAgendamento.profissional_nome || 'Dra. Camila Vasconcelos'}</p>
               </div>
-              <div className="p-3 bg-white border border-slate-200 rounded-lg font-mono text-[11px] whitespace-pre-wrap leading-relaxed">
+              <div className="p-4 bg-white border border-slate-200 rounded-2xl font-mono text-[11px] whitespace-pre-wrap leading-relaxed">
                 {selectedContratoAgendamento.contrato_vinculado}
               </div>
             </div>
             <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
               <button
                 onClick={() => setSelectedContratoAgendamento(null)}
-                className="px-4 py-2 bg-slate-800 text-white rounded-lg text-xs font-bold cursor-pointer hover:bg-slate-900"
+                className="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold cursor-pointer hover:bg-slate-900"
               >
                 Fechar Visualização
               </button>
@@ -1230,7 +1180,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
       {/* Confirmation Modal for Appointment Deletion */}
       {appointmentToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-sm overflow-hidden p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xl w-full max-w-sm overflow-hidden p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
             <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
               <AlertCircle className="w-6 h-6" />
             </div>
@@ -1243,7 +1193,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
             <div className="flex items-center justify-center gap-3 pt-2">
               <button
                 onClick={() => setAppointmentToDelete(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
               >
                 Cancelar
               </button>
@@ -1252,7 +1202,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                   if (onDeleteAppointment) onDeleteAppointment(appointmentToDelete.id);
                   setAppointmentToDelete(null);
                 }}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
               >
                 Confirmar Exclusão
               </button>

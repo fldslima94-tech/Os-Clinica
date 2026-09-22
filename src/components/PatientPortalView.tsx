@@ -37,7 +37,8 @@ import {
   SolicitacaoOrcamento, 
   PacienteGoogleProfile, 
   UsuarioEquipe, 
-  ClinicaConfig 
+  ClinicaConfig,
+  CATEGORIAS_PROCEDIMENTOS_PERMITIDAS
 } from '../types';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 import { 
@@ -123,7 +124,13 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
   const [bookingSuccessModal, setBookingSuccessModal] = useState(false);
   const [lastSubmittedBooking, setLastSubmittedBooking] = useState<any>(null);
 
-  const categories = ['todos', ...Array.from(new Set(procedimentos.map(p => p.categoria)))];
+  const categories = [
+    'todos',
+    ...CATEGORIAS_PROCEDIMENTOS_PERMITIDAS,
+    ...Array.from(new Set(procedimentos.map(p => p.categoria))).filter(
+      c => c && !CATEGORIAS_PROCEDIMENTOS_PERMITIDAS.includes(c as any)
+    )
+  ];
 
   const filteredProcedures = procedimentos.filter(p => {
     if (!p.ativo || !p.destaque_portal) return false;
@@ -541,22 +548,36 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
                     }`}
                   >
                     <div>
-                      {proc.imagem_url && (
-                        <div className="h-36 w-full relative overflow-hidden bg-slate-100">
-                          <img
-                            src={proc.imagem_url}
-                            alt={proc.nome}
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-linear-to-t from-slate-950/70 via-slate-950/20 to-transparent" />
-                          <span className="absolute bottom-2.5 left-3 text-[10px] font-bold text-white uppercase tracking-wider bg-slate-900/80 px-2 py-0.5 rounded-md backdrop-blur-xs">
-                            {proc.categoria}
-                          </span>
-                        </div>
-                      )}
+                      {(() => {
+                        const coverImg = (proc.imagens_galeria && proc.imagens_galeria.length > 0)
+                          ? proc.imagens_galeria[0]
+                          : proc.imagem_url;
+                        const totalFotos = proc.imagens_galeria?.length || (proc.imagem_url ? 1 : 0);
+
+                        if (!coverImg) return null;
+
+                        return (
+                          <div className="h-36 w-full relative overflow-hidden bg-slate-100">
+                            <img
+                              src={coverImg}
+                              alt={proc.nome}
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-linear-to-t from-slate-950/70 via-slate-950/20 to-transparent" />
+                            <span className="absolute bottom-2.5 left-3 text-[10px] font-bold text-white uppercase tracking-wider bg-slate-900/80 px-2 py-0.5 rounded-md backdrop-blur-xs">
+                              {proc.categoria}
+                            </span>
+                            {totalFotos > 1 && (
+                              <span className="absolute top-2.5 right-2.5 text-[10px] font-bold text-white bg-slate-900/80 px-2 py-0.5 rounded-full backdrop-blur-xs">
+                                📷 {totalFotos} fotos
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                       <div className="p-4 space-y-2">
-                        {!proc.imagem_url && (
+                        {!(proc.imagens_galeria && proc.imagens_galeria.length > 0) && !proc.imagem_url && (
                           <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
                             {proc.categoria}
                           </span>

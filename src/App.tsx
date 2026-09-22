@@ -87,6 +87,8 @@ import { MasterEditModal } from './components/MasterEditModal';
 import { AppContentSkeleton } from './components/AppContentSkeleton';
 import { ReceptionTVView } from './components/ReceptionTVView';
 import { SecondScreenModal } from './components/SecondScreenModal';
+import { PWAInstallModal } from './components/PWAInstallModal';
+import { PWAInstallBanner } from './components/PWAInstallBanner';
 import { useConnectionStatus } from './contexts/ConnectionStatusContext';
 import { CheckCircle2, AlertCircle, Cloud, Sparkles, Loader2, Settings } from 'lucide-react';
 import { 
@@ -254,6 +256,9 @@ export default function App() {
   // Switch User with Password Modal State
   const [isSwitchUserModalOpen, setIsSwitchUserModalOpen] = useState(false);
   const [switchTargetUser, setSwitchTargetUser] = useState<UsuarioEquipe | null>(null);
+
+  // PWA Install Modal State (Android & iOS)
+  const [isPWAInstallModalOpen, setIsPWAInstallModalOpen] = useState(false);
 
   // Centralized navigation handler with browser history stack (pushState) and storage sync
   const navigateToTab = (newTab: TabType, pushToHistory = true, extraParams?: Record<string, string | null>) => {
@@ -2202,7 +2207,25 @@ export default function App() {
             </div>
           </div>
         )}
-        <LoginView usuarios={usuarios} onLoginSuccess={handleLoginSuccess} />
+        <LoginView 
+          usuarios={usuarios} 
+          onLoginSuccess={handleLoginSuccess} 
+          clinicaConfig={clinicaConfig}
+        />
+
+        {/* PWA Floating Install Banner on Login Screen */}
+        <PWAInstallBanner
+          onOpenModal={() => setIsPWAInstallModalOpen(true)}
+          clinicName={clinicaConfig.nome}
+        />
+
+        {/* PWA Install Guide Modal for Android & iOS */}
+        <PWAInstallModal
+          isOpen={isPWAInstallModalOpen}
+          onClose={() => setIsPWAInstallModalOpen(false)}
+          clinicName={clinicaConfig.nome}
+          clinicLogo={clinicaConfig.logomarca_url}
+        />
       </div>
     );
   }
@@ -2244,6 +2267,7 @@ export default function App() {
         onOpenGlobalSearch={() => setIsGlobalSearchOpen(true)}
         onOpenNoticeBoard={() => setActiveTab('quadro_avisos')}
         onOpenSecondScreenModal={() => setIsSecondScreenModalOpen(true)}
+        onOpenPWAInstall={() => setIsPWAInstallModalOpen(true)}
         unreadNoticesCount={unreadNoticesCount}
         lowStockCount={lowStockCount}
         manutencaoAlertCount={manutencaoAlertCount}
@@ -2253,6 +2277,8 @@ export default function App() {
         usuarios={usuarios}
         onRequestSwitchUser={handleRequestSwitchUser}
         onLogout={handleLogout}
+        clinicaConfig={clinicaConfig}
+        onOpenClinicSettings={() => setIsClinicSettingsOpen(true)}
       />
 
       {/* Main Layout Body */}
@@ -2282,10 +2308,13 @@ export default function App() {
           unreadNoticesCount={unreadNoticesCount}
           onRequestSwitchUser={() => handleRequestSwitchUser()}
           onLogout={handleLogout}
+          clinicaConfig={clinicaConfig}
+          onOpenClinicSettings={() => setIsClinicSettingsOpen(true)}
+          onOpenPWAInstall={() => setIsPWAInstallModalOpen(true)}
         />
 
         {/* Content Area */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-7xl pb-24 lg:pb-8">
+        <main className="flex-1 p-3 sm:p-5 lg:p-8 overflow-y-auto max-w-7xl pb-24 lg:pb-8">
           {isInitialDataLoading ? (
             <AppContentSkeleton 
               activeTab={activeTab} 
@@ -2484,6 +2513,7 @@ export default function App() {
               agendamentos={agendamentos}
               pacientes={pacientes}
               onMarkReminderSent={handleMarkReminderSent}
+              clinicaConfig={clinicaConfig}
             />
           )}
 
@@ -2854,6 +2884,20 @@ export default function App() {
 
       {/* Modal Dinâmico Universal de Edição Master */}
       <MasterEditModal />
+
+      {/* PWA Floating Install Banner for Mobile */}
+      <PWAInstallBanner
+        onOpenModal={() => setIsPWAInstallModalOpen(true)}
+        clinicName={clinicaConfig.nome}
+      />
+
+      {/* PWA Install Guide Modal for Android & iOS */}
+      <PWAInstallModal
+        isOpen={isPWAInstallModalOpen}
+        onClose={() => setIsPWAInstallModalOpen(false)}
+        clinicName={clinicaConfig.nome}
+        clinicLogo={clinicaConfig.logomarca_url}
+      />
     </div>
   </MasterEditProvider>
   );

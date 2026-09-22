@@ -717,6 +717,18 @@ export interface ProcedimentoInsumoVinculado {
   unidade_medida: UnidadeMedida;
 }
 
+export const CATEGORIAS_PROCEDIMENTOS_PERMITIDAS = [
+  'Micropigmentação',
+  'Cilios',
+  'Sombrancelhas',
+  'Limpesa de pele',
+  'Cabelo',
+  'penteado',
+  'procedimento estetico'
+] as const;
+
+export type CategoriaProcedimento = typeof CATEGORIAS_PROCEDIMENTOS_PERMITIDAS[number];
+
 export interface ProcedimentoClinico {
   id: string;
   clinica_id?: string;
@@ -747,6 +759,7 @@ export interface ProcedimentoClinico {
   ativo?: boolean;
   destaque_portal?: boolean;
   imagem_url?: string;
+  imagens_galeria?: string[];
   criado_em?: string;
   cadastrado_por_admin?: boolean;
   criado_por_usuario_id?: string;

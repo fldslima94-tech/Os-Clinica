@@ -24,7 +24,7 @@ export const MasterEditModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-70 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-white rounded-2xl border-2 border-amber-400 shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95">
+      <div className="bg-white rounded-3xl border-2 border-amber-400 shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95">
         <div className="p-4 bg-gradient-to-r from-amber-500 via-amber-600 to-slate-900 text-slate-950 flex items-center justify-between font-bold">
           <div className="flex items-center gap-2 text-white">
             <ShieldAlert className="w-5 h-5 text-amber-300" />

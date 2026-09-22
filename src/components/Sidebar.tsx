@@ -71,25 +71,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (isCliente) {
       return [
         {
-          title: 'Área do Cliente',
+          title: 'Área do Paciente',
           items: [
             {
               id: 'portal_paciente' as TabType,
-              label: 'Portal & Orçamentos',
+              label: 'Minhas Consultas',
               icon: Globe,
-              badge: 'Minhas Consultas',
-              badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200 font-semibold',
             },
             {
               id: 'quadro_avisos' as TabType,
               label: 'Mural de Avisos',
               icon: Megaphone,
               badge: unreadNoticesCount > 0 ? `${unreadNoticesCount}` : undefined,
-              badgeColor: 'bg-rose-100 text-rose-800 border-rose-200 font-bold',
+              badgeColor: 'bg-rose-100 text-rose-700 font-bold',
             },
             {
               id: 'perfil' as TabType,
-              label: 'Meu Perfil & Segurança',
+              label: 'Meu Perfil',
               icon: Users,
             },
           ]
@@ -99,50 +97,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     return [
       {
-        title: 'Recepção & Balcão',
+        title: 'Recepção',
         items: [
           {
             id: 'dashboard' as TabType,
             label: 'Balcão do Dia',
             icon: LayoutDashboard,
-            badge: pendingCount > 0 ? `${pendingCount} hoje` : undefined,
-            badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
           },
           {
             id: 'balcao_tv' as TabType,
-            label: 'TV Recepção (2ª Tela)',
+            label: 'TV Recepção',
             icon: Tv,
-            badge: 'TV',
-            badgeColor: 'bg-purple-100 text-purple-800 border-purple-200 font-bold',
           },
           {
             id: 'agendamentos' as TabType,
-            label: 'Agenda por Profissional',
+            label: 'Agendamentos',
             icon: CalendarDays,
           },
           {
             id: 'retorno_pos' as TabType,
             label: 'Retornos & Pós-Venda',
             icon: HeartPulse,
-            badge: 'Retoque',
-            badgeColor: 'bg-rose-100 text-rose-800 border-rose-200 font-semibold',
           },
         ]
       },
       {
-        title: 'Clínico & Prontuários',
+        title: 'Clínico',
         items: [
           {
             id: 'pacientes' as TabType,
-            label: 'Ficha de Cadastro',
+            label: 'Pacientes',
             icon: Users,
           },
           {
             id: 'whatsapp' as TabType,
-            label: 'Automação WhatsApp',
+            label: 'WhatsApp',
             icon: MessageCircle,
-            badge: 'Anti-Falta',
-            badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200 font-semibold',
           },
         ]
       },
@@ -151,31 +141,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
         items: [
           {
             id: 'estoque' as TabType,
-            label: 'Insumos & Pigmentos',
+            label: 'Estoque de Insumos',
             icon: PackageCheck,
-            badge: lowStockCount > 0 ? `${lowStockCount} alerta` : undefined,
-            badgeColor: 'bg-rose-100 text-rose-800 border-rose-200 font-semibold',
+            badge: lowStockCount > 0 ? `${lowStockCount}` : undefined,
+            badgeColor: 'bg-rose-100 text-rose-700 font-bold',
           },
           {
             id: 'fornecedores' as TabType,
-            label: 'Fornecedores & Parceiros',
+            label: 'Fornecedores',
             icon: Building,
           },
           {
             id: 'patrimonio' as TabType,
-            label: 'Bens & Equipamentos',
+            label: 'Equipamentos',
             icon: Landmark,
-            badge: 'Ativos',
-            badgeColor: 'bg-amber-100 text-amber-800 border-amber-200 font-semibold',
           },
         ]
       },
       {
-        title: 'Comunicação & Vendas',
+        title: 'Comunicação',
         items: [
           {
             id: 'portal_paciente' as TabType,
-            label: 'Portal & Orçamentos',
+            label: 'Portal do Paciente',
             icon: Globe,
           },
           {
@@ -183,51 +171,43 @@ export const Sidebar: React.FC<SidebarProps> = ({
             label: 'Mural da Equipe',
             icon: Megaphone,
             badge: unreadNoticesCount > 0 ? `${unreadNoticesCount}` : undefined,
-            badgeColor: 'bg-rose-100 text-rose-800 border-rose-200 font-bold',
+            badgeColor: 'bg-rose-100 text-rose-700 font-bold',
           },
         ]
       },
       // Módulo Financeiro: EXCLUSIVO para Admin Local e Admin Master
       ...(isGestor ? [
         {
-          title: 'Financeiro & Caixa (Admin)',
+          title: 'Financeiro',
           items: [
             {
               id: 'financeiro' as TabType,
-              label: 'Fluxo de Caixa & Recorrentes',
+              label: 'Fluxo de Caixa',
               icon: DollarSign,
-              badge: isAdminTotal ? 'Master' : 'Gestor',
-              badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200 font-bold',
             },
           ]
         }
       ] : []),
       {
-        title: 'Gestão & Segurança',
+        title: 'Gestão',
         items: [
           ...(isAdminTotal ? [
             {
               id: 'banco_dados' as TabType,
-              label: 'Edição & Banco Master',
+              label: 'Banco de Dados',
               icon: Database,
-              badge: 'Master Total',
-              badgeColor: 'bg-rose-100 text-rose-800 border-rose-200 font-bold',
             },
             {
               id: 'permissoes' as TabType,
-              label: 'Permissões & Matriz',
+              label: 'Permissões',
               icon: Lock,
-              badge: 'Super Admin',
-              badgeColor: 'bg-amber-100 text-amber-800 border-amber-200 font-bold',
             }
           ] : []),
           ...(isGestor ? [
             {
               id: 'backups' as TabType,
-              label: 'Backups & Google Drive',
+              label: 'Backups',
               icon: HardDrive,
-              badge: 'Nuvem',
-              badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200 font-bold',
             }
           ] : []),
           ...(isGestor ? [{
@@ -237,7 +217,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           }] : []),
           {
             id: 'perfil' as TabType,
-            label: 'Meu Perfil & Senha',
+            label: 'Meu Perfil',
             icon: Users,
           },
           ...(isGestor ? [{
@@ -253,31 +233,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const moduleSections = getSections();
 
   return (
-    <aside className="w-full lg:w-64 bg-white text-slate-800 flex flex-col shrink-0 border-r border-slate-200">
+    <aside className="hidden lg:flex lg:w-64 bg-white text-slate-800 flex-col shrink-0 border-r border-slate-200">
       
       {/* Brand Header */}
-      <div className="p-5 border-b border-slate-100 hidden lg:block">
-        <div className="flex items-center gap-3 mb-2">
+      <div className="p-5 border-b border-slate-100">
+        <button
+          type="button"
+          onClick={() => onOpenClinicSettings && onOpenClinicSettings()}
+          className="w-full flex items-center gap-3 mb-2 text-left group cursor-pointer hover:opacity-90 transition-opacity"
+          title="Clique para abrir Configurações e Logomarca da Clínica"
+        >
           {clinicaConfig?.logomarca_url ? (
             <img 
               src={clinicaConfig.logomarca_url} 
               alt="Logo Clínica" 
-              className="w-9 h-9 rounded-xl object-cover border border-slate-200 shadow-xs" 
+              className="w-10 h-10 rounded-2xl object-cover border border-slate-200 shadow-xs group-hover:ring-2 ring-indigo-500/40 transition-all shrink-0" 
             />
           ) : (
-            <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-base shadow-xs">
-              A
+            <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-slate-900 rounded-2xl flex items-center justify-center text-white font-bold text-base shadow-xs group-hover:ring-2 ring-indigo-500/40 transition-all shrink-0">
+              {(clinicaConfig?.nome || 'A').charAt(0).toUpperCase()}
             </div>
           )}
-          <div className="min-w-0">
-            <span className="text-sm font-bold tracking-tight text-slate-900 block truncate">
+          <div className="min-w-0 flex-1">
+            <span className="text-sm font-bold tracking-tight text-slate-900 block truncate group-hover:text-indigo-600 transition-colors">
               {clinicaConfig?.nome || 'AuraEstética Studio'}
             </span>
-            <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">
-              Multi-Tenant SaaS
+            <span className="text-[11px] text-slate-400 block truncate">
+              Configurações da Clínica
             </span>
           </div>
-        </div>
+        </button>
 
         <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100">
           <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
@@ -367,23 +352,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </button>
 
-        {/* Cloud Firestore Security Status */}
-        <div className="px-2.5 py-1.5 bg-indigo-50/80 border border-indigo-100 rounded-xl flex items-center justify-between text-[11px] text-indigo-900 font-medium">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Regras RBAC Ativas</span>
-          </div>
-          <span className="text-[10px] text-indigo-700 font-bold">Multi-tenant</span>
-        </div>
-
         {onLogout && (
           <button
             onClick={onLogout}
-            className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-rose-600 hover:bg-rose-50/80 border border-slate-200 transition-colors cursor-pointer"
-            title="Encerrar sessão atual"
+            className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-100 transition-colors cursor-pointer"
+            title="Sair"
           >
             <LogOut className="w-3.5 h-3.5" />
-            <span>Sair da Sessão</span>
+            <span>Sair</span>
           </button>
         )}
       </div>

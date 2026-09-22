@@ -1,1 +1,25 @@
 @import "tailwindcss";
+
+/* Mobile PWA & iOS Safari safe area insets */
+:root {
+  --sat: env(safe-area-inset-top);
+  --sar: env(safe-area-inset-right);
+  --sab: env(safe-area-inset-bottom);
+  --sal: env(safe-area-inset-left);
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+  scroll-behavior: smooth;
+}
+
+body {
+  overscroll-behavior-y: contain;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Prevent text selection when tapping navigation tabs */
+nav button, header button {
+  -webkit-touch-callout: none;
+  user-select: none;
+}

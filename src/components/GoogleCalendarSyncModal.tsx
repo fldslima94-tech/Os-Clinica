@@ -198,7 +198,7 @@ export const GoogleCalendarSyncModal: React.FC<GoogleCalendarSyncModalProps> = (
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full p-6 animate-in fade-in zoom-in-95 space-y-5 max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xl max-w-2xl w-full p-6 animate-in fade-in zoom-in-95 space-y-5 max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
