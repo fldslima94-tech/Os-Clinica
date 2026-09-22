@@ -405,7 +405,18 @@ export default function App() {
       COLLECTIONS.CLINICA_CONFIG,
       (data) => {
         if (data && data.length > 0) {
-          setClinicaConfig(data[0]);
+          const cfg = data[0];
+          if (!cfg.logomarca_url || cfg.logomarca_url.includes('unsplash.com')) {
+            const upgraded: ClinicaConfig = {
+              ...cfg,
+              nome: cfg.nome && !cfg.nome.includes('AuraEstética') ? cfg.nome : 'Studio de Beleza Feminina',
+              logomarca_url: '/logo.svg'
+            };
+            setClinicaConfig(upgraded);
+            saveDocument(COLLECTIONS.CLINICA_CONFIG, upgraded);
+          } else {
+            setClinicaConfig(cfg);
+          }
         }
         markCollectionReady(COLLECTIONS.CLINICA_CONFIG);
       },
@@ -968,7 +979,12 @@ export default function App() {
         forma_pagamento: pagamento.forma || 'pix',
         status: pagamento.status || 'pago',
         data: new Date().toISOString(),
+        profissional_id: targetAgendamento.profissional_id || currentUser.id,
         profissional_nome: targetAgendamento.profissional_nome || currentUser.nome,
+        usuario_id: currentUser.id,
+        usuario_nome: currentUser.nome,
+        criado_por_id: currentUser.id,
+        criado_por_nome: currentUser.nome,
         observacao: pagamento.observacao || 'Recebido na finalização do procedimento (Balcão)',
         excluido: false,
       };
@@ -1128,7 +1144,12 @@ export default function App() {
         forma_pagamento: data.pagamento.forma,
         status: 'pago',
         data: new Date().toISOString(),
+        profissional_id: ag.profissional_id || currentUser.id,
         profissional_nome: ag.profissional_nome || currentUser.nome,
+        usuario_id: currentUser.id,
+        usuario_nome: currentUser.nome,
+        criado_por_id: currentUser.id,
+        criado_por_nome: currentUser.nome,
         observacao: data.pagamento.observacao || 'Recebido no Check-in (Balcão)',
         excluido: false,
       };
@@ -1582,11 +1603,19 @@ export default function App() {
       procedimento: nova.procedimento || 'Lançamento Manual',
       valor: nova.valor || 0,
       tipo: standardizedTipo,
+      categoria: nova.categoria,
       forma_pagamento: nova.forma_pagamento || 'pix',
       status: nova.status || 'pago',
       data: nova.data || new Date().toISOString(),
       observacao: nova.observacao,
       excluido: false,
+      // Auditoria e Separação por Usuário:
+      usuario_id: nova.usuario_id || currentUser.id,
+      usuario_nome: nova.usuario_nome || currentUser.nome,
+      criado_por_id: nova.criado_por_id || currentUser.id,
+      criado_por_nome: nova.criado_por_nome || currentUser.nome,
+      profissional_id: standardizedTipo === 'entrada' ? (nova.profissional_id || currentUser.id) : undefined,
+      profissional_nome: standardizedTipo === 'entrada' ? (nova.profissional_nome || currentUser.nome) : undefined,
     };
     setTransacoes(prev => [created, ...prev]);
     saveDocument(COLLECTIONS.TRANSACOES, created);

@@ -247,7 +247,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <img 
               src={clinicaConfig.logomarca_url} 
               alt="Logo Clínica" 
-              className="w-10 h-10 rounded-2xl object-cover border border-slate-200 shadow-xs group-hover:ring-2 ring-indigo-500/40 transition-all shrink-0" 
+              referrerPolicy="no-referrer"
+              className="w-10 h-10 rounded-2xl object-contain bg-white border border-slate-200/90 shadow-xs group-hover:ring-2 ring-indigo-500/40 transition-all shrink-0 p-0.5" 
             />
           ) : (
             <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-slate-900 rounded-2xl flex items-center justify-center text-white font-bold text-base shadow-xs group-hover:ring-2 ring-indigo-500/40 transition-all shrink-0">

@@ -84,14 +84,31 @@ service cloud.firestore {
     // ==========================================
     // 6. FINANCEIRO & FLUXO DE CAIXA
     // ==========================================
+    // Regra de Separação Financeira por Usuário:
+    // - Saídas operacionais (tipo == 'saida') são unificadas para toda a clínica.
+    // - Despesas recorrentes são unificadas para a gestão da clínica.
+    // - Entradas e receitas são restritas: somente o usuário criador ou profissional atrelado pode visualizar/editar.
+    // - Super Admin possui visibilidade global.
     match /transacoes/{transacaoId} {
-      allow read, write: if true;
+      allow read: if !isAuthenticated() || isSuperAdmin() ||
+        resource.data.tipo == 'saida' ||
+        resource.data.usuario_id == request.auth.uid ||
+        resource.data.criado_por_id == request.auth.uid ||
+        resource.data.profissional_id == request.auth.uid;
+
+      allow create: if true;
+
+      allow update, delete: if !isAuthenticated() || isSuperAdmin() ||
+        resource.data.usuario_id == request.auth.uid ||
+        resource.data.criado_por_id == request.auth.uid ||
+        resource.data.profissional_id == request.auth.uid;
     }
 
     match /fluxo_caixa/{fluxoId} {
       allow read, write: if true;
     }
 
+    // Despesas recorrentes unificadas para toda a clínica
     match /despesas_recorrentes/{despesaId} {
       allow read, write: if true;
     }

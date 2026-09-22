@@ -300,6 +300,7 @@ export const PrintableReceiptModal: React.FC<PrintableReceiptModalProps> = ({
                 <img
                   src={clinicaConfig.logomarca_url}
                   alt={clinicaNome}
+                  referrerPolicy="no-referrer"
                   className="w-14 h-14 object-contain rounded-xl border border-slate-200 p-1"
                 />
               ) : (

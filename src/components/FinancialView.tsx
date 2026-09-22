@@ -28,7 +28,11 @@ import {
   Edit3,
   Save,
   Repeat,
-  BarChart3
+  BarChart3,
+  Lock,
+  Globe,
+  Shield,
+  UserCheck
 } from 'lucide-react';
 import { 
   TransacaoFinanceira, 
@@ -41,6 +45,7 @@ import {
   ClinicaConfig
 } from '../types';
 import { checkUserCustomPermission, isUserAdminTotal } from '../services/firebaseService';
+import { filterTransacoesPorUsuario } from '../utils/financialFilter';
 import { FinancialReportsView } from './FinancialReportsView';
 import { PrintableReceiptModal } from './PrintableReceiptModal';
 import { FinancialEvolutionChart } from './FinancialEvolutionChart';
@@ -108,6 +113,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
   const [novaForma, setNovaForma] = useState<FormaPagamento>('pix');
   const [novoStatus, setNovoStatus] = useState<StatusPagamento>('pago');
   const [novaObs, setNovaObs] = useState('');
+  const [novoProfissionalId, setNovoProfissionalId] = useState<string>(() => currentUser?.id || '');
 
   // New Despesa Recorrente Form State
   const [recDescricao, setRecDescricao] = useState('');
@@ -128,15 +134,22 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
   const [editObs, setEditObs] = useState('');
   const [despesaToDelete, setDespesaToDelete] = useState<DespesaRecorrente | null>(null);
 
+  // Separação Financeira por Usuário:
+  // Saídas e Despesas Recorrentes são UNIFICADAS para todos os administradores.
+  // Entradas e Receitas são RESTRITAS apenas ao respectivo usuário (realizadas por ele ou atreladas a ele).
+  const scopedTransacoes = useMemo(() => {
+    return filterTransacoesPorUsuario(transacoes, currentUser);
+  }, [transacoes, currentUser]);
+
   // Filter Active (Non-deleted) vs Soft-deleted Transactions with useMemo
   const { activeTransacoes, deletedTransacoes } = useMemo(() => {
     return {
-      activeTransacoes: transacoes.filter(t => !t.excluido),
-      deletedTransacoes: transacoes.filter(t => t.excluido)
+      activeTransacoes: scopedTransacoes.filter(t => !t.excluido),
+      deletedTransacoes: scopedTransacoes.filter(t => t.excluido)
     };
-  }, [transacoes]);
+  }, [scopedTransacoes]);
 
-  // KPI Calculations (Only Non-Deleted & Paid count)
+  // KPI Calculations (Baseadas no escopo do usuário para entradas + saídas e despesas unificadas)
   const { entradas, totalEntradas, saidas, totalSaidas, saldoLiquidoCaixa, totalRecorrenteMensal } = useMemo(() => {
     const ent = activeTransacoes.filter(t => (t.tipo === 'entrada' || t.tipo === 'receita') && t.status === 'pago');
     const totEnt = ent.reduce((acc, t) => acc + (Number(t.valor) || 0), 0);
@@ -160,7 +173,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
 
   // Filtered List based on Current Tab and Search
   const displayList = useMemo(() => {
-    const sourceList = showAuditDeleted ? transacoes : activeTransacoes;
+    const sourceList = showAuditDeleted ? scopedTransacoes : activeTransacoes;
     const q = search.toLowerCase().trim();
 
     return sourceList.filter(t => {
@@ -175,16 +188,20 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
         (t.paciente_nome || '').toLowerCase().includes(q) || 
         (t.procedimento || '').toLowerCase().includes(q) ||
         (t.profissional_nome || '').toLowerCase().includes(q) ||
+        (t.usuario_nome || '').toLowerCase().includes(q) ||
+        (t.criado_por_nome || '').toLowerCase().includes(q) ||
         (t.categoria || '').toLowerCase().includes(q) ||
         (t.forma_pagamento || '').toLowerCase().includes(q);
 
       return matchesSearch;
     });
-  }, [showAuditDeleted, transacoes, activeTransacoes, activeFinTab, search]);
+  }, [showAuditDeleted, scopedTransacoes, activeTransacoes, activeFinTab, search]);
 
   const handleSaveTransaction = (e: React.FormEvent) => {
     e.preventDefault();
     if (!novoPacienteNome || novoValor <= 0) return;
+
+    const chosenProf = profissionais.find(p => p.id === novoProfissionalId) || currentUser;
 
     onAddTransaction({
       id: `tx-${Date.now()}`,
@@ -198,6 +215,12 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
       data: new Date().toISOString(),
       observacao: novaObs.trim() || undefined,
       excluido: false,
+      usuario_id: currentUser?.id,
+      usuario_nome: currentUser?.nome,
+      criado_por_id: currentUser?.id,
+      criado_por_nome: currentUser?.nome,
+      profissional_id: novoTipo === 'entrada' ? (novoProfissionalId || currentUser?.id) : undefined,
+      profissional_nome: novoTipo === 'entrada' ? (chosenProf?.nome || currentUser?.nome) : undefined,
     });
 
     setIsNewTxModalOpen(false);
@@ -300,12 +323,16 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
               Fluxo de Caixa & Gestão
             </span>
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1">
+              <Shield className="w-3 h-3 text-indigo-600" />
+              <span>Separação por Usuário</span>
+            </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight mt-1">
-            Módulo Financeiro Reestruturado
+            Gestão Financeira & Caixa
           </h2>
           <p className="text-xs text-slate-500 font-medium mt-0.5">
-            Controle transparente de entradas de procedimentos, saídas operacionais e despesas fixas recorrentes.
+            Suas receitas e procedimentos ficam restritos ao seu perfil ({currentUser?.nome || 'Você'}), enquanto saídas e despesas fixas são unificadas para a clínica.
           </p>
         </div>
 
@@ -340,7 +367,10 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
         <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-              <span>Total de Entradas (Receitas)</span>
+              <span className="flex items-center gap-1.5 font-semibold text-slate-700">
+                <Lock className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Suas Entradas (Receitas)</span>
+              </span>
               <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
                 <ArrowUpRight className="w-4 h-4" />
               </div>
@@ -350,7 +380,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
             </p>
           </div>
           <p className="text-[11px] text-slate-400 mt-2">
-            {entradas.length} atendimentos e vendas pagos
+            {entradas.length} atendimentos e vendas pagos (Restrito)
           </p>
         </div>
 
@@ -358,7 +388,10 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
         <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-              <span>Total de Saídas (Despesas)</span>
+              <span className="flex items-center gap-1.5 font-semibold text-slate-700">
+                <Globe className="w-3.5 h-3.5 text-rose-600" />
+                <span>Total de Saídas (Clínica)</span>
+              </span>
               <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
                 <ArrowDownRight className="w-4 h-4" />
               </div>
@@ -368,7 +401,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
             </p>
           </div>
           <p className="text-[11px] text-slate-400 mt-2">
-            {saidas.length} compras e comissões pagas
+            {saidas.length} compras e comissões pagas (Unificado)
           </p>
         </div>
 
@@ -384,7 +417,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
             </p>
           </div>
           <p className="text-[11px] text-slate-400 mt-2">
-            Entradas quitadas menos saídas
+            Suas receitas menos despesas da clínica
           </p>
         </div>
 
@@ -392,7 +425,10 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
         <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-              <span>Despesas Recorrentes / Mês</span>
+              <span className="flex items-center gap-1.5 font-semibold text-slate-700">
+                <RefreshCw className="w-3.5 h-3.5 text-amber-600" />
+                <span>Despesas Recorrentes / Mês</span>
+              </span>
               <RefreshCw className="w-4 h-4 text-amber-600" />
             </div>
             <p className="text-2xl font-bold text-amber-900 mt-2">
@@ -400,14 +436,14 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
             </p>
           </div>
           <p className="text-[11px] text-slate-400 mt-2">
-            {despesasRecorrentes.filter(d => d.status === 'ativo').length} contas fixas ativas
+            {despesasRecorrentes.filter(d => d.status === 'ativo').length} contas fixas ativas (Unificado)
           </p>
         </div>
       </div>
 
       {/* Gráfico Recharts de Evolução Mensal de Receitas vs Despesas com Filtro de Intervalo de Datas */}
       {showEvolutionChart && (
-        <FinancialEvolutionChart transacoes={transacoes} />
+        <FinancialEvolutionChart transacoes={scopedTransacoes} />
       )}
 
       {/* 3 Main Tabs: Entradas, Saídas, Despesas Recorrentes */}
@@ -415,7 +451,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
         
         <div className="p-4 border-b border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
           {/* Navigation Pills */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl flex-wrap">
             <button
               onClick={() => setActiveFinTab('entradas')}
               className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
@@ -424,8 +460,8 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <ArrowUpRight className="w-3.5 h-3.5" />
-              <span>1. Entradas ({entradas.length})</span>
+              <Lock className="w-3.5 h-3.5 text-emerald-600" />
+              <span>1. Entradas ({entradas.length}) - Restrito</span>
             </button>
 
             <button
@@ -436,8 +472,8 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <ArrowDownRight className="w-3.5 h-3.5" />
-              <span>2. Saídas ({saidas.length})</span>
+              <Globe className="w-3.5 h-3.5 text-rose-600" />
+              <span>2. Saídas ({saidas.length}) - Unificado</span>
             </button>
 
             <button
@@ -449,7 +485,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
               }`}
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>3. Despesas Recorrentes ({despesasRecorrentes.length})</span>
+              <span>3. Despesas Recorrentes ({despesasRecorrentes.length}) - Unificado</span>
             </button>
 
             <button
@@ -461,7 +497,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
               }`}
             >
               <BarChart3 className="w-3.5 h-3.5" />
-              <span>4. Relatórios & Gráficos</span>
+              <span>4. Relatórios & DRE</span>
             </button>
           </div>
 
@@ -473,7 +509,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
                   <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder="Buscar favorecido ou procedimento..."
+                    placeholder="Buscar cliente, procedimento..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
@@ -487,7 +523,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
                     onChange={(e) => setShowAuditDeleted(e.target.checked)}
                     className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                   />
-                  <span>Ver Excluídos (Auditoria)</span>
+                  <span>Ver Excluídos</span>
                 </label>
               </>
             )}
@@ -508,10 +544,11 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
         {activeFinTab === 'relatorios' && (
           <div className="p-4 sm:p-6 bg-slate-50/50">
             <FinancialReportsView
-              transacoes={transacoes}
+              transacoes={scopedTransacoes}
               procedimentos={procedimentos}
               profissionais={profissionais}
               despesasRecorrentes={despesasRecorrentes}
+              currentUser={currentUser}
             />
           </div>
         )}
@@ -534,8 +571,30 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
               <tbody className="divide-y divide-slate-100 text-xs">
                 {displayList.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-400">
-                      Nenhum lançamento financeiro encontrado nesta visualização.
+                    <td colSpan={7} className="py-12 text-center">
+                      <div className="max-w-md mx-auto flex flex-col items-center justify-center text-slate-400">
+                        {activeFinTab === 'entradas' ? (
+                          <>
+                            <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2">
+                              <Lock className="w-5 h-5" />
+                            </div>
+                            <p className="font-semibold text-slate-800 text-xs">Nenhum lançamento de entrada atrelado ao seu usuário</p>
+                            <p className="text-[11px] text-slate-500 mt-1">
+                              Cada administrador visualiza apenas os recebimentos que lançou ou que estejam atrelados a ele ({currentUser?.nome || 'Você'}).
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mb-2">
+                              <Globe className="w-5 h-5" />
+                            </div>
+                            <p className="font-semibold text-slate-800 text-xs">Nenhuma saída operacional registrada</p>
+                            <p className="text-[11px] text-slate-500 mt-1">
+                              As saídas e despesas operacionais da clínica ficam unificadas para todos os administradores.
+                            </p>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ) : (
@@ -556,9 +615,16 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
                           <span className={`font-bold ${isDeleted ? 'line-through text-slate-400' : 'text-slate-900'}`}>
                             {tx.paciente_nome || 'Consumidor Final'}
                           </span>
-                          {tx.profissional_nome && (
-                            <span className="block text-[11px] text-slate-500 font-normal">
-                              Prof.: {tx.profissional_nome}
+                          {activeFinTab === 'entradas' && (tx.profissional_nome || tx.usuario_nome) && (
+                            <span className="flex items-center gap-1 mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-100 w-fit">
+                              <Lock className="w-2.5 h-2.5 text-emerald-600" />
+                              Atrelado: {tx.profissional_nome || tx.usuario_nome}
+                            </span>
+                          )}
+                          {activeFinTab === 'saidas' && tx.criado_por_nome && (
+                            <span className="flex items-center gap-1 mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200 w-fit">
+                              <Globe className="w-2.5 h-2.5 text-slate-500" />
+                              Por: {tx.criado_por_nome}
                             </span>
                           )}
                           {isDeleted && (
@@ -1094,6 +1160,47 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
                   className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl"
                 />
               </div>
+
+              {/* Separação por Usuário: Profissional responsável pela receita */}
+              {novoTipo === 'entrada' ? (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Profissional / Administrador Responsável *
+                  </label>
+                  <select
+                    value={novoProfissionalId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setNovoProfissionalId(id);
+                    }}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium"
+                  >
+                    {profissionais.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.nome} {p.id === currentUser?.id ? '(Você - Usuário Conectado)' : ''}
+                      </option>
+                    ))}
+                    {!profissionais.some(p => p.id === currentUser?.id) && currentUser && (
+                      <option value={currentUser.id}>
+                        {currentUser.nome} (Você - Usuário Conectado)
+                      </option>
+                    )}
+                  </select>
+                  <p className="text-[11px] text-emerald-800 mt-1 flex items-center gap-1.5 bg-emerald-50/70 p-2 rounded-lg border border-emerald-100">
+                    <Lock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>
+                      <strong>Entrada Restrita:</strong> Visível apenas para o usuário que lançou ou o profissional atrelado.
+                    </span>
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-[11px] text-slate-700 flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-slate-500 shrink-0" />
+                  <span>
+                    <strong>Saída Unificada:</strong> As despesas operacionais da clínica ficam disponíveis e unificadas para todos os administradores.
+                  </span>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>

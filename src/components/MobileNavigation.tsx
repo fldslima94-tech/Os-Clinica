@@ -287,7 +287,8 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
                   <img
                     src={clinicaConfig.logomarca_url}
                     alt={clinicaConfig.nome || 'Logo'}
-                    className="w-9 h-9 rounded-xl object-cover border border-slate-200 shadow-2xs group-hover:ring-2 ring-indigo-500/40 transition-all shrink-0"
+                    referrerPolicy="no-referrer"
+                    className="w-9 h-9 rounded-xl object-contain bg-white border border-slate-200/90 shadow-2xs group-hover:ring-2 ring-indigo-500/40 transition-all shrink-0 p-0.5"
                   />
                 ) : (
                   <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-slate-900 text-white font-bold flex items-center justify-center text-sm shadow-2xs shrink-0">

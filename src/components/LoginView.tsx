@@ -352,7 +352,8 @@ export const LoginView: React.FC<LoginViewProps> = ({
             <img
               src={clinicaConfig.logomarca_url}
               alt={clinicaConfig.nome || 'Logo da Clínica'}
-              className="w-10 h-10 rounded-2xl object-cover border border-slate-700/80 shadow-lg"
+              referrerPolicy="no-referrer"
+              className="w-10 h-10 rounded-2xl object-contain bg-white border border-slate-700/80 shadow-lg p-0.5"
             />
           ) : (
             <div className="w-10 h-10 rounded-2xl bg-indigo-600 border border-indigo-400/40 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-indigo-600/20">

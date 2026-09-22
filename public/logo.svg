@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800">
+  <defs>
+    <!-- Rich Golden Metallic Gradients -->
+    <linearGradient id="goldGradient" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#EED59B" />
+      <stop offset="25%" stop-color="#CFA449" />
+      <stop offset="50%" stop-color="#F7E6B8" />
+      <stop offset="75%" stop-color="#B2862B" />
+      <stop offset="100%" stop-color="#805C15" />
+    </linearGradient>
+
+    <linearGradient id="goldText" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#5E4319" />
+      <stop offset="50%" stop-color="#856126" />
+      <stop offset="100%" stop-color="#5E4319" />
+    </linearGradient>
+
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#FBF9F5" />
+    </linearGradient>
+
+    <!-- Subtle Premium Shadow for Card -->
+    <filter id="softCardShadow" x="-10%" y="-10%" width="120%" height="125%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#7A6030" flood-opacity="0.08" />
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000000" flood-opacity="0.04" />
+    </filter>
+
+    <!-- Gold Line Sheen Filter -->
+    <filter id="goldGleam" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#543A0C" flood-opacity="0.25" />
+    </filter>
+  </defs>
+
+  <!-- Background Base Canvas -->
+  <rect width="800" height="800" fill="#F4F1EA" />
+
+  <!-- Central Rounded Logo Card -->
+  <g filter="url(#softCardShadow)">
+    <rect x="70" y="55" width="660" height="690" rx="140" fill="url(#bgGradient)" stroke="#EFE9DE" stroke-width="2" />
+  </g>
+
+  <!-- Emblem: Lotus + Female Profile -->
+  <g transform="translate(400, 290)" filter="url(#goldGleam)" fill="none" stroke="url(#goldGradient)" stroke-linecap="round" stroke-linejoin="round">
+    
+    <!-- 1. LOTUS FLOWER (Crown on top of the head) -->
+    <!-- Central Lotus Petal -->
+    <path d="M 0 -150 C 18 -118 20 -82 0 -48 C -20 -82 -18 -118 0 -150 Z" stroke-width="7" fill="url(#bgGradient)" fill-opacity="0.4" />
+    
+    <!-- Left Inner Petal -->
+    <path d="M 0 -48 C -18 -82 -42 -122 -15 -136 C 2 -142 5 -105 0 -48" stroke-width="7" />
+    
+    <!-- Right Inner Petal -->
+    <path d="M 0 -48 C 18 -82 42 -122 15 -136 C -2 -142 -5 -105 0 -48" stroke-width="7" />
+
+    <!-- Left Flanking Lotus Petal -->
+    <path d="M -8 -45 C -45 -65 -80 -78 -64 -102 C -48 -124 -24 -92 -3 -56" stroke-width="6.5" />
+
+    <!-- Right Flanking Lotus Petal -->
+    <path d="M 8 -45 C 45 -65 80 -78 64 -102 C 48 -124 24 -92 3 -56" stroke-width="6.5" />
+
+    <!-- Lotus Calyx / Base Support Arc -->
+    <path d="M -38 -44 C -12 -34 12 -34 38 -44" stroke-width="6" />
+
+    <!-- 2. FEMALE FACE PROFILE (Facing Right) -->
+    <!-- Forehead -> Nose -> Lips -> Chin -> Neck Line -->
+    <path d="
+      M -2 -34
+      C 18 -15 28 8 28 28
+      C 28 36 29 42 37 49
+      C 43 54 44 58 35 63
+      C 29 67 31 71 37 74
+      C 42 77 40 82 32 86
+      C 27 89 28 94 34 100
+      C 37 104 33 112 25 116
+      C 14 121 -2 123 -14 135
+      C -22 144 -26 156 -24 168
+    " stroke-width="7.5" />
+
+    <!-- 3. FLOWING HAIR & OUTER TULIP CONTOUR (Left Encompassing Curve) -->
+    <path d="
+      M -36 -44
+      C -65 -20 -95 10 -105 45
+      C -118 90 -95 140 -50 162
+      C -18 178 12 165 24 148
+      C 32 136 28 122 18 116
+    " stroke-width="8" />
+
+    <!-- 4. INNER ACCENT CONTOUR (Slender hand/neck caress rising to the face) -->
+    <path d="
+      M -42 160
+      C -68 140 -82 95 -68 55
+      C -58 24 -35 -5 -12 -28
+    " stroke-width="6" />
+
+    <!-- Hand/Palm subtle inner gesture -->
+    <path d="
+      M -48 152
+      C -25 130 -8 92 8 48
+      C 12 36 10 20 2 8
+    " stroke-width="6.5" />
+  </g>
+
+  <!-- Typography: STUDIO DE BELEZA FEMININA -->
+  <g text-anchor="middle">
+    <!-- Primary Line: STUDIO DE BELEZA -->
+    <text x="400" y="585" 
+          font-family="'Playfair Display', 'Cinzel', 'Didot', 'Bodoni MT', 'Georgia', serif" 
+          font-size="44" 
+          font-weight="600" 
+          letter-spacing="9" 
+          fill="url(#goldText)">
+      STUDIO DE BELEZA
+    </text>
+
+    <!-- Secondary Line: FEMININA -->
+    <text x="400" y="632" 
+          font-family="'Playfair Display', 'Cinzel', 'Didot', 'Bodoni MT', 'Georgia', serif" 
+          font-size="24" 
+          font-weight="500" 
+          letter-spacing="16" 
+          fill="url(#goldText)">
+      FEMININA
+    </text>
+  </g>
+</svg>

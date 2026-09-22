@@ -19,14 +19,14 @@ import {
 
 export const MOCK_CLINICA_CONFIG: ClinicaConfig = {
   id: 'config-matriz',
-  nome: 'AuraEstética - Clínica & Studio',
-  logomarca_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400&auto=format&fit=crop&q=80',
+  nome: 'Studio de Beleza Feminina',
+  logomarca_url: '/logo.svg',
   telefone: '(11) 98111-2233',
   endereco: 'Av. Paulista, 1500 - Conjunto 802, Bela Vista - São Paulo / SP',
   cnpj: '38.941.205/0001-94',
-  email_contato: 'contato@auraestetica.com.br',
-  slogan: 'Alta Tecnologia e Excelência em Procedimentos Estéticos e Beleza',
-  tema_cor_primaria: '#4f46e5'
+  email_contato: 'contato@studiodebelezafeminina.com.br',
+  slogan: 'Alta Tecnologia e Excelência em Procedimentos Estéticos e Beleza Feminina',
+  tema_cor_primaria: '#c59b27'
 };
 
 export const MOCK_USUARIOS: UsuarioEquipe[] = [
@@ -726,11 +726,35 @@ export const MOCK_AGENDAMENTOS: Agendamento[] = [
 
 export const MOCK_TRANSACOES: TransacaoFinanceira[] = [
   {
+    id: 'tx-00',
+    paciente_id: 'b1a2c3d4-0003-4000-8000-000000000003',
+    paciente_nome: 'Juliana Paes Cavalcanti',
+    profissional_id: 'user-super-admin',
+    profissional_nome: 'Fabio Lima',
+    usuario_id: 'user-super-admin',
+    usuario_nome: 'Fabio Lima',
+    criado_por_id: 'user-super-admin',
+    criado_por_nome: 'Fabio Lima',
+    procedimento: 'Harmonização Facial Completa',
+    valor: 2800,
+    custo_insumos: 620,
+    forma_pagamento: 'pix',
+    status: 'pago',
+    data: new Date(Date.now() - 3600000 * 12).toISOString(),
+    tipo: 'entrada',
+    categoria: 'atendimento',
+    observacao: 'Procedimento estético facial realizado na sala matriz.',
+  },
+  {
     id: 'tx-01',
     paciente_id: 'b1a2c3d4-0001-4000-8000-000000000001',
     paciente_nome: 'Carolina Mendes',
     profissional_id: 'user-01',
     profissional_nome: 'Dra. Camila Vasconcelos',
+    usuario_id: 'user-01',
+    usuario_nome: 'Dra. Camila Vasconcelos',
+    criado_por_id: 'user-01',
+    criado_por_nome: 'Dra. Camila Vasconcelos',
     procedimento: 'Toxina Botulínica (3 Áreas)',
     valor: 1450,
     custo_insumos: 380,
@@ -747,6 +771,10 @@ export const MOCK_TRANSACOES: TransacaoFinanceira[] = [
     paciente_nome: 'Mariana Duarte Alencar',
     profissional_id: 'user-03',
     profissional_nome: 'Renata Meireles',
+    usuario_id: 'user-03',
+    usuario_nome: 'Renata Meireles',
+    criado_por_id: 'user-03',
+    criado_por_nome: 'Renata Meireles',
     procedimento: 'Micropigmentação Labial',
     valor: 950,
     custo_insumos: 120,

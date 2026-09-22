@@ -535,6 +535,10 @@ export interface TransacaoFinanceira {
   paciente_nome: string;
   profissional_id?: string;
   profissional_nome?: string;
+  usuario_id?: string; // ID do usuário associado ao lançamento
+  usuario_nome?: string; // Nome do usuário associado ao lançamento
+  criado_por_id?: string; // ID de quem efetuou o lançamento
+  criado_por_nome?: string; // Nome de quem efetuou o lançamento
   procedimento: string;
   valor: number;
   custo_insumos?: number;

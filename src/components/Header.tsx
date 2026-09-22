@@ -131,7 +131,8 @@ export const Header: React.FC<HeaderProps> = ({
                 <img
                   src={clinicaConfig.logomarca_url}
                   alt={clinicaConfig.nome || 'Logo da Clínica'}
-                  className="w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10 rounded-xl sm:rounded-2xl object-cover border border-slate-200/90 shadow-2xs group-hover:ring-2 ring-indigo-500/40 group-hover:border-indigo-400 transition-all shrink-0"
+                  referrerPolicy="no-referrer"
+                  className="w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10 rounded-xl sm:rounded-2xl object-contain bg-white border border-slate-200/90 shadow-2xs group-hover:ring-2 ring-indigo-500/40 group-hover:border-indigo-400 transition-all shrink-0 p-0.5"
                 />
               ) : (
                 <div className="w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10 rounded-xl sm:rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-slate-900 flex items-center justify-center text-white font-bold text-sm sm:text-base lg:text-lg shadow-2xs border border-indigo-700/50 group-hover:ring-2 ring-indigo-500/40 transition-all shrink-0">
