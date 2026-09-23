@@ -30,6 +30,7 @@ interface NewPatientModalProps {
   onOpenAnamneseCompleta?: () => void;
   configuracaoCampos?: ConfiguracaoCampos;
   currentUser?: UsuarioEquipe;
+  patientToEdit?: Paciente | null;
 }
 
 export const NewPatientModal: React.FC<NewPatientModalProps> = ({
@@ -39,6 +40,8 @@ export const NewPatientModal: React.FC<NewPatientModalProps> = ({
   onSavePatient,
   onOpenAnamneseCompleta,
   configuracaoCampos,
+  currentUser,
+  patientToEdit,
 }) => {
   const [nome, setNome] = useState('');
   const [telefone, setTelefone] = useState('');
@@ -57,27 +60,46 @@ export const NewPatientModal: React.FC<NewPatientModalProps> = ({
   const [customFieldsData, setCustomFieldsData] = useState<Record<string, any>>({});
   const [formError, setFormError] = useState('');
 
-  // Reset form when modal opens
+  // Reset or fill form when modal opens
   useEffect(() => {
     if (isOpen) {
-      setNome('');
-      setTelefone('');
-      setCpf('');
-      setEmail('');
-      setDataNascimento('');
-      setEndereco('');
-      setProfissao('');
-      setContatoEmergenciaNome('');
-      setContatoEmergenciaTel('');
-      setQueixaPrincipal('');
-      setAlergias('');
-      setMedicacoes('');
-      setFototipo('Fototipo III');
-      setHistoricoClinico('');
-      setCustomFieldsData({});
-      setFormError('');
+      if (patientToEdit) {
+        setNome(patientToEdit.nome || '');
+        setTelefone(patientToEdit.telefone || '');
+        setCpf(patientToEdit.cpf || '');
+        setEmail(patientToEdit.email || '');
+        setDataNascimento(patientToEdit.data_nascimento || '');
+        setEndereco(patientToEdit.endereco || '');
+        setProfissao(patientToEdit.profissao || '');
+        setContatoEmergenciaNome(patientToEdit.contato_emergencia?.nome || '');
+        setContatoEmergenciaTel(patientToEdit.contato_emergencia?.telefone || '');
+        setQueixaPrincipal(patientToEdit.queixa_principal || '');
+        setAlergias(patientToEdit.alergias || '');
+        setMedicacoes(patientToEdit.medicacoes || '');
+        setFototipo(patientToEdit.fototipo || 'Fototipo III');
+        setHistoricoClinico(patientToEdit.historico_clinico || '');
+        setCustomFieldsData({});
+        setFormError('');
+      } else {
+        setNome('');
+        setTelefone('');
+        setCpf('');
+        setEmail('');
+        setDataNascimento('');
+        setEndereco('');
+        setProfissao('');
+        setContatoEmergenciaNome('');
+        setContatoEmergenciaTel('');
+        setQueixaPrincipal('');
+        setAlergias('');
+        setMedicacoes('');
+        setFototipo('Fototipo III');
+        setHistoricoClinico('');
+        setCustomFieldsData({});
+        setFormError('');
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, patientToEdit]);
 
   if (!isOpen) return null;
 
@@ -133,6 +155,7 @@ export const NewPatientModal: React.FC<NewPatientModalProps> = ({
     }
 
     saveFunction({
+      ...(patientToEdit ? { id: patientToEdit.id } : {}),
       nome: nome.trim(),
       telefone: telefone.trim(),
       cpf: cpf.trim() || undefined,
@@ -148,7 +171,7 @@ export const NewPatientModal: React.FC<NewPatientModalProps> = ({
       alergias: alergias.trim() || undefined,
       medicacoes: medicacoes.trim() || undefined,
       fototipo: fototipo || 'Fototipo III',
-      historico_clinico: consolidatedHistorico || 'Ficha clínica inicial cadastrada.',
+      historico_clinico: consolidatedHistorico || 'Ficha clínica cadastrada.',
     });
 
     onClose();
@@ -166,10 +189,10 @@ export const NewPatientModal: React.FC<NewPatientModalProps> = ({
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
-                Cadastrar Ficha de Cliente / Paciente
+                {patientToEdit ? 'Editar Dados do Cadastro do Cliente' : 'Cadastrar Ficha de Cliente / Paciente'}
               </h3>
               <p className="text-xs text-indigo-200 font-medium">
-                Prontuário clínico, dados pessoais, contato de emergência e histórico
+                {patientToEdit ? 'Atualize os dados pessoais, endereço, contato de emergência e histórico' : 'Prontuário clínico, dados pessoais, contato de emergência e histórico'}
               </p>
             </div>
           </div>
@@ -565,7 +588,7 @@ export const NewPatientModal: React.FC<NewPatientModalProps> = ({
               className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl font-bold shadow-xs transition-all cursor-pointer text-xs sm:text-sm flex items-center gap-2"
             >
               <User className="w-4 h-4" />
-              <span>Salvar Ficha do Cliente</span>
+              <span>{patientToEdit ? 'Salvar Alterações do Cadastro' : 'Salvar Ficha do Cliente'}</span>
             </button>
           </div>
 

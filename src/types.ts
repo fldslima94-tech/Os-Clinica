@@ -500,6 +500,7 @@ export interface EstoqueInsumo {
   unidade_medida: UnidadeMedida;
   alerta_minimo: number;
   criado_em?: string;
+  atualizado_em?: string;
   categoria: CategoriaInsumo | string;
   marca?: string;
   tom_cor?: string;
@@ -560,10 +561,10 @@ export interface DespesaRecorrente {
   id: string;
   clinica_id?: string;
   descricao: string;
-  categoria: 'aluguel' | 'energia' | 'internet' | 'software' | 'contabilidade' | 'marketing' | 'manutencao' | 'limpeza' | 'outros';
+  categoria: 'aluguel' | 'energia' | 'internet' | 'software' | 'contabilidade' | 'marketing' | 'manutencao' | 'limpeza' | 'agua' | 'luz' | 'outros' | string;
   valor: number;
   dia_vencimento: number; // 1 a 31
-  recorrencia: 'mensal' | 'anual' | 'semanal';
+  recorrencia: 'mensal' | 'bimestral' | 'trimestral' | 'semestral' | 'anual' | 'semanal';
   status: 'ativo' | 'inativo';
   forma_pagamento_preferencial: FormaPagamento;
   observacoes?: string;
@@ -572,10 +573,18 @@ export interface DespesaRecorrente {
 }
 
 export type CategoriaBemAtivo = 
+  | 'maquina'
+  | 'movel'
+  | 'eletronico'
+  | 'eletrodomesticos'
+  | 'utensilios'
+  | 'ferramentas'
+  | 'iluminacao'
+  | 'acessorios'
+  // compatibilidade legado
   | 'equipamento' 
   | 'dermografo' 
   | 'maca_mobiliario' 
-  | 'eletronico' 
   | 'laser' 
   | 'autoclave' 
   | 'climatizacao' 
@@ -639,13 +648,22 @@ export interface BemAtivo {
 export type BemPatrimonial = BemAtivo;
 
 export type CategoriaFornecedor = 
-  | 'insumos' 
-  | 'equipamentos' 
-  | 'manutencao' 
-  | 'servicos' 
-  | 'software' 
+  | 'toxinas_preenchedores'
+  | 'fios_sustentacao'
+  | 'bioestimuladores'
+  | 'anestesicos'
+  | 'agulhas_canulas'
+  | 'descartaveis_epi'
+  | 'cosmeticos_homecare'
+  | 'materiais_higienizacao'
+  | 'equipamentos'
+  | 'servicos'
+  | 'insumos'
+  | 'manutencao'
+  | 'software'
   | 'imobiliario'
-  | 'outros';
+  | 'outros'
+  | string;
 
 export interface Fornecedor {
   id: string;
@@ -677,6 +695,7 @@ export interface Fornecedor {
   banco_nome?: string;
   agencia?: string;
   conta_corrente?: string;
+  forma_pagamento_preferencial?: 'cartao' | 'dinheiro' | 'pix' | string;
   condicoes_pagamento?: string;
   prazo_entrega_medio?: string;
   observacoes?: string;

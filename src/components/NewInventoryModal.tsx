@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Package, 
@@ -18,6 +18,7 @@ interface NewInventoryModalProps {
   onSaveInventory?: (novoInsumo: Partial<EstoqueInsumo>) => void;
   procedimentos?: ProcedimentoClinico[];
   procedimentosDisponiveis?: ProcedimentoClinico[];
+  itemToEdit?: EstoqueInsumo | null;
 }
 
 export const NewInventoryModal: React.FC<NewInventoryModalProps> = ({
@@ -25,6 +26,7 @@ export const NewInventoryModal: React.FC<NewInventoryModalProps> = ({
   onClose,
   onSave,
   onSaveInventory,
+  itemToEdit,
 }) => {
   const [nomeItem, setNomeItem] = useState('');
   const [quantidade, setQuantidade] = useState<number>(10);
@@ -41,6 +43,38 @@ export const NewInventoryModal: React.FC<NewInventoryModalProps> = ({
   });
   const [custoUnitario, setCustoUnitario] = useState<number>(150);
   const [formError, setFormError] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      if (itemToEdit) {
+        setNomeItem(itemToEdit.nome_item || '');
+        setQuantidade(itemToEdit.quantidade ?? 0);
+        setUnidadeMedida(itemToEdit.unidade_medida || 'unidade');
+        setAlertaMinimo(itemToEdit.alerta_minimo ?? 5);
+        setCategoria(itemToEdit.categoria || 'Injetáveis');
+        setMarca(itemToEdit.marca || '');
+        setCorTonalidade(itemToEdit.cor_tonalidade || '');
+        setLote(itemToEdit.lote || '');
+        setValidade(itemToEdit.validade || '');
+        setCustoUnitario(itemToEdit.custo_unitario ?? 0);
+        setFormError('');
+      } else {
+        setNomeItem('');
+        setQuantidade(10);
+        setUnidadeMedida('unidade');
+        setAlertaMinimo(5);
+        setCategoria('Injetáveis');
+        setMarca('');
+        setCorTonalidade('');
+        setLote('');
+        const d = new Date();
+        d.setFullYear(d.getFullYear() + 1);
+        setValidade(d.toISOString().slice(0, 10));
+        setCustoUnitario(150);
+        setFormError('');
+      }
+    }
+  }, [isOpen, itemToEdit]);
 
   if (!isOpen) return null;
 
@@ -60,6 +94,7 @@ export const NewInventoryModal: React.FC<NewInventoryModalProps> = ({
 
     // Salva o insumo independente de procedimento
     saveFn({
+      ...(itemToEdit ? { id: itemToEdit.id } : {}),
       nome_item: nomeItem.trim(),
       quantidade: Number(quantidade) || 0,
       unidade_medida: unidadeMedida,
@@ -87,10 +122,10 @@ export const NewInventoryModal: React.FC<NewInventoryModalProps> = ({
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900">
-                Cadastrar Insumo & Item de Estoque
+                {itemToEdit ? 'Editar Dados do Insumo' : 'Cadastrar Insumo & Item de Estoque'}
               </h3>
               <p className="text-xs text-slate-500 font-medium">
-                Controle de saldo, lotes, validade e custo unitário
+                {itemToEdit ? 'Atualize as informações do item, saldo, lote e custo' : 'Controle de saldo, lotes, validade e custo unitário'}
               </p>
             </div>
           </div>
@@ -295,7 +330,7 @@ export const NewInventoryModal: React.FC<NewInventoryModalProps> = ({
               className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded-xl font-semibold shadow-sm transition-colors cursor-pointer flex items-center gap-1.5"
             >
               <Package className="w-4 h-4" />
-              <span>Salvar Insumo no Estoque</span>
+              <span>{itemToEdit ? 'Salvar Alterações do Insumo' : 'Salvar Insumo no Estoque'}</span>
             </button>
           </div>
 

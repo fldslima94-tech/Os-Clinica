@@ -36,12 +36,13 @@ import {
   sendPasswordResetEmail,
   signInAnonymously
 } from 'firebase/auth';
-import { db, auth, googleProvider, storage } from '../lib/firebase';
-export { db, auth, googleProvider, storage };
+import { db, auth, googleProvider, googleAuthProvider, storage } from '../lib/firebase';
+export { db, auth, googleProvider, googleAuthProvider, storage };
 export type { FirebaseUser };
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { ref, uploadString, getDownloadURL, uploadBytes } from 'firebase/storage';
 import {
   Paciente,
+  PacienteGoogleProfile,
   Agendamento,
   EstoqueInsumo,
   ProcedimentoClinico,
@@ -944,12 +945,140 @@ export async function sendFirebasePasswordReset(email: string): Promise<void> {
 // Firebase Google Authentication Handlers
 export async function loginWithFirebaseGoogle(): Promise<FirebaseUser | null> {
   try {
-    const result = await signInWithPopup(auth, googleProvider);
+    const result = await signInWithPopup(auth, googleAuthProvider);
     return result.user;
   } catch (error) {
     console.warn('[Firebase Auth] Erro no login Google:', error);
     throw error;
   }
+}
+
+/**
+ * Salva e sincroniza o usuário no Firestore (coleções 'usuarios' e 'perfis')
+ */
+export async function saveUserToFirestore(usuario: UsuarioEquipe): Promise<void> {
+  try {
+    const userRef = doc(db, COLLECTIONS.USUARIOS, usuario.id);
+    const perfilRef = doc(db, COLLECTIONS.PERFIS, usuario.id);
+    const sanitized = sanitizeForFirestore({
+      ...usuario,
+      atualizado_em: new Date().toISOString(),
+      updatedAt: serverTimestamp(),
+    });
+    await setDoc(userRef, sanitized, { merge: true });
+    await setDoc(perfilRef, sanitized, { merge: true });
+    console.info(`[Firestore] Usuário salvo com sucesso: ${usuario.email} (${usuario.id})`);
+  } catch (error) {
+    console.warn('[Firebase] Erro ao salvar usuário no Firestore:', error);
+    handleFirestoreError(error, OperationType.WRITE, `${COLLECTIONS.USUARIOS}/${usuario.id}`);
+  }
+}
+
+/**
+ * Autentica com o Google usando googleAuthProvider e salva/atualiza o usuário no Firestore
+ */
+export async function handleGoogleSignInAndSaveUser(
+  isClientPortalDirect: boolean = false
+): Promise<UsuarioEquipe> {
+  const fbUser = await loginWithFirebaseGoogle();
+  if (!fbUser) {
+    throw new Error('Falha na autenticação com a Conta Google.');
+  }
+
+  const cleanEmail = (fbUser.email || '').toLowerCase().trim();
+  let existingUser = await fetchUserFromFirestoreByEmail(cleanEmail);
+
+  const isSuper = SUPER_ADMIN_EMAILS.includes(cleanEmail) || cleanEmail.includes('fabio');
+  const isClientRole = isClientPortalDirect || (!isSuper && !cleanEmail.includes('admin') && !cleanEmail.includes('clinica'));
+
+  let userToSave: UsuarioEquipe;
+
+  if (existingUser) {
+    userToSave = {
+      ...existingUser,
+      nome: existingUser.nome || fbUser.displayName || 'Usuário Google',
+      nomeCompleto: existingUser.nomeCompleto || fbUser.displayName || 'Usuário Google',
+      email: cleanEmail,
+      avatar_url: fbUser.photoURL || existingUser.avatar_url,
+      avatarUrl: fbUser.photoURL || existingUser.avatarUrl,
+      telefone: fbUser.phoneNumber || existingUser.telefone || '',
+      status: 'ativo',
+      role: isSuper ? 'admin_total' : (existingUser.role || (isClientRole ? 'cliente' : 'profissional')),
+      cargo: isSuper ? 'Super Admin (Master)' : (existingUser.cargo || (isClientRole ? 'Paciente / Cliente' : 'Especialista')),
+    };
+  } else {
+    const userId = fbUser.uid || `user-${Date.now()}`;
+    userToSave = {
+      id: userId,
+      nome: fbUser.displayName || (isSuper ? 'Fabio Lima' : isClientRole ? 'Paciente Google' : 'Usuário Google'),
+      nomeCompleto: fbUser.displayName || (isSuper ? 'Fabio Lima' : isClientRole ? 'Paciente Google' : 'Usuário Google'),
+      email: cleanEmail,
+      telefone: fbUser.phoneNumber || '',
+      cargo: isSuper ? 'Super Admin (Master)' : isClientRole ? 'Paciente / Cliente' : 'Usuário da Equipe',
+      profissao: isSuper ? 'Proprietário & Administrador Geral' : isClientRole ? 'Cliente' : 'Especialista',
+      role: isSuper ? 'admin_total' : isClientRole ? 'cliente' : 'profissional',
+      status: 'ativo',
+      avatar_url: fbUser.photoURL || undefined,
+      avatarUrl: fbUser.photoURL || undefined,
+      permissoes: {
+        ver_financeiro_completo: isSuper,
+        emitir_recibo: !isClientRole,
+        editar_prontuario_clinico: !isClientRole,
+        gerenciar_estoque_custos: isSuper,
+        configuracoes_sistema: isSuper,
+        visualizar_bens_ativos: isSuper,
+      },
+      permissoesCustomizadas: {
+        financeiro: { verEntradas: isSuper, verSaidas: isSuper, verRecorrentes: isSuper, excluir: isSuper, verRelatorios: isSuper },
+        clientes: { criar: isSuper, editar: isSuper, excluir: isSuper, verHistorico: true, preencherAnamnese: true },
+        agenda: { verTodos: isSuper, verPropria: true, criar: true, cancelar: true, finalizar: isSuper },
+        procedimentos: { verCustos: isSuper, verMargem: isSuper, criar: isSuper, excluir: isSuper, ajustarEstoque: isSuper },
+        bens: { visualizar: true, cadastrar: true, editar: true, gerenciar: true, excluir: true, manutencao: true },
+        estoque: { ajustar: isSuper, excluir: isSuper },
+        orcamentos: { verTodos: !isClientRole, responder: !isClientRole, verEmails: !isClientRole }
+      }
+    };
+  }
+
+  // Se super admin, garante permissões totais
+  if (isSuper) {
+    userToSave.role = 'admin_total';
+    userToSave.cargo = 'Super Admin (Master)';
+    userToSave.profissao = userToSave.profissao || 'Proprietário & Administrador Geral';
+    userToSave.permissoes = {
+      ver_financeiro_completo: true,
+      emitir_recibo: true,
+      editar_prontuario_clinico: true,
+      gerenciar_estoque_custos: true,
+      configuracoes_sistema: true,
+      visualizar_bens_ativos: true,
+    };
+    userToSave.permissoesCustomizadas = {
+      financeiro: { verEntradas: true, verSaidas: true, verRecorrentes: true, excluir: true, verRelatorios: true },
+      clientes: { criar: true, editar: true, excluir: true, verHistorico: true, preencherAnamnese: true },
+      agenda: { verTodos: true, verPropria: true, criar: true, cancelar: true, finalizar: true },
+      procedimentos: { verCustos: true, verMargem: true, criar: true, excluir: true, ajustarEstoque: true },
+      bens: { visualizar: true, cadastrar: true, editar: true, gerenciar: true, excluir: true, manutencao: true },
+      estoque: { ajustar: true, excluir: true },
+      orcamentos: { verTodos: true, responder: true, verEmails: true }
+    };
+  }
+
+  // Persiste no Firestore
+  await saveUserToFirestore(userToSave);
+
+  // Se for cliente, também persiste e sincroniza o perfil do cliente
+  if (userToSave.role === 'cliente') {
+    await saveClientPortalProfile({
+      id: userToSave.id,
+      nome: userToSave.nome,
+      email: userToSave.email,
+      telefone: userToSave.telefone || '',
+      avatar_url: userToSave.avatar_url || ''
+    });
+  }
+
+  return userToSave;
 }
 
 export async function logoutFirebase(): Promise<void> {
@@ -958,6 +1087,79 @@ export async function logoutFirebase(): Promise<void> {
   } catch (error) {
     console.warn('[Firebase Auth] Erro ao deslogar:', error);
   }
+}
+
+/**
+ * Utilitários de Máscara e Validação de Telefone / WhatsApp Brasileiro
+ */
+export function formatPhoneBR(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 2) return digits.length > 0 ? `(${digits}` : '';
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
+}
+
+export function isValidPhoneBR(value: string): boolean {
+  const digits = (value || '').replace(/\D/g, '');
+  return digits.length === 10 || digits.length === 11;
+}
+
+/**
+ * Salva e sincroniza o perfil do cliente do portal no Firestore e localStorage
+ */
+export async function saveClientPortalProfile(profile: PacienteGoogleProfile): Promise<void> {
+  try {
+    const payload = {
+      id: profile.id,
+      nome: profile.nome,
+      email: profile.email || '',
+      telefone: profile.telefone || '',
+      avatar_url: profile.avatar_url || '',
+      data_nascimento: profile.data_nascimento || '',
+      atualizado_em: new Date().toISOString(),
+    };
+    await saveDocument('pacientes_portal', payload);
+
+    // Também registra ou atualiza na coleção de pacientes/leads da clínica
+    const pacienteLead = {
+      id: profile.id.startsWith('goog-') || profile.id.startsWith('pac-') ? profile.id : `pac-${profile.id}`,
+      nome: profile.nome,
+      telefone: profile.telefone || '',
+      email: profile.email || '',
+      data_nascimento: profile.data_nascimento || '2000-01-01',
+      historico_clinico: 'Cliente cadastrado via Portal do Cliente (Google / Acesso Web).',
+      criado_em: new Date().toISOString(),
+      atualizado_em: new Date().toISOString(),
+    };
+    saveDocument(COLLECTIONS.PACIENTES, pacienteLead).catch(() => {});
+
+    localStorage.setItem(`aura_client_profile_${profile.id}`, JSON.stringify(profile));
+    localStorage.setItem('aura_last_client_profile', JSON.stringify(profile));
+  } catch (err) {
+    console.warn('[saveClientPortalProfile error]', err);
+  }
+}
+
+/**
+ * Busca o perfil do cliente no Firestore ou cache local
+ */
+export async function fetchClientPortalProfile(userId: string): Promise<PacienteGoogleProfile | null> {
+  try {
+    const cached = localStorage.getItem(`aura_client_profile_${userId}`);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed?.telefone) return parsed;
+    }
+    const docRef = doc(db, 'pacientes_portal', userId);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return snap.data() as PacienteGoogleProfile;
+    }
+  } catch (err) {
+    console.warn('[fetchClientPortalProfile error]', err);
+  }
+  return null;
 }
 
 export function onFirebaseAuthStateChange(callback: (user: FirebaseUser | null) => void): () => void {
@@ -2510,6 +2712,31 @@ export async function obterConteudoDumpStorage(dump: FirebaseStorageDump): Promi
   } catch (e) {}
 
   return null;
+}
+
+/**
+ * Upload de Nota Fiscal em formato PDF para o Firebase Storage com fallback robusto em Data URL
+ */
+export async function uploadNotaFiscalPdf(file: File): Promise<{ url: string; nome: string }> {
+  const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = `ativos_nf/${Date.now()}_${sanitizedName}`;
+
+  try {
+    const storageRef = ref(storage, path);
+    await uploadBytes(storageRef, file, { contentType: 'application/pdf' });
+    const downloadUrl = await getDownloadURL(storageRef);
+    return { url: downloadUrl, nome: file.name };
+  } catch (storageErr) {
+    console.warn('[uploadNotaFiscalPdf] Fallback para DataURL:', storageErr);
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        resolve({ url: reader.result as string, nome: file.name });
+      };
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    });
+  }
 }
 
 

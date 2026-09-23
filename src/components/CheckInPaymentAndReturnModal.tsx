@@ -55,8 +55,10 @@ export const CheckInPaymentAndReturnModal: React.FC<CheckInPaymentAndReturnModal
   const [statusPagamento, setStatusPagamento] = useState<StatusPagamento>('pago');
   const [obsPagamento, setObsPagamento] = useState<string>('Pagamento confirmado no check-in da recepção.');
   
-  // Return Scheduling State
-  const [agendarRetorno, setAgendarRetorno] = useState<boolean>(true);
+  // Return Scheduling State (Opcional por padrão, sem cobrança obrigatória)
+  const [agendarRetorno, setAgendarRetorno] = useState<boolean>(false);
+  const [cobrarTaxaRetorno, setCobrarTaxaRetorno] = useState<boolean>(false);
+  const [valorTaxaRetorno, setValorTaxaRetorno] = useState<number>(0);
   const [diasRetorno, setDiasRetorno] = useState<number>(15);
   const [dataRetorno, setDataRetorno] = useState<string>(() => {
     const d = new Date();
@@ -76,6 +78,9 @@ export const CheckInPaymentAndReturnModal: React.FC<CheckInPaymentAndReturnModal
       setStatusPagamento('pago');
       setProcedimentoRetorno(`Revisão / Retorno de ${agendamento.procedimento}`);
       setProfissionalRetornoId(agendamento.profissional_id || (profissionais[0]?.id || ''));
+      setAgendarRetorno(false);
+      setCobrarTaxaRetorno(false);
+      setValorTaxaRetorno(0);
 
       // Set return date 15 days from today
       const d = new Date();
@@ -116,7 +121,8 @@ export const CheckInPaymentAndReturnModal: React.FC<CheckInPaymentAndReturnModal
         profissional_id: profissionalRetornoId || agendamento.profissional_id,
         profissional_nome: selectedProf?.nome || agendamento.profissional_nome,
         observacoes: obsRetorno.trim() || undefined,
-      } : undefined,
+        valor_estimado: cobrarTaxaRetorno ? Number(valorTaxaRetorno) : 0,
+      } as any : undefined,
     });
 
     onClose();
@@ -315,6 +321,47 @@ export const CheckInPaymentAndReturnModal: React.FC<CheckInPaymentAndReturnModal
 
             {agendarRetorno ? (
               <div className="space-y-3 pt-1">
+                {/* Cobrança do Retorno (Opcional - R$ 0 por padrão) */}
+                <div className="p-3 bg-white rounded-xl border border-indigo-100 flex items-center justify-between gap-3">
+                  <div>
+                    <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-800">
+                      <input
+                        type="checkbox"
+                        checked={cobrarTaxaRetorno}
+                        onChange={(e) => {
+                          const chk = e.target.checked;
+                          setCobrarTaxaRetorno(chk);
+                          if (!chk) setValorTaxaRetorno(0);
+                        }}
+                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                      />
+                      <span>Cobrar taxa ou valor neste retorno?</span>
+                    </label>
+                    <p className="text-[10px] text-slate-500">
+                      Por padrão, o retorno não gera cobrança (R$ 0,00). Marque caso haja taxa ou custo.
+                    </p>
+                  </div>
+
+                  {cobrarTaxaRetorno ? (
+                    <div className="w-32 shrink-0">
+                      <label className="block text-[10px] font-bold text-slate-600 mb-0.5">Valor Taxa (R$)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={valorTaxaRetorno || ''}
+                        onChange={(e) => setValorTaxaRetorno(parseFloat(e.target.value) || 0)}
+                        placeholder="R$ 0,00"
+                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      />
+                    </div>
+                  ) : (
+                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 shrink-0">
+                      Sem Cobrança (R$ 0,00)
+                    </span>
+                  )}
+                </div>
+
                 {/* Atalhos Rápidos de Prazo */}
                 <div>
                   <label className="font-bold text-slate-700 block mb-1 text-[11px] uppercase tracking-wide">

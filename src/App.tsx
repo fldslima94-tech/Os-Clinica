@@ -30,6 +30,7 @@ import {
   ProcedimentoClinico, 
   SolicitacaoOrcamento,
   AvisoQuadro,
+  PrioridadeAviso,
   ClinicaConfig,
   DespesaRecorrente,
   BemPatrimonial,
@@ -302,9 +303,11 @@ export default function App() {
   const [patientForPackages, setPatientForPackages] = useState<Paciente | null>(null);
   const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState(false);
   const [isNewPatientOpen, setIsNewPatientOpen] = useState(false);
+  const [patientToEdit, setPatientToEdit] = useState<Paciente | null>(null);
   const [isNewSupplierOpen, setIsNewSupplierOpen] = useState(false);
   const [supplierToEdit, setSupplierToEdit] = useState<Fornecedor | null>(null);
   const [isNewInventoryOpen, setIsNewInventoryOpen] = useState(false);
+  const [inventoryToEdit, setInventoryToEdit] = useState<EstoqueInsumo | null>(null);
   const [isNewProcedureOpen, setIsNewProcedureOpen] = useState(false);
   const [procedureToEdit, setProcedureToEdit] = useState<ProcedimentoClinico | null>(null);
   const [isNewUserOpen, setIsNewUserOpen] = useState(false);
@@ -333,7 +336,7 @@ export default function App() {
   // Role-based Access Control Route Guard
   useEffect(() => {
     if (currentUser.role === 'cliente') {
-      if (activeTab !== 'portal_paciente' && activeTab !== 'quadro_avisos') {
+      if (activeTab !== 'portal_paciente') {
         setActiveTab('portal_paciente');
       }
     } else if (currentUser.role === 'recepcao' || currentUser.role === 'operador') {
@@ -1167,7 +1170,7 @@ export default function App() {
         status: 'confirmado',
         criado_em: new Date().toISOString(),
         duracao_minutos: data.dadosRetorno.duracao_minutos || 30,
-        valor_estimado: 0,
+        valor_estimado: (data.dadosRetorno as any)?.valor_estimado ?? 0,
         profissional_id: data.dadosRetorno.profissional_id || ag.profissional_id,
         profissional_nome: data.dadosRetorno.profissional_nome || ag.profissional_nome,
         observacoes: data.dadosRetorno.observacoes || 'Retorno agendado durante o check-in na recepção.',
@@ -1545,6 +1548,44 @@ export default function App() {
   };
 
   const handleSaveInventory = (novo: Partial<EstoqueInsumo>) => {
+    if (novo.id) {
+      const existing = estoque.find(e => e.id === novo.id);
+      if (existing) {
+        const updatedItem: EstoqueInsumo = {
+          ...existing,
+          ...novo,
+          nome_item: novo.nome_item || existing.nome_item,
+          quantidade: novo.quantidade !== undefined ? Number(novo.quantidade) : existing.quantidade,
+          unidade_medida: novo.unidade_medida || existing.unidade_medida,
+          alerta_minimo: novo.alerta_minimo !== undefined ? Number(novo.alerta_minimo) : existing.alerta_minimo,
+          categoria: novo.categoria || existing.categoria,
+          lote: novo.lote !== undefined ? novo.lote : existing.lote,
+          validade: novo.validade !== undefined ? novo.validade : existing.validade,
+          custo_unitario: novo.custo_unitario !== undefined ? Number(novo.custo_unitario) : existing.custo_unitario,
+          marca: novo.marca !== undefined ? novo.marca : existing.marca,
+          tom_cor: novo.tom_cor !== undefined ? novo.tom_cor : existing.tom_cor,
+          cor_tonalidade: novo.cor_tonalidade !== undefined ? novo.cor_tonalidade : existing.cor_tonalidade,
+          procedimento_vinculado_id: novo.procedimento_vinculado_id !== undefined ? novo.procedimento_vinculado_id : existing.procedimento_vinculado_id,
+          procedimento_vinculado_nome: novo.procedimento_vinculado_nome !== undefined ? novo.procedimento_vinculado_nome : existing.procedimento_vinculado_nome,
+          quantidade_por_procedimento: novo.quantidade_por_procedimento !== undefined ? Number(novo.quantidade_por_procedimento) : existing.quantidade_por_procedimento,
+          procedimentos_vinculados: novo.procedimentos_vinculados !== undefined ? novo.procedimentos_vinculados : existing.procedimentos_vinculados,
+          atualizado_em: new Date().toISOString(),
+        };
+
+        setEstoque(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
+        queueOfflineMutation({
+          entityType: 'generico',
+          entityId: updatedItem.id,
+          entityTitle: `Insumo: ${updatedItem.nome_item}`,
+          action: 'update',
+          payload: updatedItem,
+        });
+        saveDocument(COLLECTIONS.ESTOQUE, updatedItem);
+        showToast(`Insumo "${updatedItem.nome_item}" atualizado com sucesso!`);
+        return;
+      }
+    }
+
     const createdItem: EstoqueInsumo = {
       id: novo.id || `est-${Date.now()}`,
       nome_item: novo.nome_item || 'Novo Insumo',
@@ -1974,14 +2015,27 @@ export default function App() {
   };
 
   // Notice Board Handlers
-  const handleAddAviso = (novo: Omit<AvisoQuadro, 'id' | 'data_publicacao'>) => {
+  const handleAddAviso = async (novo: any) => {
+    const agora = new Date().toISOString();
     const created: AvisoQuadro = {
-      ...novo,
-      id: `aviso-${Date.now()}`,
-      data_publicacao: new Date().toISOString(),
+      titulo: novo.titulo || 'Comunicado',
+      mensagem: novo.mensagem || '',
+      prioridade: (novo.prioridade as PrioridadeAviso) || 'importante',
+      autor_nome: novo.autor_nome || currentUser?.nome || 'Equipe',
+      autor_role: novo.autor_role || currentUser?.role || 'admin',
+      destinatarios: novo.destinatarios || 'todos',
+      ativo: novo.ativo !== undefined ? novo.ativo : true,
+      exibir_popup: Boolean(novo.exibir_popup),
+      data_criacao: novo.data_criacao || agora,
+      data_publicacao: novo.data_publicacao || agora,
+      lido_por: novo.lido_por || [],
+      id: novo.id || `aviso-${Date.now()}`,
     };
-    setAvisos(prev => [created, ...prev]);
-    saveDocument(COLLECTIONS.AVISOS, created);
+    setAvisos(prev => [created, ...prev.filter(a => a.id !== created.id)]);
+    await saveDocument(COLLECTIONS.AVISOS, created);
+    if (created.exibir_popup) {
+      handleTriggerPopup(created);
+    }
     showToast('Aviso publicado no mural da clínica!');
   };
 
@@ -2400,7 +2454,14 @@ export default function App() {
           {activeTab === 'pacientes' && currentUser.role !== 'cliente' && (
             <PatientsView
               pacientes={pacientes}
-              onOpenNewPatient={() => setIsNewPatientOpen(true)}
+              onOpenNewPatient={() => {
+                setPatientToEdit(null);
+                setIsNewPatientOpen(true);
+              }}
+              onEditPatient={(p) => {
+                setPatientToEdit(p);
+                setIsNewPatientOpen(true);
+              }}
               onOpenNewAnamnese={() => {
                 setSelectedPatientForAnamnese(null);
                 setIsAnamneseModalOpen(true);
@@ -2434,7 +2495,14 @@ export default function App() {
             <InventoryView
               estoque={estoque}
               procedimentos={procedimentos}
-              onOpenNewInventory={() => setIsNewInventoryOpen(true)}
+              onOpenNewInventory={() => {
+                setInventoryToEdit(null);
+                setIsNewInventoryOpen(true);
+              }}
+              onEditInventoryItem={(item) => {
+                setInventoryToEdit(item);
+                setIsNewInventoryOpen(true);
+              }}
               onOpenNewProcedure={() => {
                 setProcedureToEdit(null);
                 setIsNewProcedureOpen(true);
@@ -2757,9 +2825,13 @@ export default function App() {
 
       <NewPatientModal
         isOpen={isNewPatientOpen}
-        onClose={() => setIsNewPatientOpen(false)}
+        onClose={() => {
+          setIsNewPatientOpen(false);
+          setPatientToEdit(null);
+        }}
         onSave={handleSavePatient}
         onSavePatient={handleSavePatient}
+        patientToEdit={patientToEdit}
         onOpenAnamneseCompleta={() => {
           setIsNewPatientOpen(false);
           setSelectedPatientForAnamnese(null);
@@ -2794,7 +2866,11 @@ export default function App() {
 
       <NewInventoryModal
         isOpen={isNewInventoryOpen}
-        onClose={() => setIsNewInventoryOpen(false)}
+        onClose={() => {
+          setIsNewInventoryOpen(false);
+          setInventoryToEdit(null);
+        }}
+        itemToEdit={inventoryToEdit}
         procedimentos={procedimentos}
         onSave={handleSaveInventory}
       />
@@ -2836,6 +2912,10 @@ export default function App() {
           clinicaConfig={clinicaConfig}
           onUpdatePatientHistory={handleUpdatePatientHistory}
           onDeletePatient={handleDeletePatient}
+          onEditPatient={(p) => {
+            setPatientToEdit(p);
+            setIsNewPatientOpen(true);
+          }}
           currentUser={currentUser}
         />
       </ErrorBoundary>

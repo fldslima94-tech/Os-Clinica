@@ -80,19 +80,8 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
       return [
         {
           id: 'portal_paciente' as TabType,
-          label: 'Portal',
+          label: 'Procedimentos e Orçamentos',
           icon: Globe,
-        },
-        {
-          id: 'quadro_avisos' as TabType,
-          label: 'Mural',
-          icon: Megaphone,
-          badge: unreadNoticesCount > 0 ? unreadNoticesCount : undefined,
-        },
-        {
-          id: 'perfil' as TabType,
-          label: 'Perfil',
-          icon: Users,
         },
       ];
     }
@@ -160,11 +149,9 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
   // All modules grouped for drawer menu
   const moduleGroups = isCliente ? [
     {
-      title: 'Área do Paciente',
+      title: 'Área do Cliente',
       items: [
-        { id: 'portal_paciente' as TabType, label: 'Portal do Paciente & Orçamentos', icon: Globe, badge: 'Principal' },
-        { id: 'quadro_avisos' as TabType, label: 'Mural & Comunicados da Clínica', icon: Megaphone, badge: unreadNoticesCount > 0 ? `${unreadNoticesCount} novo` : undefined },
-        { id: 'perfil' as TabType, label: 'Meu Perfil & Senha', icon: Users },
+        { id: 'portal_paciente' as TabType, label: 'Procedimentos e Orçamentos', icon: Globe, badge: 'Principal' },
       ]
     }
   ] : [
@@ -249,14 +236,27 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
             );
           })}
 
-          {/* Drawer Menu Button */}
-          <button
-            onClick={() => setIsDrawerOpen(true)}
-            className="flex flex-col items-center justify-center py-1 px-1.5 min-w-[50px] min-h-[46px] rounded-xl text-slate-500 hover:text-slate-800 transition-all cursor-pointer"
-          >
-            <Menu className="w-5 h-5" />
-            <span className="text-[10px] tracking-tight mt-0.5">Módulos</span>
-          </button>
+          {/* Drawer Menu Button or Logout for Client */}
+          {isCliente ? (
+            onLogout && (
+              <button
+                onClick={onLogout}
+                className="flex flex-col items-center justify-center py-1 px-1.5 min-w-[50px] min-h-[46px] rounded-xl text-rose-600 hover:text-rose-700 transition-all cursor-pointer"
+                title="Sair"
+              >
+                <LogOut className="w-5 h-5" />
+                <span className="text-[10px] tracking-tight mt-0.5 font-semibold">Sair</span>
+              </button>
+            )
+          ) : (
+            <button
+              onClick={() => setIsDrawerOpen(true)}
+              className="flex flex-col items-center justify-center py-1 px-1.5 min-w-[50px] min-h-[46px] rounded-xl text-slate-500 hover:text-slate-800 transition-all cursor-pointer"
+            >
+              <Menu className="w-5 h-5" />
+              <span className="text-[10px] tracking-tight mt-0.5">Módulos</span>
+            </button>
+          )}
         </div>
       </nav>
 
@@ -274,37 +274,62 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
             
             {/* Drawer Header with Clinic Logo & Name (Clickable to open settings) */}
             <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsDrawerOpen(false);
-                  onOpenClinicSettings && onOpenClinicSettings();
-                }}
-                className="flex items-center gap-2.5 text-left group cursor-pointer hover:opacity-90 transition-opacity min-w-0"
-                title="Configurações e Logomarca da Clínica"
-              >
-                {clinicaConfig?.logomarca_url ? (
-                  <img
-                    src={clinicaConfig.logomarca_url}
-                    alt={clinicaConfig.nome || 'Logo'}
-                    referrerPolicy="no-referrer"
-                    className="w-9 h-9 rounded-xl object-contain bg-white border border-slate-200/90 shadow-2xs group-hover:ring-2 ring-indigo-500/40 transition-all shrink-0 p-0.5"
-                  />
-                ) : (
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-slate-900 text-white font-bold flex items-center justify-center text-sm shadow-2xs shrink-0">
-                    {(clinicaConfig?.nome || 'A').charAt(0).toUpperCase()}
+              {isCliente ? (
+                <div className="flex items-center gap-2.5 text-left min-w-0">
+                  {clinicaConfig?.logomarca_url ? (
+                    <img
+                      src={clinicaConfig.logomarca_url}
+                      alt={clinicaConfig.nome || 'Logo'}
+                      referrerPolicy="no-referrer"
+                      className="w-9 h-9 rounded-xl object-contain bg-white border border-slate-200/90 shadow-2xs shrink-0 p-0.5"
+                    />
+                  ) : (
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-slate-900 text-white font-bold flex items-center justify-center text-sm shadow-2xs shrink-0">
+                      {(clinicaConfig?.nome || 'A').charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-slate-900 text-sm truncate max-w-[160px]">
+                      {clinicaConfig?.nome || 'AuraEstética Studio'}
+                    </h3>
+                    <p className="text-[10px] text-indigo-600 font-semibold">
+                      Área do Cliente
+                    </p>
                   </div>
-                )}
-                <div className="min-w-0">
-                  <h3 className="font-bold text-slate-900 text-sm truncate max-w-[160px] group-hover:text-indigo-600 transition-colors">
-                    {clinicaConfig?.nome || 'AuraEstética Studio'}
-                  </h3>
-                  <p className="text-[10px] text-slate-500 flex items-center gap-1">
-                    <span>Configurações & Logo</span>
-                    <Settings className="w-2.5 h-2.5 text-slate-400" />
-                  </p>
                 </div>
-              </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDrawerOpen(false);
+                    onOpenClinicSettings && onOpenClinicSettings();
+                  }}
+                  className="flex items-center gap-2.5 text-left group cursor-pointer hover:opacity-90 transition-opacity min-w-0"
+                  title="Configurações e Logomarca da Clínica"
+                >
+                  {clinicaConfig?.logomarca_url ? (
+                    <img
+                      src={clinicaConfig.logomarca_url}
+                      alt={clinicaConfig.nome || 'Logo'}
+                      referrerPolicy="no-referrer"
+                      className="w-9 h-9 rounded-xl object-contain bg-white border border-slate-200/90 shadow-2xs group-hover:ring-2 ring-indigo-500/40 transition-all shrink-0 p-0.5"
+                    />
+                  ) : (
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-slate-900 text-white font-bold flex items-center justify-center text-sm shadow-2xs shrink-0">
+                      {(clinicaConfig?.nome || 'A').charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-slate-900 text-sm truncate max-w-[160px] group-hover:text-indigo-600 transition-colors">
+                      {clinicaConfig?.nome || 'AuraEstética Studio'}
+                    </h3>
+                    <p className="text-[10px] text-slate-500 flex items-center gap-1">
+                      <span>Configurações & Logo</span>
+                      <Settings className="w-2.5 h-2.5 text-slate-400" />
+                    </p>
+                  </div>
+                </button>
+              )}
 
               <button
                 onClick={() => setIsDrawerOpen(false)}
@@ -383,8 +408,8 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
               ))}
             </div>
 
-            {/* PWA Install Action */}
-            {onOpenPWAInstall && (
+            {/* PWA Install Action (staff only) */}
+            {!isCliente && onOpenPWAInstall && (
               <div className="p-3 border-t border-slate-100 bg-indigo-50/50">
                 <button
                   onClick={() => {

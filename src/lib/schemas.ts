@@ -73,17 +73,17 @@ export const SoftDeleteAuditSchema = z.object({
 
 export const DespesaRecorrenteSchema = z.object({
   descricao: z.string().min(2, 'Descrição obrigatória'),
-  categoria: z.enum(['aluguel', 'energia', 'internet', 'software', 'contabilidade', 'marketing', 'manutencao', 'limpeza', 'outros']),
+  categoria: z.string().min(1, 'Categoria obrigatória'),
   valor: z.number().positive('Valor deve ser maior que zero'),
   dia_vencimento: z.number().min(1).max(31, 'Dia de vencimento inválido (1 a 31)'),
-  recorrencia: z.enum(['mensal', 'anual', 'semanal']),
+  recorrencia: z.enum(['mensal', 'bimestral', 'trimestral', 'semestral', 'anual', 'semanal']),
   status: z.enum(['ativo', 'inativo']),
   forma_pagamento_preferencial: z.enum(['pix', 'cartao_credito', 'cartao_debito', 'dinheiro', 'transferencia', 'boleto']),
 });
 
 export const BemAtivoSchema = z.object({
   nome: z.string().min(2, 'Nome do bem / patrimônio obrigatório'),
-  categoria: z.enum(['equipamento', 'dermografo', 'maca_mobiliario', 'eletronico', 'laser', 'autoclave', 'climatizacao', 'outros']),
+  categoria: z.string().min(1, 'Categoria obrigatória'),
   data_aquisicao: z.string().min(4, 'Data de aquisição obrigatória'),
   valor_compra: z.number().min(0, 'Valor de compra deve ser positivo'),
   estado_conservacao: z.enum(['excelente', 'bom', 'regular', 'manutencao']),

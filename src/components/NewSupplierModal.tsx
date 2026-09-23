@@ -3,22 +3,15 @@ import {
   X, 
   Building2, 
   Phone, 
-  Mail, 
   CreditCard, 
   MapPin, 
-  FileText, 
-  Tag, 
-  UserCheck, 
-  Check, 
   AlertCircle,
-  Sparkles,
-  Globe,
-  Briefcase,
-  Layers,
-  Clock,
-  CheckCircle2
+  Tag,
+  DollarSign,
+  Banknote,
+  Coins
 } from 'lucide-react';
-import { Fornecedor, CategoriaFornecedor, UsuarioEquipe } from '../types';
+import { Fornecedor, UsuarioEquipe } from '../types';
 import { formatarTelefone, formatarCPF } from '../utils/anamneseValidation';
 
 // Helper to format CNPJ / CPF
@@ -27,7 +20,6 @@ export function formatarCNPJouCPF(valor: string): string {
   if (limpo.length <= 11) {
     return formatarCPF(limpo);
   }
-  // CNPJ format: 00.000.000/0000-00
   return limpo
     .slice(0, 14)
     .replace(/^(\d{2})(\d)/, '$1.$2')
@@ -41,6 +33,23 @@ export function formatarCEP(valor: string): string {
   const limpo = valor.replace(/\D/g, '').slice(0, 8);
   return limpo.replace(/^(\d{5})(\d)/, '$1-$2');
 }
+
+// Categorias padronizadas alinhadas ao cadastro de produtos/estoque + Serviços
+export const CATEGORIAS_FORNECEDOR_PRODUTOS = [
+  { id: 'Injetáveis', label: 'Injetáveis' },
+  { id: 'Preenchedores', label: 'Preenchedores' },
+  { id: 'Bioestimuladores', label: 'Bioestimuladores' },
+  { id: 'Pigmento', label: 'Pigmento' },
+  { id: 'Agulhas', label: 'Agulhas & Lâminas' },
+  { id: 'Descartáveis', label: 'Descartáveis' },
+  { id: 'Cosméticos', label: 'Cosméticos' },
+  { id: 'Tópicos & Anestésicos', label: 'Tópicos & Anestésicos' },
+  { id: 'Diluentes', label: 'Diluentes' },
+  { id: 'Equipamentos', label: 'Equipamentos & Aparelhos' },
+  { id: 'Serviços', label: 'Serviços' },
+  { id: 'Geral', label: 'Geral' },
+  { id: 'Outros', label: 'Outros' },
+];
 
 interface NewSupplierModalProps {
   isOpen: boolean;
@@ -62,31 +71,26 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
   const [razaoSocial, setRazaoSocial] = useState('');
   const [nomeFantasia, setNomeFantasia] = useState('');
   const [cnpjCpf, setCnpjCpf] = useState('');
-  const [inscricaoEstadual, setInscricaoEstadual] = useState('');
-  const [categoria, setCategoria] = useState<CategoriaFornecedor>('insumos');
+  const [categoria, setCategoria] = useState<string>('Injetáveis');
 
-  // Contato
+  // Contato (sem email e site, conforme solicitado)
   const [telefone, setTelefone] = useState('');
-  const [email, setEmail] = useState('');
-  const [site, setSite] = useState('');
   const [contatoResponsavel, setContatoResponsavel] = useState('');
   const [cargoContato, setCargoContato] = useState('');
 
-  // Endereço
+  // Endereço (sem complemento/sala, conforme solicitado)
   const [cep, setCep] = useState('');
   const [endereco, setEndereco] = useState('');
   const [numero, setNumero] = useState('');
-  const [complemento, setComplemento] = useState('');
   const [bairro, setBairro] = useState('');
   const [cidade, setCidade] = useState('');
   const [uf, setUf] = useState('');
 
-  // Financeiro & Condições
+  // Dados Financeiros & Condições de Pagamento
+  // Forma de pagamento com opções: 'Cartão', 'Dinheiro' e 'PIX'
+  const [formaPagamento, setFormaPagamento] = useState<'cartao' | 'dinheiro' | 'pix'>('pix');
   const [pixChave, setPixChave] = useState('');
   const [tipoChavePix, setTipoChavePix] = useState('CNPJ');
-  const [bancoNome, setBancoNome] = useState('');
-  const [agencia, setAgencia] = useState('');
-  const [contaCorrente, setContaCorrente] = useState('');
   const [condicoesPagamento, setCondicoesPagamento] = useState('');
   const [prazoEntregaMedio, setPrazoEntregaMedio] = useState('');
 
@@ -102,28 +106,30 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
         setRazaoSocial(fornecedorToEdit.razao_social || '');
         setNomeFantasia(fornecedorToEdit.nome_fantasia || '');
         setCnpjCpf(fornecedorToEdit.cnpj_cpf || '');
-        setInscricaoEstadual(fornecedorToEdit.inscricao_estadual || '');
-        setCategoria((fornecedorToEdit.categoria as CategoriaFornecedor) || 'insumos');
+        setCategoria(fornecedorToEdit.categoria || 'Injetáveis');
         
         setTelefone(fornecedorToEdit.telefone || '');
-        setEmail(fornecedorToEdit.email || '');
-        setSite(fornecedorToEdit.site || '');
         setContatoResponsavel(fornecedorToEdit.contato_responsavel || '');
         setCargoContato(fornecedorToEdit.cargo_contato || '');
         
         setCep(fornecedorToEdit.cep || '');
         setEndereco(fornecedorToEdit.endereco || '');
         setNumero(fornecedorToEdit.numero || '');
-        setComplemento(fornecedorToEdit.complemento || '');
         setBairro(fornecedorToEdit.bairro || '');
         setCidade(fornecedorToEdit.cidade || '');
         setUf(fornecedorToEdit.uf || '');
         
+        const forma = fornecedorToEdit.forma_pagamento_preferencial?.toLowerCase();
+        if (forma === 'cartao' || forma === 'cartão') {
+          setFormaPagamento('cartao');
+        } else if (forma === 'dinheiro') {
+          setFormaPagamento('dinheiro');
+        } else {
+          setFormaPagamento('pix');
+        }
+
         setPixChave(fornecedorToEdit.pix_chave || '');
         setTipoChavePix(fornecedorToEdit.tipo_chave_pix || 'CNPJ');
-        setBancoNome(fornecedorToEdit.banco_nome || fornecedorToEdit.banco_dados || '');
-        setAgencia(fornecedorToEdit.agencia || '');
-        setContaCorrente(fornecedorToEdit.conta_corrente || '');
         setCondicoesPagamento(fornecedorToEdit.condicoes_pagamento || '');
         setPrazoEntregaMedio(fornecedorToEdit.prazo_entrega_medio || '');
         
@@ -133,28 +139,22 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
         setRazaoSocial('');
         setNomeFantasia('');
         setCnpjCpf('');
-        setInscricaoEstadual('');
-        setCategoria('insumos');
+        setCategoria('Injetáveis');
         
         setTelefone('');
-        setEmail('');
-        setSite('');
         setContatoResponsavel('');
         setCargoContato('');
         
         setCep('');
         setEndereco('');
         setNumero('');
-        setComplemento('');
         setBairro('');
         setCidade('');
         setUf('');
         
+        setFormaPagamento('pix');
         setPixChave('');
         setTipoChavePix('CNPJ');
-        setBancoNome('');
-        setAgencia('');
-        setContaCorrente('');
         setCondicoesPagamento('');
         setPrazoEntregaMedio('');
         
@@ -192,7 +192,7 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
 
     const cidadeUfFormatada = cidade && uf ? `${cidade} - ${uf}` : cidade || uf || undefined;
     const enderecoFormatado = endereco 
-      ? `${endereco}${numero ? `, ${numero}` : ''}${complemento ? ` - ${complemento}` : ''}${bairro ? ` (${bairro})` : ''}`
+      ? `${endereco}${numero ? `, ${numero}` : ''}${bairro ? ` (${bairro})` : ''}`
       : undefined;
 
     saveFunction({
@@ -200,30 +200,23 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
       razao_social: razaoSocial.trim(),
       nome_fantasia: nomeFantasia.trim() || undefined,
       cnpj_cpf: cnpjCpf.trim() || undefined,
-      inscricao_estadual: inscricaoEstadual.trim() || undefined,
       categoria: categoria,
       
       telefone: telefone.trim(),
-      email: email.trim() || undefined,
-      site: site.trim() || undefined,
       contato_responsavel: contatoResponsavel.trim() || undefined,
       cargo_contato: cargoContato.trim() || undefined,
       
       cep: cep.trim() || undefined,
       endereco: enderecoFormatado || endereco.trim() || undefined,
       numero: numero.trim() || undefined,
-      complemento: complemento.trim() || undefined,
       bairro: bairro.trim() || undefined,
       cidade: cidade.trim() || undefined,
       uf: uf.trim() || undefined,
       cidade_uf: cidadeUfFormatada,
       
-      pix_chave: pixChave.trim() || undefined,
-      tipo_chave_pix: tipoChavePix,
-      banco_dados: bancoNome.trim() || undefined,
-      banco_nome: bancoNome.trim() || undefined,
-      agencia: agencia.trim() || undefined,
-      conta_corrente: contaCorrente.trim() || undefined,
+      forma_pagamento_preferencial: formaPagamento,
+      pix_chave: formaPagamento === 'pix' ? pixChave.trim() || undefined : undefined,
+      tipo_chave_pix: formaPagamento === 'pix' ? tipoChavePix : undefined,
       condicoes_pagamento: condicoesPagamento.trim() || undefined,
       prazo_entrega_medio: prazoEntregaMedio.trim() || undefined,
       
@@ -240,7 +233,7 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
       <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 my-6 flex flex-col max-h-[92vh]">
         
-        {/* Header no Padrão do Cadastro de Paciente / Sistema */}
+        {/* Header */}
         <div className="p-4 sm:p-5 border-b border-slate-100 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-amber-500 text-slate-950 shadow-xs font-bold">
@@ -251,7 +244,7 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
                 {fornecedorToEdit ? 'Editar Fornecedor & Parceiro' : 'Cadastrar Novo Fornecedor'}
               </h3>
               <p className="text-xs text-slate-300 font-medium">
-                Padrão estruturado de parceiros, insumos, suporte técnico e serviços
+                Gestão simplificada de fornecedores vinculada às categorias de insumos e serviços
               </p>
             </div>
           </div>
@@ -273,7 +266,7 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
           </div>
         )}
 
-        {/* Formulário com Abas/Seções Estruturadas */}
+        {/* Formulário com Seções Estruturadas */}
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1 text-xs sm:text-sm">
           
           {/* Seção 1: Identificação & Empresa */}
@@ -312,27 +305,26 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+                  <Tag className="w-3.5 h-3.5 text-indigo-600" />
                   Categoria de Fornecimento
                 </label>
                 <select
                   value={categoria}
-                  onChange={(e) => setCategoria(e.target.value as CategoriaFornecedor)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 font-medium"
+                  onChange={(e) => setCategoria(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 font-semibold"
                 >
-                  <option value="insumos">Insumos, Pigmentos & Cosméticos</option>
-                  <option value="equipamentos">Equipamentos Médicos & Estéticos</option>
-                  <option value="manutencao">Assistência Técnica & Manutenção</option>
-                  <option value="servicos">Serviços Especializados / Consultoria</option>
-                  <option value="software">Software & Tecnologia</option>
-                  <option value="imobiliario">Locação & Imobiliário</option>
-                  <option value="outros">Outros Fornecimentos</option>
+                  {CATEGORIAS_FORNECEDOR_PRODUTOS.map(cat => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 
-              <div>
+              <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  CNPJ ou CPF
+                  CNPJ ou CPF (Opcional)
                 </label>
                 <input
                   type="text"
@@ -340,19 +332,6 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
                   value={cnpjCpf}
                   onChange={(e) => setCnpjCpf(formatarCNPJouCPF(e.target.value))}
                   className="w-full px-3 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Inscrição Estadual (Opcional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ex: Isento ou 123.456.789.000"
-                  value={inscricaoEstadual}
-                  onChange={(e) => setInscricaoEstadual(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900"
                 />
               </div>
             </div>
@@ -382,19 +361,6 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  E-mail para Pedidos / NFe
-                </label>
-                <input
-                  type="email"
-                  placeholder="pedidos@fornecedor.com.br"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Contato / Representante Comercial
                 </label>
                 <input
@@ -406,26 +372,26 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
                 />
               </div>
 
-              <div>
+              <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Site / Portal de Compras
+                  Cargo / Função do Contato
                 </label>
                 <input
                   type="text"
-                  placeholder="https://loja.fornecedor.com.br"
-                  value={site}
-                  onChange={(e) => setSite(e.target.value)}
+                  placeholder="Ex: Consultor Técnico, Gerente de Contas"
+                  value={cargoContato}
+                  onChange={(e) => setCargoContato(e.target.value)}
                   className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900"
                 />
               </div>
             </div>
           </div>
 
-          {/* Seção 3: Endereço Completo */}
+          {/* Seção 3: Endereço */}
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-slate-900 font-bold border-b border-slate-100 pb-2">
               <MapPin className="w-4 h-4 text-indigo-600" />
-              <span>3. Endereço Completo & Localização</span>
+              <span>3. Endereço & Localização</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
@@ -470,19 +436,6 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Complemento / Sala
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ex: Sala 42, Bloco B"
-                  value={complemento}
-                  onChange={(e) => setComplemento(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Bairro
                 </label>
                 <input
@@ -494,36 +447,32 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
                 />
               </div>
 
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Cidade
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ex: São Paulo"
-                  value={cidade}
-                  onChange={(e) => setCidade(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900"
-                />
-              </div>
-
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Estado (UF)
+                  Cidade / UF
                 </label>
-                <input
-                  type="text"
-                  placeholder="SP"
-                  maxLength={2}
-                  value={uf}
-                  onChange={(e) => setUf(e.target.value.toUpperCase())}
-                  className="w-full px-3 py-2 text-xs uppercase bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 font-semibold"
-                />
+                <div className="grid grid-cols-3 gap-1.5">
+                  <input
+                    type="text"
+                    placeholder="Cidade"
+                    value={cidade}
+                    onChange={(e) => setCidade(e.target.value)}
+                    className="col-span-2 px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900"
+                  />
+                  <input
+                    type="text"
+                    placeholder="UF"
+                    maxLength={2}
+                    value={uf}
+                    onChange={(e) => setUf(e.target.value.toUpperCase())}
+                    className="px-2 py-2 text-xs uppercase text-center bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 font-semibold"
+                  />
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Seção 4: Dados Financeiros & Condições Comerciais */}
+          {/* Seção 4: Dados Financeiros & Condições de Pagamento */}
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-slate-900 font-bold border-b border-slate-100 pb-2">
               <CreditCard className="w-4 h-4 text-emerald-600" />
@@ -531,61 +480,96 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Chave Pix
+              
+              {/* Campo de Seleção para Forma de Pagamento: Cartão, Dinheiro e PIX */}
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Forma de Pagamento Principal / Preferencial <span className="text-rose-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  placeholder="CNPJ, E-mail, Telefone ou Chave Aleatória"
-                  value={pixChave}
-                  onChange={(e) => setPixChave(e.target.value)}
-                  className="w-full px-3 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900"
-                />
-              </div>
+                <div className="grid grid-cols-3 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setFormaPagamento('pix')}
+                    className={`py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      formaPagamento === 'pix'
+                        ? 'bg-emerald-50 border-emerald-500 text-emerald-800 ring-2 ring-emerald-500/20'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Coins className="w-4 h-4 text-emerald-600" />
+                    <span>PIX</span>
+                  </button>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Banco / Instituição Financeira
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ex: Itaú (341), Bradesco, Inter..."
-                  value={bancoNome}
-                  onChange={(e) => setBancoNome(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900"
-                />
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormaPagamento('cartao')}
+                    className={`py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      formaPagamento === 'cartao'
+                        ? 'bg-indigo-50 border-indigo-500 text-indigo-800 ring-2 ring-indigo-500/20'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <CreditCard className="w-4 h-4 text-indigo-600" />
+                    <span>Cartão</span>
+                  </button>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Agência & Conta Corrente
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    placeholder="Agência"
-                    value={agencia}
-                    onChange={(e) => setAgencia(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Conta C/C"
-                    value={contaCorrente}
-                    onChange={(e) => setContaCorrente(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setFormaPagamento('dinheiro')}
+                    className={`py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      formaPagamento === 'dinheiro'
+                        ? 'bg-amber-50 border-amber-500 text-amber-800 ring-2 ring-amber-500/20'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Banknote className="w-4 h-4 text-amber-600" />
+                    <span>Dinheiro</span>
+                  </button>
                 </div>
               </div>
 
+              {/* Se PIX, exibe campos de Chave Pix */}
+              {formaPagamento === 'pix' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Tipo de Chave PIX
+                    </label>
+                    <select
+                      value={tipoChavePix}
+                      onChange={(e) => setTipoChavePix(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 font-medium"
+                    >
+                      <option value="CNPJ">CNPJ</option>
+                      <option value="CPF">CPF</option>
+                      <option value="E-mail">E-mail</option>
+                      <option value="Telefone">Telefone</option>
+                      <option value="Aleatória">Chave Aleatória (EVP)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Chave PIX
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Informe a chave PIX do parceiro"
+                      value={pixChave}
+                      onChange={(e) => setPixChave(e.target.value)}
+                      className="w-full px-3 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900"
+                    />
+                  </div>
+                </>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Condições de Pagamento / Prazo de Faturamento
+                  Condições Comerciais / Parcelamento
                 </label>
                 <input
                   type="text"
-                  placeholder="Ex: Boleto 28 dias, 5% desc. no Pix à vista"
+                  placeholder="Ex: 30/60 dias, À vista, Faturado 15d"
                   value={condicoesPagamento}
                   onChange={(e) => setCondicoesPagamento(e.target.value)}
                   className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900"
@@ -598,79 +582,68 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
                 </label>
                 <input
                   type="text"
-                  placeholder="Ex: 2 a 4 dias úteis via Sedex"
+                  placeholder="Ex: 2 dias úteis, Sedex 24h"
                   value={prazoEntregaMedio}
                   onChange={(e) => setPrazoEntregaMedio(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Seção 5: Observações e Status */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-slate-900 font-bold border-b border-slate-100 pb-2">
+              <DollarSign className="w-4 h-4 text-indigo-600" />
+              <span>5. Status & Observações Internas</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Observações Gerais / Histórico
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Anotações internas sobre frete, pontualidade, descontos especiais de volume..."
+                  value={observacoes}
+                  onChange={(e) => setObservacoes(e.target.value)}
                   className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Status do Fornecedor
+                  Status do Cadastro
                 </label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setStatus('ativo')}
-                    className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
-                      status === 'ativo'
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300 shadow-2xs font-bold'
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    Ativo / Homologado
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStatus('inativo')}
-                    className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
-                      status === 'inativo'
-                        ? 'bg-slate-100 text-slate-700 border-slate-300 shadow-2xs font-bold'
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    Inativo / Bloqueado
-                  </button>
-                </div>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as 'ativo' | 'inativo')}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 font-semibold"
+                >
+                  <option value="ativo">Ativo (Homologado)</option>
+                  <option value="inativo">Inativo / Bloqueado</option>
+                </select>
               </div>
             </div>
           </div>
 
-          {/* Seção 5: Observações */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-slate-900 font-bold border-b border-slate-100 pb-2">
-              <FileText className="w-4 h-4 text-indigo-600" />
-              <span>5. Observações & Itens Fornecidos</span>
-            </div>
-
-            <div>
-              <textarea
-                rows={3}
-                placeholder="Anotações internas, marcas exclusivas, contatos de suporte de emergência, tabela de descontos acordada..."
-                value={observacoes}
-                onChange={(e) => setObservacoes(e.target.value)}
-                className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 resize-none"
-              />
-            </div>
-          </div>
-
-          {/* Footer Actions */}
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3 shrink-0">
+          {/* Footer & Ações */}
+          <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3 sticky bottom-0 bg-white pb-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-slate-600 hover:text-slate-900 text-xs font-semibold rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-sm flex items-center gap-2"
+              className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-slate-950 text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>{fornecedorToEdit ? 'Atualizar Fornecedor' : 'Salvar Fornecedor'}</span>
+              <Building2 className="w-4 h-4" />
+              <span>{isSubmitting ? 'Salvando...' : fornecedorToEdit ? 'Salvar Alterações' : 'Concluir Cadastro'}</span>
             </button>
           </div>
 

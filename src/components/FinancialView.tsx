@@ -121,6 +121,8 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
   const [recValor, setRecValor] = useState<number>(0);
   const [recDiaVencimento, setRecDiaVencimento] = useState<number>(10);
   const [recForma, setRecForma] = useState<FormaPagamento>('boleto');
+  const [recRecorrencia, setRecRecorrencia] = useState<DespesaRecorrente['recorrencia']>('mensal');
+  const [recObs, setRecObs] = useState('');
 
   // Edit Recurring Expense State
   const [editingDespesa, setEditingDespesa] = useState<DespesaRecorrente | null>(null);
@@ -129,7 +131,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
   const [editValor, setEditValor] = useState<number>(0);
   const [editDiaVencimento, setEditDiaVencimento] = useState<number>(10);
   const [editForma, setEditForma] = useState<FormaPagamento>('boleto');
-  const [editRecorrencia, setEditRecorrencia] = useState<'mensal' | 'anual' | 'semanal'>('mensal');
+  const [editRecorrencia, setEditRecorrencia] = useState<DespesaRecorrente['recorrencia']>('mensal');
   const [editStatus, setEditStatus] = useState<'ativo' | 'inativo'>('ativo');
   const [editObs, setEditObs] = useState('');
   const [despesaToDelete, setDespesaToDelete] = useState<DespesaRecorrente | null>(null);
@@ -239,15 +241,18 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
       categoria: recCategoria,
       valor: Number(recValor),
       dia_vencimento: Number(recDiaVencimento),
-      recorrencia: 'mensal',
+      recorrencia: recRecorrencia,
       status: 'ativo',
       forma_pagamento_preferencial: recForma,
+      observacoes: recObs.trim() || undefined,
       criado_em: new Date().toISOString(),
     });
 
     setIsNewRecorrenteModalOpen(false);
     setRecDescricao('');
     setRecValor(0);
+    setRecObs('');
+    setRecRecorrencia('mensal');
   };
 
   const handleStartEditDespesa = (desp: DespesaRecorrente) => {
@@ -738,15 +743,26 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
                 >
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white text-slate-700 border border-slate-200">
-                        {desp.categoria.toUpperCase()}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white text-slate-700 border border-slate-200">
+                          {desp.categoria === 'agua' 
+                            ? 'Água' 
+                            : desp.categoria === 'luz' 
+                            ? 'Luz' 
+                            : desp.categoria === 'aluguel'
+                            ? 'Aluguel'
+                            : desp.categoria.toUpperCase()}
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 capitalize">
+                          {desp.recorrencia || 'Mensal'}
+                        </span>
+                      </div>
                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                         desp.status === 'ativo' 
                           ? 'bg-emerald-100 text-emerald-800' 
                           : 'bg-slate-200 text-slate-600'
                       }`}>
-                        {desp.status === 'ativo' ? 'Ativo Mensal' : 'Inativo'}
+                        {desp.status === 'ativo' ? 'Ativo' : 'Inativo / Pausado'}
                       </span>
                     </div>
 
@@ -755,7 +771,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
                     </h4>
 
                     <div className="mt-3 space-y-1 text-xs text-slate-600">
-                      <p>Vencimento todo <strong>dia {desp.dia_vencimento}</strong> de cada mês</p>
+                      <p>Vencimento todo <strong>dia {desp.dia_vencimento}</strong> ({desp.recorrencia || 'mensal'})</p>
                       <p>Forma de Pgto: <strong>{getFormaLabel(desp.forma_pagamento_preferencial)}</strong></p>
                       {desp.observacoes && (
                         <p className="text-[11px] text-slate-500 italic line-clamp-1">
@@ -847,14 +863,16 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Categoria
+                    Categoria *
                   </label>
                   <select
                     value={editCategoria}
                     onChange={(e) => setEditCategoria(e.target.value as DespesaRecorrente['categoria'])}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
                   >
                     <option value="aluguel">Aluguel / Imóvel</option>
+                    <option value="agua">Água & Saneamento</option>
+                    <option value="luz">Luz (Energia Elétrica)</option>
                     <option value="energia">Energia Elétrica</option>
                     <option value="internet">Internet / Telefonia</option>
                     <option value="software">Sistemas & Software</option>
@@ -868,7 +886,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Dia de Vencimento (1 a 31)
+                    Dia de Vencimento (1 a 31) *
                   </label>
                   <input
                     type="number"
@@ -877,7 +895,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
                     required
                     value={editDiaVencimento}
                     onChange={(e) => setEditDiaVencimento(parseInt(e.target.value) || 1)}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   />
                 </div>
               </div>
@@ -885,7 +903,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Valor Mensal (R$) *
+                    Valor Recorrente (R$) *
                   </label>
                   <input
                     type="number"
@@ -894,7 +912,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
                     required
                     value={editValor || ''}
                     onChange={(e) => setEditValor(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-rose-700"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-rose-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   />
                 </div>
 
@@ -905,7 +923,7 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
                   <select
                     value={editForma}
                     onChange={(e) => setEditForma(e.target.value as FormaPagamento)}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   >
                     <option value="boleto">Boleto Bancário</option>
                     <option value="pix">Pix Instantâneo</option>
@@ -920,14 +938,17 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Recorrência
+                    Periodicidade / Recorrência *
                   </label>
                   <select
                     value={editRecorrencia}
                     onChange={(e) => setEditRecorrencia(e.target.value as any)}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   >
                     <option value="mensal">Mensal</option>
+                    <option value="bimestral">Bimestral</option>
+                    <option value="trimestral">Trimestral</option>
+                    <option value="semestral">Semestral</option>
                     <option value="anual">Anual</option>
                     <option value="semanal">Semanal</option>
                   </select>
@@ -1285,26 +1306,30 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Categoria
+                    Categoria *
                   </label>
                   <select
                     value={recCategoria}
                     onChange={(e) => setRecCategoria(e.target.value as DespesaRecorrente['categoria'])}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
                   >
                     <option value="aluguel">Aluguel / Imóvel</option>
+                    <option value="agua">Água & Saneamento</option>
+                    <option value="luz">Luz (Energia Elétrica)</option>
                     <option value="energia">Energia Elétrica</option>
                     <option value="internet">Internet / Telefonia</option>
                     <option value="software">Sistemas & Software</option>
                     <option value="contabilidade">Contabilidade</option>
                     <option value="marketing">Marketing & Tráfego</option>
+                    <option value="manutencao">Manutenção Predial</option>
+                    <option value="limpeza">Limpeza & Higiene</option>
                     <option value="outros">Outros</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Dia de Vencimento (1 a 31)
+                    Dia de Vencimento (1 a 31) *
                   </label>
                   <input
                     type="number"
@@ -1313,23 +1338,74 @@ export const FinancialView: React.FC<FinancialViewProps> = ({
                     required
                     value={recDiaVencimento}
                     onChange={(e) => setRecDiaVencimento(parseInt(e.target.value) || 10)}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Valor Recorrente (R$) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    value={recValor || ''}
+                    onChange={(e) => setRecValor(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-rose-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Forma de Pagamento
+                  </label>
+                  <select
+                    value={recForma}
+                    onChange={(e) => setRecForma(e.target.value as FormaPagamento)}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  >
+                    <option value="boleto">Boleto Bancário</option>
+                    <option value="pix">Pix Instantâneo</option>
+                    <option value="cartao_credito">Cartão de Crédito</option>
+                    <option value="cartao_debito">Cartão de Débito</option>
+                    <option value="transferencia">Transferência Bancária</option>
+                    <option value="dinheiro">Dinheiro</option>
+                  </select>
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Valor Mensal Estimado (R$) *
+                  Periodicidade / Recorrência *
                 </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  required
-                  value={recValor || ''}
-                  onChange={(e) => setRecValor(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold"
+                <select
+                  value={recRecorrencia}
+                  onChange={(e) => setRecRecorrencia(e.target.value as any)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                >
+                  <option value="mensal">Mensal</option>
+                  <option value="bimestral">Bimestral</option>
+                  <option value="trimestral">Trimestral</option>
+                  <option value="semestral">Semestral</option>
+                  <option value="anual">Anual</option>
+                  <option value="semanal">Semanal</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Observações Internas (Opcional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Ex: Conta contratada na Enel, débito em conta corrente..."
+                  value={recObs}
+                  onChange={(e) => setRecObs(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                 />
               </div>
 

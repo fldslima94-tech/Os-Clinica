@@ -43,20 +43,26 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({
 
   const getCategoryBadge = (categoria: string) => {
     switch (categoria) {
-      case 'insumos':
-        return { label: 'Insumos & Pigmentos', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+      case 'Injetáveis':
+      case 'Preenchedores':
+      case 'Bioestimuladores':
+        return { label: categoria, color: 'bg-emerald-50 text-emerald-800 border-emerald-200' };
+      case 'Equipamentos':
       case 'equipamentos':
-        return { label: 'Equipamentos & Lasers', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
-      case 'manutencao':
-        return { label: 'Manutenção & Laudos', color: 'bg-amber-50 text-amber-700 border-amber-200' };
+        return { label: 'Equipamentos', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
+      case 'Serviços':
       case 'servicos':
-        return { label: 'Serviços Gerais', color: 'bg-purple-50 text-purple-700 border-purple-200' };
-      case 'software':
-        return { label: 'TI & Software', color: 'bg-blue-50 text-blue-700 border-blue-200' };
-      case 'imobiliario':
-        return { label: 'Imobiliário / Aluguel', color: 'bg-slate-50 text-slate-700 border-slate-200' };
+        return { label: 'Serviços', color: 'bg-purple-50 text-purple-700 border-purple-200' };
+      case 'Agulhas':
+      case 'Descartáveis':
+        return { label: categoria, color: 'bg-amber-50 text-amber-700 border-amber-200' };
+      case 'Cosméticos':
+      case 'Tópicos & Anestésicos':
+        return { label: categoria, color: 'bg-rose-50 text-rose-700 border-rose-200' };
+      case 'manutencao':
+        return { label: 'Manutenção', color: 'bg-amber-50 text-amber-700 border-amber-200' };
       default:
-        return { label: 'Fornecimentos Diversos', color: 'bg-slate-50 text-slate-700 border-slate-200' };
+        return { label: categoria || 'Geral', color: 'bg-slate-100 text-slate-700 border-slate-200' };
     }
   };
 
@@ -67,7 +73,6 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({
       (f.nome_fantasia && f.nome_fantasia.toLowerCase().includes(q)) ||
       (f.cnpj_cpf && f.cnpj_cpf.includes(q)) ||
       (f.telefone && f.telefone.includes(q)) ||
-      (f.email && f.email.toLowerCase().includes(q)) ||
       (f.contato_responsavel && f.contato_responsavel.toLowerCase().includes(q));
 
     const matchesCat = selectedCategoria === 'todos' || f.categoria === selectedCategoria;
@@ -127,11 +132,13 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({
         <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 scrollbar-none text-xs">
           {[
             { id: 'todos', label: 'Todos' },
-            { id: 'insumos', label: 'Insumos' },
-            { id: 'equipamentos', label: 'Equipamentos' },
-            { id: 'manutencao', label: 'Manutenção' },
-            { id: 'servicos', label: 'Serviços' },
-            { id: 'software', label: 'Software/TI' },
+            { id: 'Injetáveis', label: 'Injetáveis' },
+            { id: 'Preenchedores', label: 'Preenchedores' },
+            { id: 'Bioestimuladores', label: 'Bioestimuladores' },
+            { id: 'Equipamentos', label: 'Equipamentos' },
+            { id: 'Serviços', label: 'Serviços' },
+            { id: 'Cosméticos', label: 'Cosméticos' },
+            { id: 'Descartáveis', label: 'Descartáveis' },
           ].map((cat) => (
             <button
               key={cat.id}
@@ -236,13 +243,6 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({
                       )}
                     </div>
 
-                    {forn.email && (
-                      <div className="flex items-center gap-2 truncate">
-                        <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="truncate">{forn.email}</span>
-                      </div>
-                    )}
-
                     {forn.contato_responsavel && (
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] font-bold text-slate-400 uppercase">Contato:</span>
@@ -256,10 +256,21 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({
                         <span>{forn.cidade_uf}</span>
                       </div>
                     )}
+
+                    {/* Forma de Pagamento */}
+                    <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                      <CreditCard className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Pagamento:</span>
+                      <span className="font-semibold text-slate-800 capitalize">
+                        {forn.forma_pagamento_preferencial === 'cartao' ? 'Cartão' : 
+                         forn.forma_pagamento_preferencial === 'dinheiro' ? 'Dinheiro' : 
+                         forn.forma_pagamento_preferencial === 'pix' ? 'PIX' : (forn.forma_pagamento_preferencial || 'PIX')}
+                      </span>
+                    </div>
                   </div>
 
-                  {/* PIX / Banking Info */}
-                  {forn.pix_chave && (
+                  {/* PIX / Chave se houver */}
+                  {forn.pix_chave && forn.forma_pagamento_preferencial !== 'cartao' && forn.forma_pagamento_preferencial !== 'dinheiro' && (
                     <div className="mt-2.5 p-2 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-700 flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
                         <CreditCard className="w-3.5 h-3.5 text-emerald-600 shrink-0" />

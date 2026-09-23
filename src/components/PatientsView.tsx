@@ -18,7 +18,8 @@ import {
   Building,
   CheckCircle2,
   MapPin,
-  Clock
+  Clock,
+  Edit2
 } from 'lucide-react';
 import { Paciente, UsuarioEquipe } from '../types';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
@@ -31,6 +32,7 @@ interface PatientsViewProps {
   onOpenNewPatient: () => void;
   onOpenNewAnamnese?: () => void;
   onViewPatient: (paciente: Paciente) => void;
+  onEditPatient?: (paciente: Paciente) => void;
   onOpenPackages?: (paciente: Paciente) => void;
   onDeletePatient?: (id: string, motivo?: string) => void;
   onGoToSuppliers?: () => void;
@@ -55,6 +57,7 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
   onOpenNewPatient,
   onOpenNewAnamnese,
   onViewPatient,
+  onEditPatient,
   onOpenPackages,
   onDeletePatient,
   onGoToSuppliers,
@@ -260,15 +263,28 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
                     <ChevronRight className="w-3.5 h-3.5" />
                   </button>
 
-                  {canDelete && onDeletePatient && (
-                    <button
-                      onClick={() => setPatientToDelete(paciente)}
-                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                      title="Excluir Ficha"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
+                  <div className="flex items-center gap-1">
+                    {onEditPatient && (
+                      <button
+                        onClick={() => onEditPatient(paciente)}
+                        className="px-2.5 py-1 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer flex items-center gap-1 text-xs font-semibold border border-slate-200/80 hover:border-indigo-200"
+                        title="Editar dados cadastrais do cliente"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                        <span>Editar</span>
+                      </button>
+                    )}
+
+                    {canDelete && onDeletePatient && (
+                      <button
+                        onClick={() => setPatientToDelete(paciente)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                        title="Excluir Ficha"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );

@@ -14,6 +14,8 @@ import {
   CheckCircle2, 
   X, 
   ChevronRight, 
+  ChevronLeft,
+  Eye,
   FileText, 
   ExternalLink,
   Layers,
@@ -30,7 +32,8 @@ import {
   Navigation,
   Compass,
   CalendarCheck,
-  Building2
+  Building2,
+  Image as ImageIcon
 } from 'lucide-react';
 import { 
   ProcedimentoClinico, 
@@ -46,7 +49,11 @@ import {
   logoutFirebase, 
   onFirebaseAuthStateChange, 
   isUserAdminTotal, 
-  isUserAdminLocalOrTotal 
+  isUserAdminLocalOrTotal,
+  saveClientPortalProfile,
+  fetchClientPortalProfile,
+  formatPhoneBR,
+  isValidPhoneBR
 } from '../services/firebaseService';
 
 interface PatientPortalViewProps {
@@ -82,26 +89,71 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
   const [search, setSearch] = useState('');
   const [orcamentoToDelete, setOrcamentoToDelete] = useState<SolicitacaoOrcamento | null>(null);
 
+  useEffect(() => {
+    if (currentUser?.role === 'cliente' && activeTab !== 'simulador' && activeTab !== 'meus_orcamentos') {
+      setActiveTab('simulador');
+    }
+  }, [currentUser?.role, activeTab]);
+
   // Google Authentication State
   const [googleProfile, setGoogleProfile] = useState<PacienteGoogleProfile | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  // Sync with Firebase Auth state in real-time
+  // Onboarding Obrigatório para Retorno (Nome + Telefone/WhatsApp)
+  const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
+  const [onboardingNome, setOnboardingNome] = useState('');
+  const [onboardingTelefone, setOnboardingTelefone] = useState('');
+  const [onboardingError, setOnboardingError] = useState('');
+  const [isSavingOnboarding, setIsSavingOnboarding] = useState(false);
+
+  // Procedure Details & Photo Carousel Modal
+  const [procedureForDetails, setProcedureForDetails] = useState<ProcedimentoClinico | null>(null);
+  const [activePhotoIndex, setActivePhotoIndex] = useState<number>(0);
+
+  // Sync with Firebase Auth state in real-time and check profile persistence
   useEffect(() => {
-    const unsubscribe = onFirebaseAuthStateChange((user) => {
+    // Se o usuário logado no sistema já for do perfil cliente, inicializa o perfil com seus dados
+    if (currentUser?.role === 'cliente' && !googleProfile) {
+      setGoogleProfile({
+        id: currentUser.id,
+        nome: currentUser.nome,
+        email: currentUser.email || '',
+        avatar_url: currentUser.avatar_url || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&auto=format&fit=crop&q=80',
+        telefone: currentUser.telefone || '',
+      });
+    }
+
+    const unsubscribe = onFirebaseAuthStateChange(async (user) => {
       if (user) {
-        setGoogleProfile({
+        // Busca perfil salvo no Firestore / Cache
+        const storedProfile = await fetchClientPortalProfile(user.uid);
+        const nome = storedProfile?.nome || user.displayName || 'Paciente Google';
+        const telefone = storedProfile?.telefone || '';
+        const email = user.email || storedProfile?.email || '';
+        const avatar_url = user.photoURL || storedProfile?.avatar_url || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&auto=format&fit=crop&q=80';
+
+        const profile: PacienteGoogleProfile = {
           id: user.uid,
-          nome: user.displayName || 'Paciente Google',
-          email: user.email || '',
-          avatar_url: user.photoURL || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&auto=format&fit=crop&q=80',
-          telefone: user.phoneNumber || '(11) 99888-7766',
-        });
+          nome,
+          email,
+          avatar_url,
+          telefone,
+        };
+
+        setGoogleProfile(profile);
+
+        // Se perfil não possuir telefone cadastrado válido, dispara o onboarding obrigatório
+        if (!telefone || !isValidPhoneBR(telefone)) {
+          setOnboardingNome(nome);
+          setOnboardingTelefone(formatPhoneBR(telefone));
+          setOnboardingError('');
+          setIsOnboardingModalOpen(true);
+        }
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [currentUser]);
 
   const [isGoogleLoginModalOpen, setIsGoogleLoginModalOpen] = useState(false);
   const [customNameInput, setCustomNameInput] = useState('');
@@ -133,7 +185,8 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
   ];
 
   const filteredProcedures = procedimentos.filter(p => {
-    if (!p.ativo || !p.destaque_portal) return false;
+    if (p.ativo === false) return false;
+    if (p.destaque_portal === false) return false;
     if (categoryFilter !== 'todos' && p.categoria !== categoryFilter) return false;
     const q = (search || '').toLowerCase();
     return (p.nome || '').toLowerCase().includes(q) || (p.descricao || '').toLowerCase().includes(q);
@@ -163,15 +216,32 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
     try {
       const user = await loginWithFirebaseGoogle();
       if (user) {
+        const storedProfile = await fetchClientPortalProfile(user.uid);
+        const nome = storedProfile?.nome || user.displayName || 'Paciente Google';
+        const telefone = storedProfile?.telefone || '';
+        const email = user.email || storedProfile?.email || '';
+        const avatar_url = user.photoURL || storedProfile?.avatar_url || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&auto=format&fit=crop&q=80';
+
         const profile: PacienteGoogleProfile = {
           id: user.uid,
-          nome: user.displayName || 'Paciente Google',
-          email: user.email || '',
-          avatar_url: user.photoURL || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&auto=format&fit=crop&q=80',
-          telefone: user.phoneNumber || '(11) 99888-7766',
+          nome,
+          email,
+          avatar_url,
+          telefone,
         };
+
         setGoogleProfile(profile);
         setIsGoogleLoginModalOpen(false);
+
+        // Se não possui telefone válido, redireciona/abre onboarding obrigatório
+        if (!telefone || !isValidPhoneBR(telefone)) {
+          setOnboardingNome(nome);
+          setOnboardingTelefone(formatPhoneBR(telefone));
+          setOnboardingError('');
+          setIsOnboardingModalOpen(true);
+        } else {
+          await saveClientPortalProfile(profile);
+        }
       }
     } catch (err: any) {
       console.warn('[Firebase Auth] Abrindo modal para identificação:', err);
@@ -182,7 +252,7 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
     }
   };
 
-  const handleGoogleLogin = (useMockOrCustom: 'mock' | 'custom') => {
+  const handleGoogleLogin = async (useMockOrCustom: 'mock' | 'custom') => {
     let profile: PacienteGoogleProfile;
     if (useMockOrCustom === 'mock') {
       profile = {
@@ -193,18 +263,79 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
         telefone: '(11) 99888-7766',
       };
     } else {
-      if (!customNameInput.trim() || !customEmailInput.trim()) return;
+      if (!customNameInput.trim()) return;
+      const cleanPhone = formatPhoneBR(customPhoneInput.trim());
+      const cleanEmail = customEmailInput.trim() || `${customNameInput.trim().toLowerCase().replace(/[^a-z0-9]/g, '') || 'paciente'}@portal.cliente`;
       profile = {
-        id: `goog-${Date.now()}`,
+        id: `pac-${Date.now()}`,
         nome: customNameInput.trim(),
-        email: customEmailInput.trim(),
+        email: cleanEmail,
         avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
-        telefone: customPhoneInput.trim() || '(11) 99999-8888',
+        telefone: cleanPhone,
       };
     }
 
     setGoogleProfile(profile);
     setIsGoogleLoginModalOpen(false);
+
+    if (!profile.telefone || !isValidPhoneBR(profile.telefone)) {
+      setOnboardingNome(profile.nome);
+      setOnboardingTelefone(formatPhoneBR(profile.telefone || ''));
+      setIsOnboardingModalOpen(true);
+    } else {
+      await saveClientPortalProfile(profile);
+    }
+  };
+
+  // Salvar Onboarding de Contato Obrigatório
+  const handleSaveOnboarding = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onboardingNome.trim()) {
+      setOnboardingError('Por favor, informe seu nome completo.');
+      return;
+    }
+    if (!isValidPhoneBR(onboardingTelefone)) {
+      setOnboardingError('Por favor, digite um WhatsApp válido com DDD (10 ou 11 dígitos, ex: (11) 99999-8888).');
+      return;
+    }
+
+    setIsSavingOnboarding(true);
+    setOnboardingError('');
+
+    try {
+      const updatedProfile: PacienteGoogleProfile = {
+        id: googleProfile?.id || `goog-${Date.now()}`,
+        nome: onboardingNome.trim(),
+        email: googleProfile?.email || customEmailInput.trim() || `${onboardingNome.toLowerCase().replace(/[^a-z0-9]/g, '')}@portal.cliente`,
+        avatar_url: googleProfile?.avatar_url || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&auto=format&fit=crop&q=80',
+        telefone: onboardingTelefone.trim(),
+      };
+
+      await saveClientPortalProfile(updatedProfile);
+      setGoogleProfile(updatedProfile);
+      setIsOnboardingModalOpen(false);
+    } catch (err) {
+      console.error('[handleSaveOnboarding error]', err);
+      setOnboardingError('Erro ao salvar os dados. Tente novamente.');
+    } finally {
+      setIsSavingOnboarding(false);
+    }
+  };
+
+  // Direct WhatsApp link for a specific procedure in the showcase
+  const generateDirectProcWhatsAppLink = (proc: ProcedimentoClinico) => {
+    const rawPhone = clinicaConfig?.telefone ? clinicaConfig.telefone.replace(/\D/g, '') : '5511987654321';
+    const phone = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
+    const clientName = googleProfile?.nome || (currentUser?.role === 'cliente' ? currentUser?.nome : '') || '';
+    const clientPhone = googleProfile?.telefone || '';
+    const preco = proc.valor_promocional || proc.valor_tabela;
+    
+    const idGreeting = clientName
+      ? `Olá, meu nome é *${clientName}*${clientPhone ? ` (Tel: *${clientPhone}*)` : ''}.`
+      : 'Olá!';
+
+    const msg = `${idGreeting}\n\nTenho interesse no procedimento *${proc.nome}* no *${clinicaConfig?.nome || 'Studio'}*:\n• *Valor Estimado:* R$ ${preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n• *Duração Estimada:* ${proc.duracao_minutos} min\n\nGostaria de solicitar um orçamento e saber os horários disponíveis para avaliação! ✨`;
+    return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
   };
 
   const handleGoogleLogout = async () => {
@@ -212,20 +343,31 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
     setGoogleProfile(null);
   };
 
-  // Submit quote request
+  // Submit quote request with protection and WhatsApp integration
   const handleSubmitQuote = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedProcedures.length === 0) return;
 
+    // Proteção de rota / fluxo: usuário precisa estar identificado
     if (!googleProfile) {
       setIsGoogleLoginModalOpen(true);
       return;
     }
 
+    // Proteção de rota / fluxo: usuário precisa ter completado nome e telefone de contato
+    if (!googleProfile.telefone || !isValidPhoneBR(googleProfile.telefone)) {
+      setOnboardingNome(googleProfile.nome || '');
+      setOnboardingTelefone(formatPhoneBR(googleProfile.telefone || ''));
+      setOnboardingError('Por favor, informe seu telefone / WhatsApp para que nossa equipe possa retornar seu orçamento.');
+      setIsOnboardingModalOpen(true);
+      return;
+    }
+
+    // 1. Persistência Interna: Registrar o pedido com status "Pendente"
     const payload: Omit<SolicitacaoOrcamento, 'id' | 'data_solicitacao'> = {
       paciente_nome: googleProfile.nome,
       paciente_email: googleProfile.email,
-      paciente_telefone: googleProfile.telefone || '(11) 99999-0000',
+      paciente_telefone: googleProfile.telefone,
       paciente_avatar_url: googleProfile.avatar_url,
       conta_google_vinculada: true,
       procedimentos_selecionados: selectedProcedures.map(p => ({
@@ -237,7 +379,7 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
       valor_total_estimado: totalEstimado,
       queixa_principal: queixaPrincipal.trim() || undefined,
       periodo_preferencia: periodoPreferencia,
-      status: 'novo',
+      status: 'pendente', // Status "Pendente" conforme especificação
     };
 
     onCriarOrcamento(payload);
@@ -250,6 +392,15 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
 
     setLastSubmittedQuote(generatedQuote);
     setShowSuccessModal(true);
+
+    // 2. Integração com WhatsApp: Redirecionamento amigável com mensagem pré-formatada
+    const whatsAppUrl = generateWhatsAppLink(generatedQuote);
+    try {
+      window.open(whatsAppUrl, '_blank');
+    } catch {
+      // Ignorar bloqueio de popup caso o navegador exija clique direto
+    }
+
     setSelectedProcedures([]);
     setQueixaPrincipal('');
   };
@@ -264,15 +415,23 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
       return;
     }
 
+    if (!googleProfile.telefone || !isValidPhoneBR(googleProfile.telefone)) {
+      setOnboardingNome(googleProfile.nome || '');
+      setOnboardingTelefone(formatPhoneBR(googleProfile.telefone || ''));
+      setOnboardingError('Informe seu WhatsApp para confirmarmos o agendamento.');
+      setIsOnboardingModalOpen(true);
+      return;
+    }
+
     const selectedProc = procedimentos.find(p => p.id === bookingProcedureId);
     const selectedProf = profissionais.find(p => p.id === bookingProfessionalId);
     const valorEstimado = selectedProc ? (selectedProc.valor_promocional || selectedProc.valor_tabela) : 0;
 
-    // Criar solicitação de orçamento vinculada
+    // Criar solicitação de orçamento vinculada com status pendente
     const orcamentoPayload: Omit<SolicitacaoOrcamento, 'id' | 'data_solicitacao'> = {
       paciente_nome: googleProfile.nome,
       paciente_email: googleProfile.email,
-      paciente_telefone: googleProfile.telefone || '(11) 99999-0000',
+      paciente_telefone: googleProfile.telefone,
       paciente_avatar_url: googleProfile.avatar_url,
       conta_google_vinculada: true,
       procedimentos_selecionados: selectedProc ? [{
@@ -284,7 +443,7 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
       valor_total_estimado: valorEstimado,
       queixa_principal: `[Solicitação Direta de Agendamento] Data Preferida: ${bookingDate} (${bookingPeriod}). Profissional: ${selectedProf?.nome || 'Qualquer Disponível'}. Observações: ${bookingNotes}`,
       periodo_preferencia: (bookingPeriod as any) || 'qualquer',
-      status: 'novo',
+      status: 'pendente',
     };
 
     onCriarOrcamento(orcamentoPayload);
@@ -295,7 +454,7 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
       onCriarAgendamento({
         pacienteId: `pac-${Date.now()}`,
         pacienteNome: googleProfile.nome,
-        pacienteTelefone: googleProfile.telefone || '(11) 99999-0000',
+        pacienteTelefone: googleProfile.telefone,
         pacienteEmail: googleProfile.email,
         procedimentoId: selectedProc.id,
         procedimentoNome: selectedProc.nome,
@@ -325,11 +484,18 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
     setBookingNotes('');
   };
 
-  // Generate WhatsApp Direct link
+  // Generate WhatsApp Direct link strictly conforming to requirements:
+  // Saudação e identificação: "Olá, meu nome é [Nome] (Tel: [Telefone])."
+  // Lista de procedimentos de interesse.
+  // Mensagem/dúvida adicional (se houver).
+  // Redirecionar o cliente para iniciar a conversa no WhatsApp oficial da clínica.
   const generateWhatsAppLink = (quote: SolicitacaoOrcamento) => {
-    const phone = clinicaConfig?.telefone ? clinicaConfig.telefone.replace(/\D/g, '') : '5511987654321';
-    const procList = (quote.procedimentos_selecionados || []).map(p => `• *${p.nome}* (R$ ${p.valor_unitario.toLocaleString('pt-BR')})`).join('\n');
-    const msg = `Olá, Equipe ${clinicaConfig?.nome || 'EstéticaOS'}! 👋\n\nSou *${quote.paciente_nome}* e acabei de solicitar um orçamento/agendamento no Portal do Paciente:\n\n📋 *Procedimentos de Interesse:*\n${procList || `• ${quote.procedimento_nome || 'Consulta Avaliativa'}`}\n\n💰 *Total Estimado:* R$ ${(quote.valor_total_estimado || quote.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n${quote.queixa_principal ? `\n📝 *Detalhes:* ${quote.queixa_principal}` : ''}\n\nGostaria de confirmar o agendamento! ✨`;
+    const rawPhone = clinicaConfig?.telefone ? clinicaConfig.telefone.replace(/\D/g, '') : '5511987654321';
+    const phone = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
+    const procList = (quote.procedimentos_selecionados || []).map(p => `• *${p.nome}* (R$ ${p.valor_unitario.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`).join('\n');
+    const details = quote.queixa_principal ? `\n\n*Observações / Dúvidas:*\n${quote.queixa_principal}` : '';
+    
+    const msg = `Olá, meu nome é *${quote.paciente_nome}* (Tel: *${quote.paciente_telefone}*).\n\nTenho interesse nos seguintes procedimentos no *${clinicaConfig?.nome || 'Studio'}*:\n${procList || `• ${quote.procedimento_nome || 'Consulta Avaliativa'}`}\n\n*Total Estimado:* R$ ${(quote.valor_total_estimado || quote.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}${details}\n\nGostaria de solicitar o orçamento e saber as disponibilidades de agendamento! ✨`;
     return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
   };
 
@@ -355,13 +521,15 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
           <div className="space-y-2.5 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-xs font-semibold text-indigo-200 backdrop-blur-xs border border-white/10 shadow-2xs">
               <Sparkles className="w-3.5 h-3.5 text-indigo-300" />
-              <span>Portal de Autoatendimento & Agendamentos • {clinicaConfig?.nome || 'EstéticaOS'}</span>
+              <span>{currentUser.role === 'cliente' ? 'Área do Cliente' : 'Portal de Autoatendimento'} • {clinicaConfig?.nome || 'AuraEstética Studio'}</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-              Simule seu Orçamento & Agende sua Consulta
+              {currentUser.role === 'cliente' ? 'Procedimentos & Orçamentos' : 'Simule seu Orçamento & Agende sua Consulta'}
             </h2>
             <p className="text-xs sm:text-sm text-indigo-100/80 leading-relaxed">
-              Explore os procedimentos ofertados pela clínica, calcule o investimento em tempo real com condições de parcelamento sem juros, verifique a localização no Google Maps e solicite seu agendamento direto com a equipe médica.
+              {currentUser.role === 'cliente' 
+                ? 'Consulte os procedimentos disponíveis no studio, confira valores e detalhes, e solicite seus orçamentos diretamente com nossa equipe.'
+                : 'Explore os procedimentos ofertados pela clínica, calcule o investimento em tempo real com condições de parcelamento sem juros, verifique a localização no Google Maps e solicite seu agendamento direto com a equipe médica.'}
             </p>
           </div>
 
@@ -436,36 +604,12 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
           }`}
         >
           <Sparkles className="w-4 h-4 text-indigo-400" />
-          <span>Simulador & Vitrine</span>
+          <span>{currentUser.role === 'cliente' ? 'Procedimentos e Orçamentos' : 'Simulador & Vitrine'}</span>
           {selectedProcedures.length > 0 && (
             <span className="px-1.5 py-0.5 text-[10px] bg-indigo-500 text-white rounded-full font-bold">
               {selectedProcedures.length}
             </span>
           )}
-        </button>
-
-        <button
-          onClick={() => setActiveTab('agendamento')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
-            activeTab === 'agendamento'
-              ? 'bg-slate-900 text-white shadow-sm'
-              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <CalendarCheck className="w-4 h-4 text-blue-500" />
-          <span>Solicitar Agendamento</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('mapa')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
-            activeTab === 'mapa'
-              ? 'bg-slate-900 text-white shadow-sm'
-              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <MapPin className="w-4 h-4 text-rose-500" />
-          <span>Localização & Google Maps</span>
         </button>
 
         <button
@@ -477,10 +621,38 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
           }`}
         >
           <FileText className="w-4 h-4 text-emerald-500" />
-          <span>Minhas Solicitações ({myQuotes.length})</span>
+          <span>{currentUser.role === 'cliente' ? 'Meus Orçamentos' : 'Minhas Solicitações'} ({myQuotes.length})</span>
         </button>
 
-        {isAdmin && (
+        {currentUser.role !== 'cliente' && (
+          <>
+            <button
+              onClick={() => setActiveTab('agendamento')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
+                activeTab === 'agendamento'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+              }`}
+            >
+              <CalendarCheck className="w-4 h-4 text-blue-500" />
+              <span>Solicitar Agendamento</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('mapa')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
+                activeTab === 'mapa'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+              }`}
+            >
+              <MapPin className="w-4 h-4 text-rose-500" />
+              <span>Localização & Google Maps</span>
+            </button>
+          </>
+        )}
+
+        {isAdmin && currentUser.role !== 'cliente' && (
           <button
             onClick={() => setActiveTab('gestao_clinica')}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ml-auto ${
@@ -557,33 +729,63 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
                         if (!coverImg) return null;
 
                         return (
-                          <div className="h-36 w-full relative overflow-hidden bg-slate-100">
+                          <div 
+                            onClick={() => {
+                              setProcedureForDetails(proc);
+                              setActivePhotoIndex(0);
+                            }}
+                            className="h-40 w-full relative overflow-hidden bg-slate-100 cursor-pointer group"
+                            title="Clique para ver fotos e detalhes completos"
+                          >
                             <img
                               src={coverImg}
                               alt={proc.nome}
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                             />
-                            <div className="absolute inset-0 bg-linear-to-t from-slate-950/70 via-slate-950/20 to-transparent" />
+                            <div className="absolute inset-0 bg-linear-to-t from-slate-950/75 via-slate-950/20 to-transparent" />
                             <span className="absolute bottom-2.5 left-3 text-[10px] font-bold text-white uppercase tracking-wider bg-slate-900/80 px-2 py-0.5 rounded-md backdrop-blur-xs">
                               {proc.categoria}
                             </span>
-                            {totalFotos > 1 && (
-                              <span className="absolute top-2.5 right-2.5 text-[10px] font-bold text-white bg-slate-900/80 px-2 py-0.5 rounded-full backdrop-blur-xs">
-                                📷 {totalFotos} fotos
+                            <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
+                              {totalFotos > 1 && (
+                                <span className="text-[10px] font-bold text-white bg-slate-900/80 px-2 py-0.5 rounded-full backdrop-blur-xs">
+                                  📷 {totalFotos} fotos
+                                </span>
+                              )}
+                              <span className="text-[10px] font-bold text-white bg-indigo-600/90 hover:bg-indigo-600 px-2 py-0.5 rounded-full backdrop-blur-xs flex items-center gap-1">
+                                <Eye className="w-3 h-3" /> Ver Detalhes
                               </span>
-                            )}
+                            </div>
                           </div>
                         );
                       })()}
 
                       <div className="p-4 space-y-2">
                         {!(proc.imagens_galeria && proc.imagens_galeria.length > 0) && !proc.imagem_url && (
-                          <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
-                            {proc.categoria}
-                          </span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
+                              {proc.categoria}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setProcedureForDetails(proc);
+                                setActivePhotoIndex(0);
+                              }}
+                              className="text-[11px] text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 cursor-pointer"
+                            >
+                              <Eye className="w-3 h-3" /> Detalhes
+                            </button>
+                          </div>
                         )}
 
-                        <h4 className="text-sm font-bold text-slate-900 leading-snug">
+                        <h4 
+                          onClick={() => {
+                            setProcedureForDetails(proc);
+                            setActivePhotoIndex(0);
+                          }}
+                          className="text-sm font-bold text-slate-900 leading-snug cursor-pointer hover:text-indigo-600 transition-colors"
+                        >
                           {proc.nome}
                         </h4>
 
@@ -607,24 +809,37 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
                       </div>
                     </div>
 
-                    <div className="p-3 bg-slate-50/70 border-t border-slate-100">
+                    <div className="p-3 bg-slate-50/70 border-t border-slate-100 flex flex-col sm:flex-row gap-2">
+                      <a
+                        href={generateDirectProcWhatsAppLink(proc)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-2xs hover:shadow-xs"
+                        title="Solicitar Orçamento direto no WhatsApp do Studio"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        <span>Solicitar no WhatsApp</span>
+                      </a>
+
                       <button
+                        type="button"
                         onClick={() => handleToggleProcedure(proc)}
-                        className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                           isSelected
-                            ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                            : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-2xs'
+                            ? 'bg-slate-900 text-white hover:bg-slate-800'
+                            : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200'
                         }`}
+                        title={isSelected ? 'Remover da simulação' : 'Adicionar à simulação'}
                       >
                         {isSelected ? (
                           <>
                             <Check className="w-3.5 h-3.5" />
-                            <span>Selecionado no Orçamento</span>
+                            <span>Selecionado</span>
                           </>
                         ) : (
                           <>
                             <Plus className="w-3.5 h-3.5" />
-                            <span>Adicionar ao Orçamento</span>
+                            <span>Simular</span>
                           </>
                         )}
                       </button>
@@ -638,7 +853,7 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
           </div>
 
           {/* Right Column: Quote Summary & Order Form */}
-          <div className="lg:col-span-5 xl:col-span-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm sticky top-6 space-y-5">
+          <div id="resumo-orcamento" className="lg:col-span-5 xl:col-span-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm sticky top-6 space-y-5">
             
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -1227,60 +1442,83 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
               </div>
 
               <div>
-                <h3 className="text-lg font-bold text-slate-900">Entrar com a Conta Google</h3>
+                <h3 className="text-lg font-bold text-slate-900">Identificação do Cliente</h3>
                 <p className="text-xs text-slate-500 mt-1">
-                  Cadastre-se ou entre em 1 clique para salvar seus orçamentos e solicitações de agendamento.
+                  Acesse com sua conta Google ou faça o cadastro rápido com Nome e WhatsApp.
                 </p>
               </div>
 
               {/* Instant Google Connect Button */}
-              <button
-                onClick={() => handleGoogleLogin('mock')}
-                className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white hover:bg-slate-50 active:bg-slate-100 border border-slate-300 rounded-xl shadow-xs text-xs sm:text-sm font-bold text-slate-700 transition-all cursor-pointer"
-              >
-                <img
-                  src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&auto=format&fit=crop&q=80"
-                  alt="Avatar"
-                  className="w-6 h-6 rounded-full object-cover"
-                />
-                <span>Continuar como Fernanda (paciente.fernanda@exemplo.com)</span>
-              </button>
+              <div className="space-y-2">
+                <button
+                  onClick={handleFirebaseGoogleSignIn}
+                  disabled={isAuthLoading}
+                  className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white hover:bg-slate-50 active:bg-slate-100 border border-slate-300 rounded-xl shadow-xs text-xs sm:text-sm font-bold text-slate-700 transition-all cursor-pointer disabled:opacity-60"
+                >
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                  </svg>
+                  <span>{isAuthLoading ? 'Conectando...' : 'Entrar com a Conta Google'}</span>
+                </button>
+              </div>
 
               <div className="flex items-center gap-3 text-xs text-slate-400">
                 <div className="flex-1 h-px bg-slate-200" />
-                <span>ou preencha seus dados</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider">ou cadastro rápido sem senha</span>
                 <div className="flex-1 h-px bg-slate-200" />
               </div>
 
               <div className="space-y-3 text-left">
-                <input
-                  type="text"
-                  placeholder="Nome completo do paciente"
-                  value={customNameInput}
-                  onChange={(e) => setCustomNameInput(e.target.value)}
-                  className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20"
-                />
-                <input
-                  type="email"
-                  placeholder="Seu email Google (@gmail.com)"
-                  value={customEmailInput}
-                  onChange={(e) => setCustomEmailInput(e.target.value)}
-                  className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20"
-                />
-                <input
-                  type="tel"
-                  placeholder="WhatsApp para contato (ex: 11 99999-8888)"
-                  value={customPhoneInput}
-                  onChange={(e) => setCustomPhoneInput(e.target.value)}
-                  className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20"
-                />
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Nome Completo *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Seu nome e sobrenome"
+                    value={customNameInput}
+                    onChange={(e) => setCustomNameInput(e.target.value)}
+                    className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    WhatsApp / Telefone *
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="(11) 99999-8888"
+                    value={customPhoneInput}
+                    onChange={(e) => setCustomPhoneInput(formatPhoneBR(e.target.value))}
+                    className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    E-mail (Opcional)
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="seu.email@exemplo.com"
+                    value={customEmailInput}
+                    onChange={(e) => setCustomEmailInput(e.target.value)}
+                    className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                </div>
 
                 <button
                   onClick={() => handleGoogleLogin('custom')}
-                  disabled={!customNameInput.trim() || !customEmailInput.trim()}
-                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                  disabled={!customNameInput.trim() || !customPhoneInput.trim()}
+                  className="w-full py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm hover:shadow-md"
                 >
-                  Conectar com estes Dados
+                  Continuar com Nome & Telefone
                 </button>
               </div>
 
@@ -1296,6 +1534,327 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
         </div>
       )}
 
+      {/* ONBOARDING OBRIGATÓRIO (NOME COMPLETO + WHATSAPP PARA RETORNO) */}
+      {isOnboardingModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="p-6 sm:p-7 space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center mx-auto shadow-2xs">
+                <UserCheck className="w-7 h-7" />
+              </div>
+
+              <div className="text-center">
+                <h3 className="text-lg font-bold text-slate-900">Finalize seus Dados para Retorno</h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Precisamos do seu WhatsApp para que a equipe do Studio possa retornar seu orçamento e agendamento.
+                </p>
+              </div>
+
+              {onboardingError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{onboardingError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSaveOnboarding} className="space-y-3.5 text-left">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Nome Completo *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Seu nome completo"
+                    value={onboardingNome}
+                    onChange={(e) => setOnboardingNome(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    WhatsApp / Telefone *
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="(11) 99999-8888"
+                    value={onboardingTelefone}
+                    onChange={(e) => setOnboardingTelefone(formatPhoneBR(e.target.value))}
+                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 font-mono"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Digite com DDD. Exemplo: (11) 99999-8888
+                  </p>
+                </div>
+
+                {googleProfile?.email && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                      E-mail Vinculado (Google)
+                    </label>
+                    <input
+                      type="email"
+                      disabled
+                      value={googleProfile.email}
+                      className="w-full px-3.5 py-2 text-xs bg-slate-100 text-slate-500 border border-slate-200 rounded-xl cursor-not-allowed"
+                    />
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isSavingOnboarding || !onboardingNome.trim() || !onboardingTelefone.trim()}
+                  className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 text-white rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-md flex items-center justify-center gap-2"
+                >
+                  {isSavingOnboarding ? (
+                    <span>Salvando dados...</span>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Salvar Dados e Continuar</span>
+                    </>
+                  )}
+                </button>
+              </form>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PROCEDURE DETAILS & PHOTO CAROUSEL MODAL */}
+      {procedureForDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-2xl max-h-[92vh] rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-lg">
+                  {procedureForDetails.categoria}
+                </span>
+                <span className="text-xs text-slate-400">•</span>
+                <span className="text-xs text-slate-500 font-medium flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  {procedureForDetails.duracao_minutos} min
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setProcedureForDetails(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+              {/* Photo Carousel */}
+              {(() => {
+                const fotos = (procedureForDetails.imagens_galeria && procedureForDetails.imagens_galeria.length > 0)
+                  ? procedureForDetails.imagens_galeria
+                  : (procedureForDetails.imagem_url ? [procedureForDetails.imagem_url] : []);
+
+                if (fotos.length === 0) {
+                  return (
+                    <div className="h-44 sm:h-56 w-full rounded-2xl bg-gradient-to-br from-indigo-900 via-indigo-800 to-purple-900 text-white flex flex-col items-center justify-center p-6 text-center shadow-inner">
+                      <Sparkles className="w-10 h-10 text-indigo-300 mb-2" />
+                      <h4 className="text-lg font-bold">{procedureForDetails.nome}</h4>
+                      <p className="text-xs text-indigo-200 mt-1 max-w-sm">Procedimento estético profissional com tecnologia de ponta</p>
+                    </div>
+                  );
+                }
+
+                const currentPhoto = fotos[Math.min(activePhotoIndex, fotos.length - 1)];
+
+                return (
+                  <div className="space-y-3">
+                    <div className="relative h-60 sm:h-80 w-full rounded-2xl overflow-hidden bg-slate-900 group">
+                      <img
+                        src={currentPhoto}
+                        alt={procedureForDetails.nome}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent pointer-events-none" />
+
+                      {/* Photo counter */}
+                      <span className="absolute top-3 right-3 text-xs font-bold text-white bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 shadow-sm">
+                        Foto {activePhotoIndex + 1} de {fotos.length}
+                      </span>
+
+                      {/* Prev / Next controls */}
+                      {fotos.length > 1 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setActivePhotoIndex((prev) => (prev > 0 ? prev - 1 : fotos.length - 1))}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-slate-900/70 hover:bg-slate-900 text-white flex items-center justify-center backdrop-blur-xs transition-all cursor-pointer shadow-md"
+                          >
+                            <ChevronLeft className="w-5 h-5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setActivePhotoIndex((prev) => (prev < fotos.length - 1 ? prev + 1 : 0))}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-slate-900/70 hover:bg-slate-900 text-white flex items-center justify-center backdrop-blur-xs transition-all cursor-pointer shadow-md"
+                          >
+                            <ChevronRight className="w-5 h-5" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Thumbnail strip */}
+                    {fotos.length > 1 && (
+                      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+                        {fotos.map((img, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setActivePhotoIndex(idx)}
+                            className={`w-16 h-14 rounded-xl overflow-hidden shrink-0 border-2 transition-all cursor-pointer ${
+                              activePhotoIndex === idx
+                                ? 'border-indigo-600 ring-2 ring-indigo-400/40 shadow-xs scale-105'
+                                : 'border-slate-200 opacity-60 hover:opacity-100'
+                            }`}
+                          >
+                            <img src={img} alt={`Miniatura ${idx + 1}`} className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              <div>
+                <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900 leading-tight">
+                  {procedureForDetails.nome}
+                </h3>
+              </div>
+
+              {/* Description */}
+              <div className="space-y-2">
+                <h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Sobre o Procedimento
+                </h5>
+                <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                  {procedureForDetails.descricao || 'Sem descrição detalhada cadastrada.'}
+                </p>
+              </div>
+
+              {/* Pricing & Conditions Card */}
+              {(() => {
+                const preco = procedureForDetails.valor_promocional || procedureForDetails.valor_tabela;
+                const pix = preco * 0.95;
+                const parcela = preco / 10;
+                return (
+                  <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-4 sm:p-5 space-y-3">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-xs font-bold text-indigo-900 uppercase tracking-wider">Investimento Estimado</span>
+                      <div className="text-right">
+                        {procedureForDetails.valor_promocional && (
+                          <span className="text-xs text-slate-400 line-through mr-2 font-mono">
+                            R$ {procedureForDetails.valor_tabela.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        )}
+                        <span className="text-2xl font-extrabold text-slate-900 font-mono">
+                          R$ {preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-indigo-200/50 space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between text-emerald-800 font-semibold">
+                        <span>✨ À vista no PIX com 5% de desconto:</span>
+                        <span>R$ {pix.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-indigo-900 font-medium">
+                        <span>💳 Condições no Cartão de Crédito:</span>
+                        <span className="font-bold">Até 10x de R$ {parcela.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} sem juros</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Footer Actions */}
+            {(() => {
+              const isSelected = selectedProcedures.some(p => p.id === procedureForDetails.id);
+              return (
+                <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50/70 flex flex-col sm:flex-row gap-2.5">
+                  <a
+                    href={generateDirectProcWhatsAppLink(procedureForDetails)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    <span>Solicitar Orçamento no WhatsApp</span>
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={() => handleToggleProcedure(procedureForDetails)}
+                    className={`py-3 px-5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-slate-900 text-white hover:bg-slate-800 shadow-sm'
+                        : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm'
+                    }`}
+                  >
+                    {isSelected ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        <span>Adicionado à Cotação</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4" />
+                        <span>Adicionar à Cotação</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* STICKY BOTTOM BAR FOR MOBILE QUOTE CART */}
+      {selectedProcedures.length > 0 && activeTab === 'simulador' && (
+        <div className="fixed bottom-3 left-3 right-3 sm:hidden z-40 bg-slate-900/95 backdrop-blur-md text-white p-3.5 rounded-2xl shadow-2xl flex items-center justify-between border border-slate-700 animate-in slide-in-from-bottom-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xs relative">
+              <FileText className="w-5 h-5" />
+              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] flex items-center justify-center font-bold">
+                {selectedProcedures.length}
+              </span>
+            </div>
+            <div>
+              <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Cotação Atual</p>
+              <p className="text-sm font-extrabold font-mono text-white">
+                R$ {totalEstimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              const el = document.getElementById('resumo-orcamento');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="py-2 px-3.5 bg-indigo-500 hover:bg-indigo-600 active:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+          >
+            <span>Finalizar</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* SUCCESS CONFIRMATION MODAL - QUOTE */}
       {showSuccessModal && lastSubmittedQuote && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
@@ -1306,13 +1865,20 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
             </div>
 
             <div>
-              <h3 className="text-lg font-bold text-slate-900">Orçamento Solicitado com Sucesso!</h3>
+              <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md inline-block mb-1">
+                Status: Pendente
+              </span>
+              <h3 className="text-lg font-bold text-slate-900">Orçamento Registrado com Sucesso!</h3>
               <p className="text-xs text-slate-500 mt-1">
-                Olá <strong>{lastSubmittedQuote.paciente_nome}</strong>, sua solicitação foi registrada no sistema da clínica.
+                Olá <strong>{lastSubmittedQuote.paciente_nome}</strong>, seu pedido foi registrado no sistema e já está disponível para o WhatsApp oficial do Studio.
               </p>
             </div>
 
             <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 text-left text-xs space-y-1.5">
+              <div className="flex justify-between font-bold text-slate-800">
+                <span>WhatsApp de Contato:</span>
+                <span className="font-mono text-slate-900">{lastSubmittedQuote.paciente_telefone}</span>
+              </div>
               <div className="flex justify-between font-bold text-slate-800">
                 <span>Total Estimado:</span>
                 <span className="font-mono text-indigo-700">
@@ -1329,10 +1895,10 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
                 href={generateWhatsAppLink(lastSubmittedQuote)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all cursor-pointer"
               >
                 <MessageCircle className="w-4 h-4" />
-                <span>Abrir Resumo no WhatsApp da Clínica</span>
+                <span>Abrir Conversa no WhatsApp Oficial</span>
               </a>
 
               <button

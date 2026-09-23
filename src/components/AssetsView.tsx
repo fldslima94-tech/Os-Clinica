@@ -120,20 +120,30 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   const manutençõesEmAndamento = bens.filter(b => getStatusManutencao(b) === 'em_manutencao');
   const manutençõesEmDia = bens.filter(b => getStatusManutencao(b) === 'em_dia');
 
-  const getCategoriaBadge = (cat: CategoriaBem) => {
+  const getCategoriaBadge = (cat: CategoriaBem | string) => {
     switch (cat) {
+      case 'maquina':
       case 'laser':
-        return { label: 'Laser & Alta Potência', bg: 'bg-rose-50 text-rose-700 border-rose-200' };
-      case 'dermografo':
-        return { label: 'Dermógrafo & Micropigmentação', bg: 'bg-purple-50 text-purple-700 border-purple-200' };
+        return { label: 'Máquina', bg: 'bg-rose-50 text-rose-700 border-rose-200' };
+      case 'movel':
       case 'maca_mobiliario':
-        return { label: 'Maca & Mobiliário', bg: 'bg-blue-50 text-blue-700 border-blue-200' };
-      case 'autoclave':
-        return { label: 'Autoclave & Esterilização', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+        return { label: 'Móvel', bg: 'bg-blue-50 text-blue-700 border-blue-200' };
       case 'eletronico':
-        return { label: 'Eletrônico & TI', bg: 'bg-amber-50 text-amber-700 border-amber-200' };
+        return { label: 'Eletrônico', bg: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
+      case 'eletrodomesticos':
+        return { label: 'Eletrodomésticos', bg: 'bg-amber-50 text-amber-700 border-amber-200' };
+      case 'utensilios':
+      case 'autoclave':
+        return { label: 'Utensílios', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+      case 'ferramentas':
+      case 'dermografo':
+        return { label: 'Ferramentas', bg: 'bg-purple-50 text-purple-700 border-purple-200' };
+      case 'iluminacao':
+        return { label: 'Iluminação', bg: 'bg-yellow-50 text-yellow-800 border-yellow-200' };
+      case 'acessorios':
+        return { label: 'Acessórios', bg: 'bg-cyan-50 text-cyan-700 border-cyan-200' };
       default:
-        return { label: 'Equipamento Geral', bg: 'bg-slate-50 text-slate-700 border-slate-200' };
+        return { label: cat || 'Geral', bg: 'bg-slate-50 text-slate-700 border-slate-200' };
     }
   };
 
@@ -419,12 +429,14 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
             className="px-3 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
           >
             <option value="todos">Todas as Categorias</option>
-            <option value="laser">Lasers</option>
-            <option value="dermografo">Dermógrafos</option>
-            <option value="maca_mobiliario">Macas & Mobiliário</option>
-            <option value="autoclave">Autoclaves</option>
+            <option value="maquina">Máquinas</option>
+            <option value="movel">Móveis</option>
             <option value="eletronico">Eletrônicos</option>
-            <option value="outros">Outros</option>
+            <option value="eletrodomesticos">Eletrodomésticos</option>
+            <option value="utensilios">Utensílios</option>
+            <option value="ferramentas">Ferramentas</option>
+            <option value="iluminacao">Iluminação</option>
+            <option value="acessorios">Acessórios</option>
           </select>
 
           <select
@@ -542,6 +554,27 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                             <span className="truncate">{bem.empresaTecnica}</span>
                           </div>
                         )}
+                      </div>
+                    )}
+                    {/* Vínculo de Nota Fiscal em PDF */}
+                    {(bem.nota_fiscal_url || bem.notaFiscalUrl) && (
+                      <div className="mt-2.5 p-2.5 bg-indigo-50/60 rounded-xl border border-indigo-100 flex items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <FileText className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                          <span className="font-semibold text-indigo-900 truncate">
+                            {bem.nota_fiscal_nome || 'Nota Fiscal (PDF)'}
+                          </span>
+                        </div>
+                        <a
+                          href={bem.nota_fiscal_url || bem.notaFiscalUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold transition-colors shrink-0"
+                          title="Abrir arquivo PDF"
+                        >
+                          <Download className="w-3 h-3" />
+                          <span>PDF</span>
+                        </a>
                       </div>
                     )}
                   </div>

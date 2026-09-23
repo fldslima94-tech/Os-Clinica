@@ -71,24 +71,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (isCliente) {
       return [
         {
-          title: 'Área do Paciente',
+          title: 'Área do Cliente',
           items: [
             {
               id: 'portal_paciente' as TabType,
-              label: 'Minhas Consultas',
+              label: 'Procedimentos e Orçamentos',
               icon: Globe,
-            },
-            {
-              id: 'quadro_avisos' as TabType,
-              label: 'Mural de Avisos',
-              icon: Megaphone,
-              badge: unreadNoticesCount > 0 ? `${unreadNoticesCount}` : undefined,
-              badgeColor: 'bg-rose-100 text-rose-700 font-bold',
-            },
-            {
-              id: 'perfil' as TabType,
-              label: 'Meu Perfil',
-              icon: Users,
             },
           ]
         }
@@ -237,33 +225,58 @@ export const Sidebar: React.FC<SidebarProps> = ({
       
       {/* Brand Header */}
       <div className="p-5 border-b border-slate-100">
-        <button
-          type="button"
-          onClick={() => onOpenClinicSettings && onOpenClinicSettings()}
-          className="w-full flex items-center gap-3 mb-2 text-left group cursor-pointer hover:opacity-90 transition-opacity"
-          title="Clique para abrir Configurações e Logomarca da Clínica"
-        >
-          {clinicaConfig?.logomarca_url ? (
-            <img 
-              src={clinicaConfig.logomarca_url} 
-              alt="Logo Clínica" 
-              referrerPolicy="no-referrer"
-              className="w-10 h-10 rounded-2xl object-contain bg-white border border-slate-200/90 shadow-xs group-hover:ring-2 ring-indigo-500/40 transition-all shrink-0 p-0.5" 
-            />
-          ) : (
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-slate-900 rounded-2xl flex items-center justify-center text-white font-bold text-base shadow-xs group-hover:ring-2 ring-indigo-500/40 transition-all shrink-0">
-              {(clinicaConfig?.nome || 'A').charAt(0).toUpperCase()}
+        {isCliente ? (
+          <div className="w-full flex items-center gap-3 mb-2 text-left">
+            {clinicaConfig?.logomarca_url ? (
+              <img 
+                src={clinicaConfig.logomarca_url} 
+                alt="Logo Clínica" 
+                referrerPolicy="no-referrer"
+                className="w-10 h-10 rounded-2xl object-contain bg-white border border-slate-200/90 shadow-xs shrink-0 p-0.5" 
+              />
+            ) : (
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-slate-900 rounded-2xl flex items-center justify-center text-white font-bold text-base shadow-xs shrink-0">
+                {(clinicaConfig?.nome || 'A').charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <span className="text-sm font-bold tracking-tight text-slate-900 block truncate">
+                {clinicaConfig?.nome || 'AuraEstética Studio'}
+              </span>
+              <span className="text-[11px] text-indigo-600 font-semibold block truncate">
+                Área do Cliente
+              </span>
             </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <span className="text-sm font-bold tracking-tight text-slate-900 block truncate group-hover:text-indigo-600 transition-colors">
-              {clinicaConfig?.nome || 'AuraEstética Studio'}
-            </span>
-            <span className="text-[11px] text-slate-400 block truncate">
-              Configurações da Clínica
-            </span>
           </div>
-        </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onOpenClinicSettings && onOpenClinicSettings()}
+            className="w-full flex items-center gap-3 mb-2 text-left group cursor-pointer hover:opacity-90 transition-opacity"
+            title="Clique para abrir Configurações e Logomarca da Clínica"
+          >
+            {clinicaConfig?.logomarca_url ? (
+              <img 
+                src={clinicaConfig.logomarca_url} 
+                alt="Logo Clínica" 
+                referrerPolicy="no-referrer"
+                className="w-10 h-10 rounded-2xl object-contain bg-white border border-slate-200/90 shadow-xs group-hover:ring-2 ring-indigo-500/40 transition-all shrink-0 p-0.5" 
+              />
+            ) : (
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-slate-900 rounded-2xl flex items-center justify-center text-white font-bold text-base shadow-xs group-hover:ring-2 ring-indigo-500/40 transition-all shrink-0">
+                {(clinicaConfig?.nome || 'A').charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <span className="text-sm font-bold tracking-tight text-slate-900 block truncate group-hover:text-indigo-600 transition-colors">
+                {clinicaConfig?.nome || 'AuraEstética Studio'}
+              </span>
+              <span className="text-[11px] text-slate-400 block truncate">
+                Configurações da Clínica
+              </span>
+            </div>
+          </button>
+        )}
 
         <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100">
           <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
@@ -330,28 +343,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* User profile footer */}
       <div className="p-3 border-t border-slate-100 bg-slate-50/50 space-y-2 hidden lg:block">
-        <button
-          onClick={onOpenUserAvatarModal}
-          className="w-full flex items-center gap-3 p-1.5 rounded-xl text-left hover:bg-white transition-all border border-transparent hover:border-slate-200 cursor-pointer group"
-          title="Clique para alterar sua foto de perfil"
-        >
-          <div className="relative">
+        {isCliente ? (
+          <div className="w-full flex items-center gap-3 p-1.5 rounded-xl text-left">
             <img
               src={currentUser.avatar_url || 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&auto=format&fit=crop&q=80'}
               alt={currentUser.nome}
-              className="w-9 h-9 rounded-xl object-cover border border-slate-200 shrink-0 group-hover:ring-2 ring-indigo-500/40 transition-all"
+              className="w-9 h-9 rounded-xl object-cover border border-slate-200 shrink-0"
             />
-            <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[8px]">
-              ✎
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-bold text-slate-800 truncate">{currentUser.nome}</span>
+              <span className="text-[11px] text-indigo-600 truncate font-semibold">
+                Área do Cliente
+              </span>
             </div>
           </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-600">{currentUser.nome}</span>
-            <span className="text-[11px] text-slate-500 truncate flex items-center gap-1 font-medium">
-              {roleLabel} • {currentUser.cargo || 'Equipe'}
-            </span>
-          </div>
-        </button>
+        ) : (
+          <button
+            onClick={onOpenUserAvatarModal}
+            className="w-full flex items-center gap-3 p-1.5 rounded-xl text-left hover:bg-white transition-all border border-transparent hover:border-slate-200 cursor-pointer group"
+            title="Clique para alterar sua foto de perfil"
+          >
+            <div className="relative">
+              <img
+                src={currentUser.avatar_url || 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&auto=format&fit=crop&q=80'}
+                alt={currentUser.nome}
+                className="w-9 h-9 rounded-xl object-cover border border-slate-200 shrink-0 group-hover:ring-2 ring-indigo-500/40 transition-all"
+              />
+              <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[8px]">
+                ✎
+              </div>
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-600">{currentUser.nome}</span>
+              <span className="text-[11px] text-slate-500 truncate flex items-center gap-1 font-medium">
+                {roleLabel} • {currentUser.cargo || 'Equipe'}
+              </span>
+            </div>
+          </button>
+        )}
 
         {onLogout && (
           <button

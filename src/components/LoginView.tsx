@@ -16,8 +16,11 @@ import {
 import { UsuarioEquipe, ClinicaConfig } from '../types';
 import { 
   auth,
+  googleAuthProvider,
   isUserAdminTotal, 
   loginWithFirebaseGoogle, 
+  handleGoogleSignInAndSaveUser,
+  saveUserToFirestore,
   loginWithFirebaseEmailPassword, 
   sendFirebasePasswordReset, 
   fetchUserFromFirestoreByEmail,
@@ -45,6 +48,12 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSuccess, setForgotSuccess] = useState(false);
   const [dbUsers, setDbUsers] = useState<UsuarioEquipe[]>([]);
+
+  // Modal de Acesso Rápido do Cliente (Nome + WhatsApp ou Google)
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [clientNome, setClientNome] = useState('');
+  const [clientTelefone, setClientTelefone] = useState('');
+  const [clientError, setClientError] = useState<string | null>(null);
 
   // Background warm-up to ensure newly created users on Firestore are instantly ready in any browser
   useEffect(() => {
@@ -77,86 +86,90 @@ export const LoginView: React.FC<LoginViewProps> = ({
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const fbUser = await loginWithFirebaseGoogle();
-      if (!fbUser) {
-        setIsLoading(false);
-        return;
-      }
-
-      const cleanEmail = (fbUser.email || '').toLowerCase().trim();
-      let userFound = allAvailableUsers.find(u => (u.email || '').toLowerCase().trim() === cleanEmail);
-
-      // Consulta direta no Firestore se não estiver ainda em memória
-      if (!userFound) {
-        userFound = await fetchUserFromFirestoreByEmail(cleanEmail);
-      }
-
-      const isSuper = SUPER_ADMIN_EMAILS.includes(cleanEmail) || cleanEmail.includes('fabio');
-
-      if (!userFound) {
-        // Se for acesso direto pelo portal do paciente ou usuário não cadastrado na equipe
-        const isClientRole = isClientPortalDirect || (!isSuper && !cleanEmail.includes('admin') && !cleanEmail.includes('clinica'));
-        
-        userFound = {
-          id: fbUser.uid || `user-${Date.now()}`,
-          nome: fbUser.displayName || (isSuper ? 'Fabio Lima' : isClientRole ? 'Paciente Google' : 'Usuário Google'),
-          nomeCompleto: fbUser.displayName || (isSuper ? 'Fabio Lima' : isClientRole ? 'Paciente Google' : 'Usuário Google'),
-          email: cleanEmail,
-          cargo: isSuper ? 'Super Admin (Master)' : isClientRole ? 'Paciente / Cliente' : 'Usuário da Equipe',
-          profissao: isSuper ? 'Proprietário & Administrador Geral' : isClientRole ? 'Cliente' : 'Especialista',
-          role: isSuper ? 'admin_total' : isClientRole ? 'cliente' : 'profissional',
-          status: 'ativo',
-          avatar_url: fbUser.photoURL || undefined,
-          permissoes: {
-            ver_financeiro_completo: isSuper,
-            emitir_recibo: !isClientRole,
-            editar_prontuario_clinico: !isClientRole,
-            gerenciar_estoque_custos: isSuper,
-            configuracoes_sistema: isSuper,
-            visualizar_bens_ativos: isSuper,
-          },
-          permissoesCustomizadas: {
-            financeiro: { verEntradas: isSuper, verSaidas: isSuper, verRecorrentes: isSuper, excluir: isSuper, verRelatorios: isSuper },
-            clientes: { criar: isSuper, editar: isSuper, excluir: isSuper, verHistorico: true, preencherAnamnese: true },
-            agenda: { verTodos: isSuper, verPropria: true, criar: true, cancelar: true, finalizar: isSuper },
-            procedimentos: { verCustos: isSuper, verMargem: isSuper, criar: isSuper, excluir: isSuper, ajustarEstoque: isSuper },
-            bens: { visualizar: isSuper, cadastrar: isSuper, editar: isSuper, gerenciar: isSuper, excluir: isSuper, manutencao: isSuper },
-            estoque: { ajustar: isSuper, excluir: isSuper },
-            orcamentos: { verTodos: !isClientRole, responder: !isClientRole, verEmails: !isClientRole }
-          }
-        };
-      } else if (isSuper) {
-        userFound = {
-          ...userFound,
-          role: 'admin_total',
-          cargo: 'Super Admin (Master)',
-          profissao: userFound.profissao || 'Proprietário & Administrador Geral',
-          permissoes: {
-            ver_financeiro_completo: true,
-            emitir_recibo: true,
-            editar_prontuario_clinico: true,
-            gerenciar_estoque_custos: true,
-            configuracoes_sistema: true,
-            visualizar_bens_ativos: true,
-          },
-          permissoesCustomizadas: {
-            financeiro: { verEntradas: true, verSaidas: true, verRecorrentes: true, excluir: true, verRelatorios: true },
-            clientes: { criar: true, editar: true, excluir: true, verHistorico: true, preencherAnamnese: true },
-            agenda: { verTodos: true, verPropria: true, criar: true, cancelar: true, finalizar: true },
-            procedimentos: { verCustos: true, verMargem: true, criar: true, excluir: true, ajustarEstoque: true },
-            bens: { visualizar: true, cadastrar: true, editar: true, gerenciar: true, excluir: true, manutencao: true },
-            estoque: { ajustar: true, excluir: true },
-            orcamentos: { verTodos: true, responder: true, verEmails: true }
-          }
-        };
-      }
+      // Autenticação oficial com Firebase Auth utilizando googleAuthProvider e salvamento no Firestore
+      const userFound = await handleGoogleSignInAndSaveUser(isClientPortalDirect);
+      
+      // Sincroniza estado de usuários em memória
+      setDbUsers(prev => {
+        const index = prev.findIndex(u => u.id === userFound.id || (u.email && u.email.toLowerCase() === userFound.email?.toLowerCase()));
+        if (index >= 0) {
+          const updated = [...prev];
+          updated[index] = userFound;
+          return updated;
+        }
+        return [...prev, userFound];
+      });
 
       executeLogin(userFound);
     } catch (err: any) {
-      console.warn('Erro no login com Google:', err);
-      setErrorMessage(err.message || 'Falha ao autenticar com a conta Google.');
+      console.warn('[handleGoogleLogin] Erro no login com Google:', err);
+      if (err?.code === 'auth/popup-closed-by-user') {
+        setErrorMessage('A janela de autenticação do Google foi fechada antes de concluir o acesso.');
+      } else if (err?.code === 'auth/cancelled-popup-request') {
+        setErrorMessage('Solicitação de login com Google cancelada. Tente novamente.');
+      } else {
+        setErrorMessage(err?.message || 'Falha ao autenticar com a Conta Google.');
+      }
       setIsLoading(false);
     }
+  };
+
+  const handleQuickClientLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setClientError(null);
+
+    if (!clientNome.trim()) {
+      setClientError('Por favor, informe seu nome completo.');
+      return;
+    }
+
+    if (!clientTelefone.trim() || clientTelefone.replace(/\D/g, '').length < 8) {
+      setClientError('Por favor, informe um WhatsApp ou telefone válido para contato.');
+      return;
+    }
+
+    const cleanPhone = clientTelefone.trim();
+    const cleanNome = clientNome.trim();
+    const phoneSlug = cleanPhone.replace(/\D/g, '');
+
+    const clientUser: UsuarioEquipe = {
+      id: `cliente-${phoneSlug || Date.now()}`,
+      nome: cleanNome,
+      nomeCompleto: cleanNome,
+      email: `${cleanNome.toLowerCase().replace(/[^a-z0-9]/g, '') || 'cliente'}.${phoneSlug || Date.now()}@portal.cliente`,
+      telefone: cleanPhone,
+      cargo: 'Paciente / Cliente',
+      profissao: 'Cliente',
+      role: 'cliente',
+      status: 'ativo',
+      permissoes: {
+        ver_financeiro_completo: false,
+        emitir_recibo: false,
+        editar_prontuario_clinico: false,
+        gerenciar_estoque_custos: false,
+        configuracoes_sistema: false,
+        visualizar_bens_ativos: false,
+      },
+      permissoesCustomizadas: {
+        financeiro: { verEntradas: false, verSaidas: false, verRecorrentes: false, excluir: false, verRelatorios: false },
+        clientes: { criar: false, editar: false, excluir: false, verHistorico: true, preencherAnamnese: true },
+        agenda: { verTodos: false, verPropria: true, criar: true, cancelar: true, finalizar: false },
+        procedimentos: { verCustos: false, verMargem: false, criar: false, excluir: false, ajustarEstoque: false },
+        bens: { visualizar: false, cadastrar: false, editar: false, gerenciar: false, excluir: false, manutencao: false },
+        estoque: { ajustar: false, excluir: false },
+        orcamentos: { verTodos: false, responder: false, verEmails: false }
+      }
+    };
+
+    // Salva o cadastro do cliente no Firestore
+    try {
+      await saveUserToFirestore(clientUser);
+    } catch (saveErr) {
+      console.warn('[handleQuickClientLogin] Aviso ao salvar cliente no Firestore:', saveErr);
+    }
+
+    setIsClientModalOpen(false);
+    executeLogin(clientUser);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -423,18 +436,21 @@ export const LoginView: React.FC<LoginViewProps> = ({
           </button>
 
           {/* Dedicated Patient / Client Portal Quick Button */}
-          <div className="mb-4 p-3 bg-linear-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-100/80 flex items-center justify-between gap-2">
+          <div className="mb-4 p-3.5 bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 rounded-xl border border-indigo-100 flex items-center justify-between gap-3 shadow-xs">
             <div className="min-w-0">
-              <span className="text-[11px] font-bold text-indigo-900 block">É Paciente ou Cliente?</span>
-              <span className="text-[10px] text-indigo-700/80 leading-tight block">Simule orçamentos e solicite agendamentos.</span>
+              <span className="text-xs font-bold text-indigo-950 block">É Cliente do Studio?</span>
+              <span className="text-[11px] text-indigo-700 leading-tight block">Acesse a vitrine, consulte procedimentos e solicite orçamentos.</span>
             </div>
             <button
               type="button"
-              onClick={() => handleGoogleLogin(true)}
+              onClick={() => {
+                setClientError(null);
+                setIsClientModalOpen(true);
+              }}
               disabled={isLoading}
-              className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-lg text-[11px] font-bold shrink-0 transition-colors cursor-pointer shadow-xs"
+              className="px-3 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer shadow-sm hover:shadow-md"
             >
-              Área do Paciente
+              Área do Cliente
             </button>
           </div>
 
@@ -624,6 +640,123 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 </div>
               </form>
             )}
+
+          </div>
+        </div>
+      )}
+
+      {/* Client / Patient Flexible Access Modal (Google OU Nome + Telefone) */}
+      {isClientModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white text-slate-900 rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-150">
+            
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-md">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-base">Portal do Cliente</h3>
+                  <p className="text-xs text-slate-500">Vitrine de Procedimentos & Orçamentos</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsClientModalOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {clientError && (
+              <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                <span>{clientError}</span>
+              </div>
+            )}
+
+            {/* Option 1: Fast Google Login */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold text-slate-700">Opção 1: Conectar em 1 clique com sua conta Google</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsClientModalOpen(false);
+                  handleGoogleLogin(true);
+                }}
+                disabled={isLoading}
+                className="w-full py-2.5 px-4 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold rounded-xl shadow-xs transition-all flex items-center justify-center gap-3 cursor-pointer text-xs disabled:opacity-60"
+              >
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                </svg>
+                <span>Acessar com o Google</span>
+              </button>
+            </div>
+
+            <div className="relative flex py-4 items-center">
+              <div className="grow border-t border-slate-200"></div>
+              <span className="shrink mx-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                OU CADASTRO RÁPIDO (SEM SENHA)
+              </span>
+              <div className="grow border-t border-slate-200"></div>
+            </div>
+
+            {/* Option 2: Quick Registration with Name + Phone (No Password required) */}
+            <form onSubmit={handleQuickClientLogin} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Seu Nome Completo *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={clientNome}
+                  onChange={(e) => setClientNome(e.target.value)}
+                  placeholder="Ex: Mariana Albuquerque"
+                  className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  WhatsApp / Telefone para Contato *
+                </label>
+                <input
+                  type="tel"
+                  required
+                  value={clientTelefone}
+                  onChange={(e) => setClientTelefone(e.target.value)}
+                  placeholder="Ex: (11) 98765-4321"
+                  className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 text-slate-900"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Não é necessário criar senha! Seus orçamentos serão vinculados a este número.
+                </p>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsClientModalOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                >
+                  Voltar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <span>Entrar no Portal</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </form>
 
           </div>
         </div>

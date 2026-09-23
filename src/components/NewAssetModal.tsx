@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   Shield, 
@@ -8,15 +8,29 @@ import {
   User, 
   FileText, 
   CheckCircle2, 
-  Sparkles,
-  Layers,
-  Upload,
-  Wrench,
-  AlertTriangle,
-  Clock,
-  Building2
+  Upload, 
+  Wrench, 
+  Clock, 
+  Building2,
+  Trash2,
+  ExternalLink,
+  FileCheck,
+  Loader2
 } from 'lucide-react';
 import { BemAtivo, CategoriaBem, EstadoConservacaoBem, UsuarioEquipe } from '../types';
+import { uploadNotaFiscalPdf } from '../services/firebaseService';
+
+// Opções padronizadas de categoria do bem conforme diretrizes do sistema
+export const CATEGORIAS_BEM_PADRONIZADAS: { id: CategoriaBem; label: string }[] = [
+  { id: 'maquina', label: 'Máquina' },
+  { id: 'movel', label: 'Móvel' },
+  { id: 'eletronico', label: 'Eletrônico' },
+  { id: 'eletrodomesticos', label: 'Eletrodomésticos' },
+  { id: 'utensilios', label: 'Utensílios' },
+  { id: 'ferramentas', label: 'Ferramentas' },
+  { id: 'iluminacao', label: 'Iluminação' },
+  { id: 'acessorios', label: 'Acessórios' },
+];
 
 interface NewAssetModalProps {
   isOpen: boolean;
@@ -34,7 +48,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
   profissionais = [],
 }) => {
   const [nome, setNome] = useState('');
-  const [categoria, setCategoria] = useState<CategoriaBem>('equipamento');
+  const [categoria, setCategoria] = useState<CategoriaBem>('maquina');
   const [dataAquisicao, setDataAquisicao] = useState(new Date().toISOString().slice(0, 10));
   const [valorCompra, setValorCompra] = useState<number>(0);
   const [estadoConservacao, setEstadoConservacao] = useState<EstadoConservacaoBem>('excelente');
@@ -42,11 +56,15 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
   const [localizacaoSala, setLocalizacaoSala] = useState('');
   const [responsavelNome, setResponsavelNome] = useState('');
   const [garantiaAte, setGarantiaAte] = useState('');
+
+  // Anexo de Nota Fiscal em formato PDF
   const [notaFiscalNome, setNotaFiscalNome] = useState('');
   const [notaFiscalUrl, setNotaFiscalUrl] = useState('');
-  const [observacoes, setObservacoes] = useState('');
+  const [isUploadingNf, setIsUploadingNf] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 6.1 Manutenção Preventiva
+  // Manutenção Preventiva
   const [requerManutencao, setRequerManutencao] = useState(false);
   const [periodicidadeDias, setPeriodicidadeDias] = useState<number>(90);
   const [dataUltimaManutencao, setDataUltimaManutencao] = useState('');
@@ -83,7 +101,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
   useEffect(() => {
     if (bemToEdit) {
       setNome(bemToEdit.nome || bemToEdit.nomeBem || '');
-      setCategoria(bemToEdit.categoria);
+      setCategoria(bemToEdit.categoria || 'maquina');
       setDataAquisicao(bemToEdit.data_aquisicao ? bemToEdit.data_aquisicao.slice(0, 10) : new Date().toISOString().slice(0, 10));
       setValorCompra(bemToEdit.valor_compra ?? bemToEdit.valorCompra ?? 0);
       setEstadoConservacao(bemToEdit.estado_conservacao || bemToEdit.estadoConservacao || 'excelente');
@@ -92,8 +110,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
       setResponsavelNome(bemToEdit.responsavel_nome || '');
       setGarantiaAte(bemToEdit.garantia_ate ? bemToEdit.garantia_ate.slice(0, 10) : '');
       setNotaFiscalNome(bemToEdit.nota_fiscal_nome || '');
-      setNotaFiscalUrl(bemToEdit.nota_fiscal_url || '');
-      setObservacoes(bemToEdit.observacoes || '');
+      setNotaFiscalUrl(bemToEdit.nota_fiscal_url || bemToEdit.notaFiscalUrl || '');
 
       // Manutenção
       setRequerManutencao(Boolean(bemToEdit.requerManutencao));
@@ -104,7 +121,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
       setStatusManutencao(bemToEdit.statusManutencao || 'em_dia');
     } else {
       setNome('');
-      setCategoria('equipamento');
+      setCategoria('maquina');
       setDataAquisicao(new Date().toISOString().slice(0, 10));
       setValorCompra(0);
       setEstadoConservacao('excelente');
@@ -114,7 +131,6 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
       setGarantiaAte('');
       setNotaFiscalNome('');
       setNotaFiscalUrl('');
-      setObservacoes('');
 
       // Manutenção default
       setRequerManutencao(false);
@@ -124,7 +140,48 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
       setEmpresaTecnica('');
       setStatusManutencao('em_dia');
     }
+    setUploadError(null);
   }, [bemToEdit, profissionais, isOpen]);
+
+  // Upload handler for Nota Fiscal PDF
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      setUploadError('Por favor, selecione um documento exclusivamente no formato PDF.');
+      return;
+    }
+
+    // Limit to 20MB
+    if (file.size > 20 * 1024 * 1024) {
+      setUploadError('O arquivo PDF não deve ultrapassar 20MB.');
+      return;
+    }
+
+    setUploadError(null);
+    setIsUploadingNf(true);
+
+    try {
+      const result = await uploadNotaFiscalPdf(file);
+      setNotaFiscalUrl(result.url);
+      setNotaFiscalNome(result.nome);
+    } catch (err: any) {
+      console.error('Erro ao anexar PDF de Nota Fiscal:', err);
+      setUploadError('Falha ao processar o upload do arquivo PDF. Tente novamente.');
+    } finally {
+      setIsUploadingNf(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveNotaFiscal = () => {
+    setNotaFiscalUrl('');
+    setNotaFiscalNome('');
+    setUploadError(null);
+  };
 
   if (!isOpen) return null;
 
@@ -162,9 +219,10 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
         localizacao_sala: localizacaoSala.trim(),
         responsavel_nome: responsavelNome.trim() || undefined,
         garantia_ate: garantiaAte ? garantiaAte : undefined,
+        
+        // Vínculo ao documento da Nota Fiscal (PDF)
         nota_fiscal_nome: notaFiscalNome.trim() || undefined,
         nota_fiscal_url: notaFiscalUrl.trim() || undefined,
-        observacoes: observacoes.trim() || undefined,
 
         // Manutenção Preventiva
         requerManutencao,
@@ -194,16 +252,16 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
             </div>
             <div>
               <h3 className="text-base font-bold">
-                {bemToEdit ? 'Editar Bem / Equipamento' : 'Novo Bem & Ativo do Studio'}
+                {bemToEdit ? 'Editar Bem & Ativo' : 'Novo Bem & Ativo do Studio'}
               </h3>
               <p className="text-xs text-indigo-200">
-                Cadastro patrimonial e controle de ciclo de manutenção preventiva
+                Cadastro patrimonial com anexo de Nota Fiscal em PDF e gestão técnica
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -214,12 +272,12 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
           
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Nome do Bem / Aparelho *
+              Nome do Bem / Ativo <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
               required
-              placeholder="Ex: Laser Lavieen 1927nm, Dermógrafo Cheyenne Pen, Maca 3 Motores"
+              placeholder="Ex: Laser de Diodo, Maca Hidráulica, Computador Recepção, Geladeira"
               value={nome}
               onChange={(e) => setNome(e.target.value)}
               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
@@ -229,26 +287,24 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Categoria do Bem *
+                Categoria do Bem <span className="text-rose-500">*</span>
               </label>
               <select
                 value={categoria}
                 onChange={(e) => setCategoria(e.target.value as CategoriaBem)}
-                className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-semibold text-slate-800"
               >
-                <option value="laser">Laser & Alta Potência</option>
-                <option value="dermografo">Dermógrafo / Micropigmentação</option>
-                <option value="maca_mobiliario">Maca / Mobiliário Cirúrgico</option>
-                <option value="autoclave">Autoclave & Esterilização</option>
-                <option value="eletronico">Eletrônico / Computador</option>
-                <option value="equipamento">Equipamento Estético Geral</option>
-                <option value="outros">Outros Ativos</option>
+                {CATEGORIAS_BEM_PADRONIZADAS.map(cat => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.label}
+                  </option>
+                ))}
               </select>
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Estado de Conservação *
+                Estado de Conservação <span className="text-rose-500">*</span>
               </label>
               <select
                 value={estadoConservacao}
@@ -266,7 +322,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Valor de Aquisição (R$) *
+                Valor de Aquisição (R$) <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
@@ -286,7 +342,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Data de Aquisição *
+                Data de Aquisição <span className="text-rose-500">*</span>
               </label>
               <input
                 type="date"
@@ -301,7 +357,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Localização / Sala no Studio *
+                Localização / Sala no Studio <span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"
@@ -355,7 +411,117 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
           </div>
 
           {/* ========================================================= */}
-          {/* 6.1 SEÇÃO DE GESTÃO DE MANUTENÇÃO PREVENTIVA E ALERTAS */}
+          {/* UPLOAD DE NOTA FISCAL EM FORMATO PDF */}
+          {/* ========================================================= */}
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-indigo-600" />
+                <span>Nota Fiscal / Comprovante de Compra (PDF)</span>
+              </label>
+              {notaFiscalUrl && (
+                <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
+                  <FileCheck className="w-3.5 h-3.5" /> Anexado
+                </span>
+              )}
+            </div>
+
+            {uploadError && (
+              <p className="text-xs text-rose-600 font-semibold bg-rose-50 p-2 rounded-lg border border-rose-200">
+                {uploadError}
+              </p>
+            )}
+
+            {/* Quando há PDF anexado */}
+            {notaFiscalUrl ? (
+              <div className="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-200">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="p-2 rounded-lg bg-rose-50 text-rose-600 shrink-0">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-900 truncate">
+                      {notaFiscalNome || 'Nota_Fiscal.pdf'}
+                    </p>
+                    <p className="text-[10px] text-slate-400">Documento PDF armazenado</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                  <a
+                    href={notaFiscalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                    title="Visualizar PDF"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={handleRemoveNotaFiscal}
+                    className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                    title="Remover anexo"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Botão de Selecionar / Upload de PDF */
+              <div>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="application/pdf,.pdf"
+                  onChange={handlePdfUpload}
+                  className="hidden"
+                  id="pdf-nf-upload"
+                />
+                <label
+                  htmlFor="pdf-nf-upload"
+                  className={`w-full border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all ${
+                    isUploadingNf
+                      ? 'border-indigo-400 bg-indigo-50/50'
+                      : 'border-slate-300 hover:border-indigo-500 bg-white hover:bg-indigo-50/20'
+                  }`}
+                >
+                  {isUploadingNf ? (
+                    <>
+                      <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
+                      <span className="text-xs font-semibold text-indigo-700">Enviando PDF para o storage...</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="p-2 bg-indigo-50 rounded-full text-indigo-600">
+                        <Upload className="w-4 h-4" />
+                      </div>
+                      <span className="text-xs font-bold text-slate-700">
+                        Clique para anexar Nota Fiscal em formato PDF
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        Suporta arquivos .pdf até 20MB
+                      </span>
+                    </>
+                  )}
+                </label>
+              </div>
+            )}
+
+            {/* Campo descritivo opcional da NF */}
+            <div>
+              <input
+                type="text"
+                placeholder="Nº ou identificador da NF-e (ex: NF-e 004.918 - MedDistribuidora)"
+                value={notaFiscalNome}
+                onChange={(e) => setNotaFiscalNome(e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              />
+            </div>
+          </div>
+
+          {/* ========================================================= */}
+          {/* SEÇÃO DE GESTÃO DE MANUTENÇÃO PREVENTIVA E ALERTAS */}
           {/* ========================================================= */}
           <div className="mt-4 p-4.5 bg-gradient-to-br from-indigo-50/70 via-slate-50 to-amber-50/40 rounded-2xl border border-indigo-100 space-y-4">
             <div className="flex items-center justify-between">
@@ -366,9 +532,6 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
                 <div>
                   <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                     Manutenção Preventiva & Alertas Periódicos
-                    <span className="px-2 py-0.5 text-[10px] bg-indigo-100 text-indigo-700 font-bold rounded-full">
-                      Módulo 6.1
-                    </span>
                   </h4>
                   <p className="text-[11px] text-slate-500">
                     Controle de ciclos de calibração, revisões e alertas visuais de vencimento
@@ -499,7 +662,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
                   </label>
                   <input
                     type="text"
-                    placeholder="Ex: MedLaser Assistência Técnica Autorizada - (11) 98888-0000 / Eng. Roberto"
+                    placeholder="Ex: Assistência Técnica Especializada - (11) 98888-0000 / Eng. Roberto"
                     value={empresaTecnica}
                     onChange={(e) => setEmpresaTecnica(e.target.value)}
                     className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
@@ -507,32 +670,6 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
                 </div>
               </div>
             )}
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Nota Fiscal / Comprovante de Compra
-            </label>
-            <input
-              type="text"
-              placeholder="Ex: NF-e 004.918 - MedLaser Brasil Distribuidora"
-              value={notaFiscalNome}
-              onChange={(e) => setNotaFiscalNome(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Observações Técnicas & Histórico
-            </label>
-            <textarea
-              rows={2}
-              placeholder="Ex: Revisão óptica anual obrigatória. Acompanha ponteira fracionada e óculos de proteção."
-              value={observacoes}
-              onChange={(e) => setObservacoes(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-            />
           </div>
 
           {/* Footer Actions */}
@@ -546,7 +683,8 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+              disabled={isUploadingNf}
+              className="px-5 py-2.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>{bemToEdit ? 'Salvar Alterações' : 'Cadastrar Ativo'}</span>
@@ -557,4 +695,3 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
     </div>
   );
 };
-

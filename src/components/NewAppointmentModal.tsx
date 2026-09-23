@@ -57,6 +57,10 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
   const [observacoes, setObservacoes] = useState<string>('');
   const [formError, setFormError] = useState<string | null>(null);
 
+  // Retornos Sem Cobrança por Padrão & Cobrança Opcional
+  const [isRetorno, setIsRetorno] = useState<boolean>(false);
+  const [cobrarTaxaRetorno, setCobrarTaxaRetorno] = useState<boolean>(false);
+
   // Sincronização ao abrir o modal ou receber initialData
   useEffect(() => {
     if (!isOpen) {
@@ -132,9 +136,24 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
     if (initialData?.duracao_minutos) {
       setDuracao(initialData.duracao_minutos);
     }
-    if (initialData?.valor_estimado !== undefined) {
-      setValor(String(initialData.valor_estimado));
+    
+    // Auto-detect if it's a Retorno/Revisão
+    const isRet = Boolean(
+      (initialData?.procedimento && /retorno|revis[ãa]o/i.test(initialData.procedimento)) ||
+      (initialData?.valor_estimado === 0)
+    );
+    setIsRetorno(isRet);
+    if (isRet) {
+      const hasFee = Boolean(initialData?.valor_estimado && initialData.valor_estimado > 0);
+      setCobrarTaxaRetorno(hasFee);
+      setValor(hasFee ? String(initialData?.valor_estimado) : '0');
+    } else {
+      setCobrarTaxaRetorno(false);
+      if (initialData?.valor_estimado !== undefined) {
+        setValor(String(initialData.valor_estimado));
+      }
     }
+
     if (initialData?.observacoes) {
       setObservacoes(initialData.observacoes);
     }
@@ -239,7 +258,7 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
         procedimento: procedureName,
         status: status,
         duracao_minutos: Number(duracao) || 45,
-        valor_estimado: valor ? parseFloat(valor) : undefined,
+        valor_estimado: isRetorno && !cobrarTaxaRetorno ? 0 : (valor ? parseFloat(valor) : 0),
         observacoes: observacoes.trim() || undefined,
         profissional_id: profissionalId || undefined,
         profissional_nome: selectedProf?.nome || undefined,
@@ -489,6 +508,64 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
             </div>
           </div>
 
+          {/* Procedimento de Retorno / Revisão - Opcional e Sem Cobrança por Padrão */}
+          <div className="p-3 bg-indigo-50/70 border border-indigo-100 rounded-xl space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-indigo-950">
+                <input
+                  type="checkbox"
+                  checked={isRetorno}
+                  onChange={(e) => {
+                    const chk = e.target.checked;
+                    setIsRetorno(chk);
+                    if (chk) {
+                      if (!cobrarTaxaRetorno) setValor('0');
+                    } else {
+                      setCobrarTaxaRetorno(false);
+                      const defaultVal = currentProc?.valor_promocional || currentProc?.valor_tabela || currentProc?.preco_sugerido || 350;
+                      setValor(String(defaultVal));
+                    }
+                  }}
+                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                />
+                <span>É uma consulta ou sessão de Retorno / Revisão</span>
+              </label>
+
+              {isRetorno && !cobrarTaxaRetorno && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                  Sem Cobrança (R$ 0,00)
+                </span>
+              )}
+            </div>
+
+            {isRetorno && (
+              <div className="pt-2 border-t border-indigo-200/60 flex items-center justify-between gap-3 animate-in fade-in">
+                <div>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={cobrarTaxaRetorno}
+                      onChange={(e) => {
+                        const chk = e.target.checked;
+                        setCobrarTaxaRetorno(chk);
+                        if (!chk) {
+                          setValor('0');
+                        } else if (valor === '0') {
+                          setValor('100');
+                        }
+                      }}
+                      className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    />
+                    <span>Cobrar taxa ou valor especial para este retorno (Opcional)</span>
+                  </label>
+                  <p className="text-[10px] text-slate-500">
+                    Por padrão, retornos clínicos não possuem cobrança.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Status, Duração & Valor */}
           <div className="grid grid-cols-3 gap-3">
             <div>
@@ -529,10 +606,15 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
               </label>
               <input
                 type="number"
-                value={valor}
+                value={isRetorno && !cobrarTaxaRetorno ? 0 : valor}
                 onChange={(e) => setValor(e.target.value)}
+                disabled={isRetorno && !cobrarTaxaRetorno}
                 placeholder="Ex: 350"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className={`w-full px-3 py-2 border rounded-xl font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 ${
+                  isRetorno && !cobrarTaxaRetorno 
+                    ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed'
+                    : 'bg-slate-50 text-slate-800 border-slate-200'
+                }`}
               />
             </div>
           </div>

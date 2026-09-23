@@ -80,16 +80,20 @@ export const NoticeBoardView: React.FC<NoticeBoardViewProps> = ({
     e.preventDefault();
     if (!novoTitulo.trim() || !novaMensagem.trim()) return;
 
+    const agora = new Date().toISOString();
     onAddAviso({
       titulo: novoTitulo.trim(),
       mensagem: novaMensagem.trim(),
       prioridade: novaPrioridade,
-      autor_nome: currentUser.nome,
-      autor_role: currentUser.role,
+      autor_nome: currentUser?.nome || 'Administrador',
+      autor_role: currentUser?.role || 'admin',
       destinatarios: novosDestinatarios,
       ativo: true,
       exibir_popup: novoExibirPopup,
-    });
+      data_criacao: agora,
+      data_publicacao: agora,
+      lido_por: [],
+    } as any);
 
     // Reset Form
     setNovoTitulo('');
@@ -248,13 +252,17 @@ export const NoticeBoardView: React.FC<NoticeBoardViewProps> = ({
               ? 'bg-amber-50/40 border-amber-200 hover:border-amber-300' 
               : 'bg-white border-slate-200 hover:border-slate-300';
 
-            const dateFormatted = new Intl.DateTimeFormat('pt-BR', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            }).format(new Date(aviso.data_criacao));
+            const rawDate = aviso.data_criacao || aviso.data_publicacao || new Date().toISOString();
+            const parsedDate = new Date(rawDate);
+            const dateFormatted = !isNaN(parsedDate.getTime())
+              ? new Intl.DateTimeFormat('pt-BR', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }).format(parsedDate)
+              : new Date().toLocaleDateString('pt-BR');
 
             return (
               <div 

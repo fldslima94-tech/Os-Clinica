@@ -39,6 +39,7 @@ interface InventoryViewProps {
   onOpenNewInventory: () => void;
   onOpenNewProcedure: () => void;
   onEditProcedure: (proc: ProcedimentoClinico) => void;
+  onEditInventoryItem?: (item: EstoqueInsumo) => void;
   onDeleteProcedure: (id: string) => void;
   onDeleteInventoryItem?: (id: string) => void;
   onUpdateQuantity: (id: string, newQuantity: number) => void;
@@ -52,6 +53,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   onOpenNewInventory,
   onOpenNewProcedure,
   onEditProcedure,
+  onEditInventoryItem,
   onDeleteProcedure,
   onDeleteInventoryItem,
   onUpdateQuantity,
@@ -579,6 +581,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                             <CheckCircle2 className="w-3 h-3 text-green-600" />
                             Regular
                           </span>
+                        )}
+
+                        {onEditInventoryItem && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditInventoryItem(item);
+                            }}
+                            className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors cursor-pointer"
+                            title="Editar dados cadastrais do insumo"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
                         )}
 
                         {isAdmin && onDeleteInventoryItem && (

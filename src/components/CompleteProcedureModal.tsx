@@ -81,6 +81,17 @@ export const CompleteProcedureModal: React.FC<CompleteProcedureModalProps> = ({
   const [diasAcompanhamento, setDiasAcompanhamento] = useState<number>(15);
   const [motivoAcompanhamento, setMotivoAcompanhamento] = useState('');
 
+  // Agendamento Opcional na Grade (Não-obrigatório / Sem duplicar automaticamente)
+  const [agendarNaGrade, setAgendarNaGrade] = useState(false);
+  const [dataGrade, setDataGrade] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 15);
+    return d.toISOString().slice(0, 10);
+  });
+  const [horaGrade, setHoraGrade] = useState('14:30');
+  const [cobrarRetornoGrade, setCobrarRetornoGrade] = useState(false);
+  const [valorTaxaRetorno, setValorTaxaRetorno] = useState<number>(0);
+
   const jaPagouNoCheckIn = Boolean(
     agendamento?.pagamento_registrado_no_caixa === true ||
     agendamento?.pago_no_checkin === true ||
@@ -235,19 +246,23 @@ export const CompleteProcedureModal: React.FC<CompleteProcedureModalProps> = ({
       }
     }
 
+    const returnScheduleDate = (!jaAgendouRetornoNoCheckIn && agendarNaGrade)
+      ? new Date(`${dataGrade}T${horaGrade}:00`).toISOString()
+      : undefined;
+
     if (typeof onConfirmComplete === 'function') {
       onConfirmComplete(
         agendamento.id,
         insumosUsados,
         paymentData,
-        dataIdealStr
+        returnScheduleDate
       );
     } else if (typeof onComplete === 'function') {
       onComplete(
         agendamento,
         insumosUsados,
         paymentData,
-        dataIdealStr
+        returnScheduleDate
       );
     }
 
@@ -653,6 +668,86 @@ export const CompleteProcedureModal: React.FC<CompleteProcedureModalProps> = ({
                       placeholder="Ex: Revisão de 15 dias de Toxina Botulínica"
                       className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900"
                     />
+                  </div>
+
+                  {/* Agendar Retorno Direto na Grade (Opcional - Não Forçado) */}
+                  <div className="pt-3 border-t border-slate-200/80">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-800">
+                        <input
+                          type="checkbox"
+                          checked={agendarNaGrade}
+                          onChange={(e) => setAgendarNaGrade(e.target.checked)}
+                          className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                        />
+                        <span>Inserir Retorno Imediatamente na Grade de Horários (Opcional)</span>
+                      </label>
+                    </div>
+
+                    {agendarNaGrade && (
+                      <div className="p-3 bg-white rounded-xl border border-indigo-200 space-y-3 animate-in fade-in">
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">Data do Retorno</label>
+                            <input
+                              type="date"
+                              value={dataGrade}
+                              onChange={(e) => setDataGrade(e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">Horário do Retorno</label>
+                            <input
+                              type="time"
+                              value={horaGrade}
+                              onChange={(e) => setHoraGrade(e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Cobrança do Retorno */}
+                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                          <div>
+                            <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-slate-800">
+                              <input
+                                type="checkbox"
+                                checked={cobrarRetornoGrade}
+                                onChange={(e) => {
+                                  const c = e.target.checked;
+                                  setCobrarRetornoGrade(c);
+                                  if (!c) setValorTaxaRetorno(0);
+                                }}
+                                className="w-3.5 h-3.5 rounded text-indigo-600 cursor-pointer"
+                              />
+                              <span>Cobrar taxa/sessão de retorno?</span>
+                            </label>
+                            <p className="text-[10px] text-slate-500">
+                              Retornos são gratuitos (R$ 0,00) por padrão.
+                            </p>
+                          </div>
+
+                          {cobrarRetornoGrade ? (
+                            <div className="w-28">
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={valorTaxaRetorno || ''}
+                                onChange={(e) => setValorTaxaRetorno(parseFloat(e.target.value) || 0)}
+                                placeholder="R$ 0,00"
+                                className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-indigo-700"
+                              />
+                            </div>
+                          ) : (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              Sem Cobrança (R$ 0,00)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
