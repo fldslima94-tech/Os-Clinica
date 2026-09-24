@@ -224,6 +224,10 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    match /whatsapp_campanhas/{campanhaId} {
+      allow read, write: if true;
+    }
+
     // Bloqueio por padrão para qualquer outro caminho não declarado
     match /{document=**} {
       allow read, write: if false;

@@ -924,6 +924,10 @@ export type WhatsAppTemplateCategoria =
   | 'pre_cuidados' 
   | 'pos_cuidados' 
   | 'retorno' 
+  | 'promocao'
+  | 'evento'
+  | 'aniversario'
+  | 'reativacao'
   | 'personalizado';
 
 export interface WhatsAppTemplate {
@@ -938,6 +942,20 @@ export interface WhatsAppTemplate {
   ordem?: number;
   criado_em?: string;
   atualizado_em?: string;
+}
+
+export interface WhatsAppCampanha {
+  id: string;
+  titulo: string;
+  tipo: 'promocao' | 'evento' | 'aniversariantes' | 'reativacao' | 'geral';
+  mensagem: string;
+  total_destinatarios: number;
+  total_enviados: number;
+  total_erros: number;
+  status: 'em_andamento' | 'concluido' | 'cancelado';
+  criado_em: string;
+  criado_por?: string;
+  filtros_aplicados?: string;
 }
 
 

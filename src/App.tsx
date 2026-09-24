@@ -2778,6 +2778,8 @@ export default function App() {
               usuarios={usuarios}
               currentUser={currentUser}
               showToast={showToast}
+              alertasRetorno={alertasRetorno}
+              transacoes={transacoes}
             />
           )}
 

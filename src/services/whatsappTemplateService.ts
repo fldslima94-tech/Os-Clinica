@@ -81,6 +81,81 @@ Já se passaram os primeiros dias de acomodação do resultado e gostaríamos de
 
 Podemos verificar uma data e horário esta semana na {clinica}?`,
   },
+  {
+    id: 'template-promocao-padrao',
+    titulo: '5. Promoção & Oferta Especial',
+    categoria: 'promocao',
+    gatilho_sugerido: 'Disparo em Massa',
+    descricao: 'Divulgação de condições exclusivas, campanhas e semanas promocionais para a base de pacientes.',
+    ativo: true,
+    padrao: true,
+    ordem: 5,
+    mensagem: `Olá, *{paciente}*! Tudo bem? ✨
+
+Temos uma novidade especial para você na *{clinica}*! 💖
+
+🎉 *Semana Especial de Cuidados & Procedimentos*
+Preparamos uma condição exclusiva com condições facilitadas e mimos especiais para os atendimentos agendados esta semana!
+
+✨ Vagas limitadas para garantir sua experiência VIP.
+
+Gostaria de conhecer as condições especiais e garantir seu horário? Responda com *SIM* e te enviamos todos os detalhes!`,
+  },
+  {
+    id: 'template-evento-padrao',
+    titulo: '6. Convite para Evento / Coquetel VIP',
+    categoria: 'evento',
+    gatilho_sugerido: 'Evento / Lançamento',
+    descricao: 'Convite exclusivo para coquetel, dia do Botox, inaugurações ou apresentação de novas tecnologias.',
+    ativo: true,
+    padrao: true,
+    ordem: 6,
+    mensagem: `Olá, *{paciente}*! Tudo bem? 🥂✨
+
+Você é nossa convidada de honra para o *Encontro VIP de Estética & Bem-Estar* na *{clinica}*!
+
+🗓 *Quando:* Em breve!
+📍 *Local:* {endereco}
+🍾 *Programação:* Demonstração de protocolos, coquetel exclusivo e condições inéditas para tratamentos.
+
+Sua presença é muito especial para nós! Confirme sua presença respondendo com *QUERO IR* para incluirmos seu nome na lista VIP!`,
+  },
+  {
+    id: 'template-aniversario-padrao',
+    titulo: '7. Felicitações & Mimo de Aniversário',
+    categoria: 'aniversario',
+    gatilho_sugerido: 'No Mês / Dia de Aniversário',
+    descricao: 'Mensagem carinhosa de parabéns com voucher de presente ou desconto de aniversário.',
+    ativo: true,
+    padrao: true,
+    ordem: 7,
+    mensagem: `Parabéns pelo seu dia, *{paciente}*! 🎂✨🎉
+
+Toda a equipe da *{clinica}* deseja um novo ciclo repleto de saúde, alegria, realizações e muita autoestima!
+
+Para celebrar junto com você, preparamos um *Presente Exclusivo de Aniversário*:
+🎁 *Voucher Especial de Aniversário* para usar em qualquer procedimento ou home care durante todo o seu mês de aniversário!
+
+Que tal agendar um momento especial de autocuidado para comemorar?`,
+  },
+  {
+    id: 'template-reativacao-padrao',
+    titulo: '8. Reativação de Clientes Ausentes',
+    categoria: 'reativacao',
+    gatilho_sugerido: '+60 dias sem agendamento',
+    descricao: 'Mensagem carinhosa para resgatar pacientes que não visitam a clínica há algum tempo.',
+    ativo: true,
+    padrao: true,
+    ordem: 8,
+    mensagem: `Olá, *{paciente}*! Tudo bem? Sentimos muito a sua falta aqui na *{clinica}*! 🌸✨
+
+Faz algum tempo que não cuidamos de você e gostaríamos de saber como está sua pele e seu bem-estar!
+
+Preparamos uma *Cortesia Especial de Retorno*:
+✨ *Revitalização Facial com Avaliação Personalizada* de cortesia no agendamento do seu próximo procedimento.
+
+Podemos verificar um horário confortável para você esta semana? Adoraríamos te receber novamente!`,
+  },
 ];
 
 /**
@@ -175,7 +250,51 @@ export function formatWhatsAppMessage(
     .replace(/\{clinica\}/gi, clinicName)
     .replace(/\{telefone_clinica\}/gi, clinicPhone)
     .replace(/\{endereco\}/gi, clinicAddress)
-    .replace(/\{dias_retorno\}/gi, '15');
+    .replace(/\{dias_retorno\}/gi, '15')
+    .replace(/\{cupom\}/gi, 'VIP15')
+    .replace(/\{aniversario_mes\}/gi, new Date().toLocaleString('pt-BR', { month: 'long' }));
+}
+
+const CAMPAIGNS_STORAGE_KEY = 'aura_whatsapp_campanhas_v1';
+
+export function getStoredWhatsAppCampanhas(): import('../types').WhatsAppCampanha[] {
+  try {
+    const raw = localStorage.getItem(CAMPAIGNS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (err) {
+    console.warn('[whatsappTemplateService] Erro ao ler campanhas do localStorage:', err);
+  }
+  return [];
+}
+
+export function saveStoredWhatsAppCampanhas(campanhas: import('../types').WhatsAppCampanha[]): void {
+  try {
+    localStorage.setItem(CAMPAIGNS_STORAGE_KEY, JSON.stringify(campanhas));
+  } catch (err) {
+    console.warn('[whatsappTemplateService] Erro ao salvar campanhas no localStorage:', err);
+  }
+}
+
+export async function persistWhatsAppCampanha(campanha: import('../types').WhatsAppCampanha): Promise<void> {
+  const current = getStoredWhatsAppCampanhas();
+  const index = current.findIndex(c => c.id === campanha.id);
+  let updatedList: import('../types').WhatsAppCampanha[];
+  if (index >= 0) {
+    updatedList = [...current];
+    updatedList[index] = campanha;
+  } else {
+    updatedList = [campanha, ...current];
+  }
+  saveStoredWhatsAppCampanhas(updatedList);
+
+  try {
+    await saveDocument(COLLECTIONS.WHATSAPP_CAMPANHAS, campanha);
+  } catch (err) {
+    console.warn('[whatsappTemplateService] Erro ao persistir campanha no Firestore:', err);
+  }
 }
 
 /**

@@ -29,7 +29,7 @@ interface WhatsAppTemplateModalProps {
 }
 
 const AVAILABLE_TAGS = [
-  { tag: '{paciente}', label: 'Nome do Paciente', icon: User, example: 'Maria' },
+  { tag: '{paciente}', label: 'Nome do Paciente', icon: User, example: 'Mariana' },
   { tag: '{procedimento}', label: 'Procedimento', icon: Sparkles, example: 'Toxina Botulínica' },
   { tag: '{data}', label: 'Data', icon: Calendar, example: '25/09/2026' },
   { tag: '{horario}', label: 'Horário', icon: Clock, example: '14:30' },
@@ -37,6 +37,8 @@ const AVAILABLE_TAGS = [
   { tag: '{clinica}', label: 'Nome da Clínica', icon: Building2, example: 'Aura Estética' },
   { tag: '{telefone_clinica}', label: 'Tel da Clínica', icon: Phone, example: '(11) 98765-4321' },
   { tag: '{endereco}', label: 'Endereço', icon: MapPin, example: 'Av. Paulista, 1000' },
+  { tag: '{aniversario_mes}', label: 'Mês de Aniversário', icon: Calendar, example: 'Setembro' },
+  { tag: '{cupom}', label: 'Cupom de Desconto', icon: Tag, example: 'VIP15' },
 ];
 
 export const WhatsAppTemplateModal: React.FC<WhatsAppTemplateModalProps> = ({
@@ -230,6 +232,10 @@ export const WhatsAppTemplateModal: React.FC<WhatsAppTemplateModalProps> = ({
                   <option value="pre_cuidados">Cuidados Pré-Procedimento</option>
                   <option value="pos_cuidados">Cuidados Pós-Sessão</option>
                   <option value="retorno">Retorno / Avaliação Clínica</option>
+                  <option value="promocao">Promoção & Campanha Especial</option>
+                  <option value="evento">Convite para Evento / Coquetel VIP</option>
+                  <option value="aniversario">Felicitações & Presente de Aniversário</option>
+                  <option value="reativacao">Reativação de Pacientes Ausentes</option>
                   <option value="personalizado">Personalizado / Outro</option>
                 </select>
               </div>

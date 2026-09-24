@@ -101,6 +101,7 @@ export const COLLECTIONS = {
   ALERTAS_RETORNO: 'alertas_retorno',
   BACKUPS: 'backups_sistema',
   WHATSAPP_TEMPLATES: 'whatsapp_templates',
+  WHATSAPP_CAMPANHAS: 'whatsapp_campanhas',
 } as const;
 
 export enum OperationType {
