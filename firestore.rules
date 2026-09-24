@@ -190,13 +190,24 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // ==========================================
+    // 14. INTEGRAÇÃO WHATSAPP (conversas, mensagens e pedidos recebidos)
+    // ==========================================
+    match /whatsapp_conversas/{telefone} {
+      allow read, write: if true;
+    }
+
+    match /whatsapp_mensagens/{mensagemId} {
+      allow read, write: if true;
+    }
+
+    match /pedidos_whatsapp/{pedidoId} {
+      allow read, write: if true;
+    }
+
     // Bloqueio por padrão para qualquer outro caminho não declarado
     match /{document=**} {
       allow read, write: if false;
     }
   }
 }
-
-
-
-

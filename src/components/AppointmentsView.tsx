@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Plus, 
   Search, 
@@ -53,6 +53,8 @@ interface AppointmentsViewProps {
   ) => void;
   currentUser?: UsuarioEquipe;
   initialBalcaoMode?: boolean;
+  initialViewFormat?: 'cards' | 'profissionais' | 'calendario' | 'balcao';
+  onOpenCadastroCompleto?: (agendamento: Agendamento) => void;
 }
 
 export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
@@ -69,9 +71,19 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
   onRescheduleAppointment,
   currentUser,
   initialBalcaoMode = false,
+  initialViewFormat,
+  onOpenCadastroCompleto,
 }) => {
   const isAdmin = !currentUser || isUserAdminTotal(currentUser) || isUserAdminLocalOrTotal(currentUser) || currentUser.role === 'admin_master' || currentUser.role === 'admin_total' || currentUser.role === 'admin' || currentUser.role === 'gestor';
-  const [viewFormat, setViewFormat] = useState<'cards' | 'profissionais' | 'calendario' | 'balcao'>(initialBalcaoMode ? 'balcao' : 'cards');
+  const [viewFormat, setViewFormat] = useState<'cards' | 'profissionais' | 'calendario' | 'balcao'>(
+    initialViewFormat || (initialBalcaoMode ? 'balcao' : 'cards')
+  );
+
+  useEffect(() => {
+    if (initialViewFormat) {
+      setViewFormat(initialViewFormat);
+    }
+  }, [initialViewFormat]);
   const [filterStatus, setFilterStatus] = useState<string>('todos');
   const [balcaoFilterStatus, setBalcaoFilterStatus] = useState<string>('todos');
   const [filterProfissional, setFilterProfissional] = useState<string>('todos');
@@ -169,6 +181,15 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
       onOpenCheckInModal(ag);
     } else {
       onUpdateStatus(ag.id, 'em_espera');
+    }
+  };
+
+  const handleRecepcionarChegada = (ag: Agendamento) => {
+    onUpdateStatus(ag.id, 'em_espera');
+    if (ag.necessita_cadastro_completo || ag.origem_portal || !ag.paciente?.cpf) {
+      if (onOpenCadastroCompleto) {
+        onOpenCadastroCompleto(ag);
+      }
     }
   };
 
@@ -461,7 +482,15 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                                 {patientName.charAt(0)}
                               </div>
                               <div>
-                                <span className="block font-bold text-slate-900">{patientName}</span>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="block font-bold text-slate-900">{patientName}</span>
+                                  {(ag.origem_portal || ag.necessita_cadastro_completo) && (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-md bg-amber-100 text-amber-800 text-[9px] font-black border border-amber-200" title="Agendado pelo Portal do Cliente - Necessita Cadastro Completo">
+                                      <FileText className="w-2.5 h-2.5" />
+                                      Portal • Cadastro Pendente
+                                    </span>
+                                  )}
+                                </div>
                                 {patient && (
                                   <button
                                     onClick={() => onViewPatient(patient)}
@@ -520,13 +549,23 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                               {(ag.status === 'confirmado' || ag.status === 'pendente') && (
                                 <>
                                   <button
-                                    onClick={() => onUpdateStatus(ag.id, 'em_espera')}
+                                    onClick={() => handleRecepcionarChegada(ag)}
                                     className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
-                                    title="Marcar que o cliente chegou na recepção"
+                                    title="Marcar que o cliente chegou na recepção e prosseguir com o cadastro completo"
                                   >
                                     <UserCheck className="w-3.5 h-3.5" />
                                     <span>Chegou (Recepção)</span>
                                   </button>
+                                  {onOpenCadastroCompleto && (ag.necessita_cadastro_completo || ag.origem_portal || !patient?.cpf) && (
+                                    <button
+                                      onClick={() => onOpenCadastroCompleto(ag)}
+                                      className="inline-flex items-center gap-1 px-2 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                                      title="Completar ficha cadastral do cliente na recepção"
+                                    >
+                                      <User className="w-3.5 h-3.5" />
+                                      <span>Completar Cadastro</span>
+                                    </button>
+                                  )}
                                   <button
                                     onClick={() => handleCheckInClick(ag)}
                                     className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-all cursor-pointer"
@@ -789,7 +828,14 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                                   Cliente / Paciente
                                 </div>
                                 <div className="text-xs sm:text-sm font-extrabold text-slate-900 flex items-center justify-between mt-0.5">
-                                  <span className="truncate">{patient?.nome || ag.paciente?.nome || 'Cliente'}</span>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="truncate">{patient?.nome || ag.paciente?.nome || 'Cliente'}</span>
+                                    {(ag.origem_portal || ag.necessita_cadastro_completo) && (
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-md bg-amber-100 text-amber-800 text-[9px] font-black border border-amber-200">
+                                        Portal • Cadastro Pendente
+                                      </span>
+                                    )}
+                                  </div>
                                   {patient && (
                                     <button
                                       onClick={() => onViewPatient(patient)}
@@ -832,16 +878,40 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                             </div>
 
                             {/* Action Buttons */}
-                            <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-1">
+                            <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-1 flex-wrap">
                               {ag.status !== 'concluido' && (
-                                <button
-                                  onClick={() => handleCheckInClick(ag)}
-                                  className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                                  title="Confirmar Chegada, Pagamento e Retorno"
-                                >
-                                  <UserCheck className="w-3 h-3" />
-                                  <span>Chegada & Pagto</span>
-                                </button>
+                                <div className="flex items-center gap-1">
+                                  {(ag.status === 'confirmado' || ag.status === 'pendente') ? (
+                                    <button
+                                      onClick={() => handleRecepcionarChegada(ag)}
+                                      className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                      title="Confirmar Chegada na Recepção e Cadastro Completo"
+                                    >
+                                      <UserCheck className="w-3 h-3" />
+                                      <span>Chegou (Recepção)</span>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleCheckInClick(ag)}
+                                      className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                      title="Confirmar Chegada, Pagamento e Retorno"
+                                    >
+                                      <UserCheck className="w-3 h-3" />
+                                      <span>Chegada & Pagto</span>
+                                    </button>
+                                  )}
+
+                                  {onOpenCadastroCompleto && (ag.necessita_cadastro_completo || ag.origem_portal || !patient?.cpf) && (
+                                    <button
+                                      onClick={() => onOpenCadastroCompleto(ag)}
+                                      className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                      title="Completar ficha cadastral do cliente na recepção"
+                                    >
+                                      <User className="w-3 h-3" />
+                                      <span>Cadastro</span>
+                                    </button>
+                                  )}
+                                </div>
                               )}
 
                               <div className="flex items-center gap-1 ml-auto">

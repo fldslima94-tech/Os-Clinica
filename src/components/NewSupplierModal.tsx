@@ -36,19 +36,19 @@ export function formatarCEP(valor: string): string {
 
 // Categorias padronizadas alinhadas ao cadastro de produtos/estoque + Serviços
 export const CATEGORIAS_FORNECEDOR_PRODUTOS = [
-  { id: 'Injetáveis', label: 'Injetáveis' },
-  { id: 'Preenchedores', label: 'Preenchedores' },
-  { id: 'Bioestimuladores', label: 'Bioestimuladores' },
-  { id: 'Pigmento', label: 'Pigmento' },
   { id: 'Agulhas', label: 'Agulhas & Lâminas' },
-  { id: 'Descartáveis', label: 'Descartáveis' },
+  { id: 'Bioestimuladores', label: 'Bioestimuladores' },
   { id: 'Cosméticos', label: 'Cosméticos' },
-  { id: 'Tópicos & Anestésicos', label: 'Tópicos & Anestésicos' },
+  { id: 'Descartáveis', label: 'Descartáveis' },
   { id: 'Diluentes', label: 'Diluentes' },
   { id: 'Equipamentos', label: 'Equipamentos & Aparelhos' },
-  { id: 'Serviços', label: 'Serviços' },
   { id: 'Geral', label: 'Geral' },
+  { id: 'Injetáveis', label: 'Injetáveis' },
   { id: 'Outros', label: 'Outros' },
+  { id: 'Pigmento', label: 'Pigmento' },
+  { id: 'Preenchedores', label: 'Preenchedores' },
+  { id: 'Serviços', label: 'Serviços' },
+  { id: 'Tópicos & Anestésicos', label: 'Tópicos & Anestésicos' },
 ];
 
 interface NewSupplierModalProps {

@@ -22,14 +22,14 @@ import { uploadNotaFiscalPdf } from '../services/firebaseService';
 
 // Opções padronizadas de categoria do bem conforme diretrizes do sistema
 export const CATEGORIAS_BEM_PADRONIZADAS: { id: CategoriaBem; label: string }[] = [
-  { id: 'maquina', label: 'Máquina' },
-  { id: 'movel', label: 'Móvel' },
-  { id: 'eletronico', label: 'Eletrônico' },
+  { id: 'acessorios', label: 'Acessórios' },
   { id: 'eletrodomesticos', label: 'Eletrodomésticos' },
-  { id: 'utensilios', label: 'Utensílios' },
+  { id: 'eletronico', label: 'Eletrônico' },
   { id: 'ferramentas', label: 'Ferramentas' },
   { id: 'iluminacao', label: 'Iluminação' },
-  { id: 'acessorios', label: 'Acessórios' },
+  { id: 'maquina', label: 'Máquina' },
+  { id: 'movel', label: 'Móvel' },
+  { id: 'utensilios', label: 'Utensílios' },
 ];
 
 interface NewAssetModalProps {

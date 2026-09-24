@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Package, 
   Plus, 
@@ -85,14 +85,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     return { status: 'ok', label: 'Validade OK', color: 'text-emerald-700 bg-emerald-50 border-emerald-200' };
   };
 
-  // Categories present in procedures (prioritizing the official allowed categories)
-  const procedureCategories = [
-    'todos',
-    ...CATEGORIAS_PROCEDIMENTOS_PERMITIDAS,
-    ...Array.from(new Set(procedimentos.map(p => p.categoria))).filter(
-      c => c && !CATEGORIAS_PROCEDIMENTOS_PERMITIDAS.includes(c as any)
-    )
-  ];
+  // Categories present in procedures (prioritizing the official allowed categories, sorted alphabetically and numerically)
+  const procedureCategories = useMemo(() => {
+    const customCats = Array.from(new Set(procedimentos.map(p => p.categoria))).filter(
+      (c): c is string => Boolean(c) && !CATEGORIAS_PROCEDIMENTOS_PERMITIDAS.includes(c as any)
+    );
+    const sortedCategories = [
+      ...CATEGORIAS_PROCEDIMENTOS_PERMITIDAS,
+      ...customCats
+    ].sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true, sensitivity: 'base' }));
+
+    return ['todos', ...sortedCategories];
+  }, [procedimentos]);
 
   // Insumos filtering
   const filteredInsumos = estoque.filter(item => {

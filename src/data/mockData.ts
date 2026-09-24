@@ -501,8 +501,8 @@ export const MOCK_PROCEDIMENTOS: ProcedimentoClinico[] = [
   },
   {
     id: 'proc-04',
-    nome: 'Limpesa de Pele Profunda com Peeling Ultrassônico',
-    categoria: 'Limpesa de pele',
+    nome: 'Limpeza de Pele Profunda com Peeling Ultrassônico',
+    categoria: 'Limpeza de pele',
     duracao_minutos: 60,
     valor_tabela: 190,
     quantidade_sessoes: 1,

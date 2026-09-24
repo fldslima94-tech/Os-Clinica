@@ -463,9 +463,16 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
                                         {patient?.nome || ag.paciente?.nome || 'Paciente'}
                                       </span>
                                     </div>
-                                    <span className="text-[9px] px-1 py-0.2 rounded font-semibold capitalize shrink-0 bg-white/80">
-                                      {ag.status === 'em_espera' ? 'Na Recepção' : ag.status === 'em_atendimento' ? 'Em Sala' : ag.status}
-                                    </span>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      {(ag.origem_portal || ag.necessita_cadastro_completo) && (
+                                        <span className="text-[8px] font-black px-1 py-0.2 rounded bg-amber-200 text-amber-900 border border-amber-300">
+                                          Portal
+                                        </span>
+                                      )}
+                                      <span className="text-[9px] px-1 py-0.2 rounded font-semibold capitalize shrink-0 bg-white/80">
+                                        {ag.status === 'em_espera' ? 'Na Recepção' : ag.status === 'em_atendimento' ? 'Em Sala' : ag.status}
+                                      </span>
+                                    </div>
                                   </div>
 
                                   <p className="text-[10px] text-slate-600 truncate font-medium pl-3.5">
@@ -617,10 +624,15 @@ export const CalendarGridView: React.FC<CalendarGridViewProps> = ({
                                   <GripVertical className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
                                 )}
                                 <div>
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
                                     <span className="font-bold text-sm text-slate-900">
                                       {patient?.nome || ag.paciente?.nome || 'Cliente'}
                                     </span>
+                                    {(ag.origem_portal || ag.necessita_cadastro_completo) && (
+                                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                                        Portal • Cadastro Pendente
+                                      </span>
+                                    )}
                                     <span className="text-[10px] px-2 py-0.5 rounded-full font-medium capitalize bg-slate-100 text-slate-700 border border-slate-200">
                                       {ag.status === 'em_espera' ? 'Na Recepção' : ag.status === 'em_atendimento' ? 'Em Sala' : ag.status}
                                     </span>

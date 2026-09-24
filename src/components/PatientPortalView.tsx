@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Sparkles, 
   Search, 
@@ -67,6 +67,7 @@ interface PatientPortalViewProps {
   currentUser: UsuarioEquipe;
   clinicaConfig?: ClinicaConfig;
   profissionais?: UsuarioEquipe[];
+  onGoToAgendaSemanal?: (targetDate?: string) => void;
 }
 
 export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
@@ -80,17 +81,20 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
   currentUser,
   clinicaConfig,
   profissionais = [],
+  onGoToAgendaSemanal,
 }) => {
-  const isAdmin = !currentUser || isUserAdminTotal(currentUser) || isUserAdminLocalOrTotal(currentUser) || currentUser.role === 'admin_master' || currentUser.role === 'admin_total' || currentUser.role === 'admin' || currentUser.role === 'gestor';
+  const isAdmin = !currentUser || isUserAdminTotal(currentUser) || isUserAdminLocalOrTotal(currentUser) || currentUser.role === 'admin_master' || currentUser.role === 'admin_total' || currentUser.role === 'admin' || currentUser.role === 'gestor' || currentUser.role === 'recepcao';
   
-  // Active Tab: simulador | agendamento | mapa | meus_orcamentos | gestao_clinica
+  // Active Tab: simulador (Orçamento) | agendamento | mapa | meus_orcamentos | gestao_clinica
   const [activeTab, setActiveTab] = useState<'simulador' | 'agendamento' | 'mapa' | 'meus_orcamentos' | 'gestao_clinica'>('simulador');
+  const [portalMode, setPortalMode] = useState<'orcamento' | 'agendamento'>('orcamento');
   const [categoryFilter, setCategoryFilter] = useState('todos');
   const [search, setSearch] = useState('');
   const [orcamentoToDelete, setOrcamentoToDelete] = useState<SolicitacaoOrcamento | null>(null);
 
   useEffect(() => {
-    if (currentUser?.role === 'cliente' && activeTab !== 'simulador' && activeTab !== 'meus_orcamentos') {
+    // Only restrict 'gestao_clinica' from regular clients, leaving simulador and agendamento fully accessible
+    if (currentUser?.role === 'cliente' && activeTab === 'gestao_clinica') {
       setActiveTab('simulador');
     }
   }, [currentUser?.role, activeTab]);
@@ -176,13 +180,17 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
   const [bookingSuccessModal, setBookingSuccessModal] = useState(false);
   const [lastSubmittedBooking, setLastSubmittedBooking] = useState<any>(null);
 
-  const categories = [
-    'todos',
-    ...CATEGORIAS_PROCEDIMENTOS_PERMITIDAS,
-    ...Array.from(new Set(procedimentos.map(p => p.categoria))).filter(
-      c => c && !CATEGORIAS_PROCEDIMENTOS_PERMITIDAS.includes(c as any)
-    )
-  ];
+  const categories = useMemo(() => {
+    const customCats = Array.from(new Set(procedimentos.map(p => p.categoria))).filter(
+      (c): c is string => Boolean(c) && !CATEGORIAS_PROCEDIMENTOS_PERMITIDAS.includes(c as any)
+    );
+    const sortedCategories = [
+      ...CATEGORIAS_PROCEDIMENTOS_PERMITIDAS,
+      ...customCats
+    ].sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true, sensitivity: 'base' }));
+
+    return ['todos', ...sortedCategories];
+  }, [procedimentos]);
 
   const filteredProcedures = procedimentos.filter(p => {
     if (p.ativo === false) return false;
@@ -427,28 +435,7 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
     const selectedProf = profissionais.find(p => p.id === bookingProfessionalId);
     const valorEstimado = selectedProc ? (selectedProc.valor_promocional || selectedProc.valor_tabela) : 0;
 
-    // Criar solicitação de orçamento vinculada com status pendente
-    const orcamentoPayload: Omit<SolicitacaoOrcamento, 'id' | 'data_solicitacao'> = {
-      paciente_nome: googleProfile.nome,
-      paciente_email: googleProfile.email,
-      paciente_telefone: googleProfile.telefone,
-      paciente_avatar_url: googleProfile.avatar_url,
-      conta_google_vinculada: true,
-      procedimentos_selecionados: selectedProc ? [{
-        procedimento_id: selectedProc.id,
-        nome: selectedProc.nome,
-        categoria: selectedProc.categoria,
-        valor_unitario: valorEstimado,
-      }] : [],
-      valor_total_estimado: valorEstimado,
-      queixa_principal: `[Solicitação Direta de Agendamento] Data Preferida: ${bookingDate} (${bookingPeriod}). Profissional: ${selectedProf?.nome || 'Qualquer Disponível'}. Observações: ${bookingNotes}`,
-      periodo_preferencia: (bookingPeriod as any) || 'qualquer',
-      status: 'pendente',
-    };
-
-    onCriarOrcamento(orcamentoPayload);
-
-    // Se houver manipulador de agendamento direto na clínica
+    // Agendamento direto na clínica (vai direto para a agenda semanal da clínica)
     if (onCriarAgendamento && selectedProc) {
       const horaPadrao = bookingPeriod === 'manha' ? '09:00' : bookingPeriod === 'tarde' ? '14:30' : '18:30';
       onCriarAgendamento({
@@ -464,8 +451,10 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
         hora: horaPadrao,
         duracaoMinutos: selectedProc.duracao_minutos || 45,
         valor: valorEstimado,
-        status: 'pendente',
-        observacoes: `Solicitado via Portal do Paciente Google. ${bookingNotes}`
+        status: 'confirmado',
+        observacoes: `[Agendamento via Portal do Cliente] ${bookingNotes ? bookingNotes : ''}`,
+        origem_portal: true,
+        necessita_cadastro_completo: true,
       });
     }
 
@@ -593,23 +582,145 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
         </div>
       </div>
 
+      {/* Seletor de Intenção do Cliente: Orçamento vs Agendamento do Procedimento */}
+      <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full border border-indigo-200/60">
+                Atendimento Personalizado
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full">
+                Portal do Cliente
+              </span>
+            </div>
+            <h3 className="text-base sm:text-lg font-bold text-slate-900 mt-1">
+              Como você prefere prosseguir com seu atendimento?
+            </h3>
+            <p className="text-xs text-slate-500">
+              Escolha entre solicitar uma cotação de <strong>orçamento</strong> ou realizar o <strong>agendamento direto</strong> na agenda semanal da clínica.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+          {/* Opção 1: Orçamento */}
+          <div 
+            onClick={() => {
+              setPortalMode('orcamento');
+              setActiveTab('simulador');
+            }}
+            className={`p-4 sm:p-5 rounded-2xl border-2 transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between ${
+              activeTab === 'simulador'
+                ? 'border-indigo-600 bg-indigo-50/40 shadow-sm ring-2 ring-indigo-500/20'
+                : 'border-slate-200 hover:border-indigo-300 bg-white hover:bg-slate-50/50'
+            }`}
+          >
+            <div className="flex items-start gap-3.5">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                activeTab === 'simulador' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700'
+              }`}>
+                <FileText className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-bold text-slate-900">Solicitar Orçamento</h4>
+                  {activeTab === 'simulador' && (
+                    <span className="text-[10px] font-bold bg-indigo-600 text-white px-2 py-0.5 rounded-full">
+                      Ativo
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Simule valores e envie seu pedido com o <strong>procedimento selecionado, nome, contato e e-mail</strong> diretamente para a <strong>gestão da clínica e leads</strong> analisar.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span className="text-slate-400 font-medium">Aparece na gestão e leads</span>
+              <span className="font-bold text-indigo-600 flex items-center gap-1">
+                Simular Orçamento <ChevronRight className="w-3.5 h-3.5" />
+              </span>
+            </div>
+          </div>
+
+          {/* Opção 2: Agendamento */}
+          <div 
+            onClick={() => {
+              setPortalMode('agendamento');
+              setActiveTab('agendamento');
+            }}
+            className={`p-4 sm:p-5 rounded-2xl border-2 transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between ${
+              activeTab === 'agendamento'
+                ? 'border-blue-600 bg-blue-50/40 shadow-sm ring-2 ring-blue-500/20'
+                : 'border-slate-200 hover:border-blue-300 bg-white hover:bg-slate-50/50'
+            }`}
+          >
+            <div className="flex items-start gap-3.5">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                activeTab === 'agendamento' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'
+              }`}>
+                <CalendarCheck className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-bold text-slate-900">Agendamento do Procedimento</h4>
+                  {activeTab === 'agendamento' && (
+                    <span className="text-[10px] font-bold bg-blue-600 text-white px-2 py-0.5 rounded-full">
+                      Ativo
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Vai <strong>direto para a agenda semanal da clínica</strong>. Ao comparecer na recepção, seguiremos com o preenchimento do seu <strong>cadastro completo</strong>.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span className="text-slate-400 font-medium">Agenda semanal & recepção</span>
+              <span className="font-bold text-blue-600 flex items-center gap-1">
+                Agendar Horário <ChevronRight className="w-3.5 h-3.5" />
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto scrollbar-thin">
         <button
-          onClick={() => setActiveTab('simulador')}
+          onClick={() => {
+            setPortalMode('orcamento');
+            setActiveTab('simulador');
+          }}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
             activeTab === 'simulador'
               ? 'bg-slate-900 text-white shadow-sm'
               : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
           }`}
         >
-          <Sparkles className="w-4 h-4 text-indigo-400" />
-          <span>{currentUser.role === 'cliente' ? 'Procedimentos e Orçamentos' : 'Simulador & Vitrine'}</span>
+          <FileText className="w-4 h-4 text-indigo-400" />
+          <span>Solicitar Orçamento</span>
           {selectedProcedures.length > 0 && (
             <span className="px-1.5 py-0.5 text-[10px] bg-indigo-500 text-white rounded-full font-bold">
               {selectedProcedures.length}
             </span>
           )}
+        </button>
+
+        <button
+          onClick={() => {
+            setPortalMode('agendamento');
+            setActiveTab('agendamento');
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
+            activeTab === 'agendamento'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <CalendarCheck className="w-4 h-4 text-blue-300" />
+          <span>Agendamento do Procedimento</span>
         </button>
 
         <button
@@ -620,37 +731,21 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
               : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
           }`}
         >
-          <FileText className="w-4 h-4 text-emerald-500" />
-          <span>{currentUser.role === 'cliente' ? 'Meus Orçamentos' : 'Minhas Solicitações'} ({myQuotes.length})</span>
+          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+          <span>Minhas Solicitações ({myQuotes.length})</span>
         </button>
 
-        {currentUser.role !== 'cliente' && (
-          <>
-            <button
-              onClick={() => setActiveTab('agendamento')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
-                activeTab === 'agendamento'
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-              }`}
-            >
-              <CalendarCheck className="w-4 h-4 text-blue-500" />
-              <span>Solicitar Agendamento</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('mapa')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
-                activeTab === 'mapa'
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-              }`}
-            >
-              <MapPin className="w-4 h-4 text-rose-500" />
-              <span>Localização & Google Maps</span>
-            </button>
-          </>
-        )}
+        <button
+          onClick={() => setActiveTab('mapa')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
+            activeTab === 'mapa'
+              ? 'bg-slate-900 text-white shadow-sm'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <MapPin className="w-4 h-4 text-rose-500" />
+          <span>Localização & Endereço</span>
+        </button>
 
         {isAdmin && currentUser.role !== 'cliente' && (
           <button
@@ -662,7 +757,7 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
             }`}
           >
             <ShieldCheck className="w-4 h-4 text-indigo-600" />
-            <span>Gestão da Clínica / Leads ({orçamentos.length})</span>
+            <span>Gestão da Clínica e Leads ({orçamentos.length})</span>
           </button>
         )}
       </div>
@@ -810,39 +905,53 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
                     </div>
 
                     <div className="p-3 bg-slate-50/70 border-t border-slate-100 flex flex-col sm:flex-row gap-2">
-                      <a
-                        href={generateDirectProcWhatsAppLink(proc)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-2xs hover:shadow-xs"
-                        title="Solicitar Orçamento direto no WhatsApp do Studio"
-                      >
-                        <MessageCircle className="w-3.5 h-3.5" />
-                        <span>Solicitar no WhatsApp</span>
-                      </a>
-
                       <button
                         type="button"
                         onClick={() => handleToggleProcedure(proc)}
-                        className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                           isSelected
                             ? 'bg-slate-900 text-white hover:bg-slate-800'
                             : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200'
                         }`}
-                        title={isSelected ? 'Remover da simulação' : 'Adicionar à simulação'}
+                        title={isSelected ? 'Remover da simulação de orçamento' : 'Adicionar à simulação de orçamento'}
                       >
                         {isSelected ? (
                           <>
                             <Check className="w-3.5 h-3.5" />
-                            <span>Selecionado</span>
+                            <span>No Orçamento</span>
                           </>
                         ) : (
                           <>
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>Simular</span>
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>Orçamento</span>
                           </>
                         )}
                       </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBookingProcedureId(proc.id);
+                          setPortalMode('agendamento');
+                          setActiveTab('agendamento');
+                          window.scrollTo({ top: 400, behavior: 'smooth' });
+                        }}
+                        className="flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white shadow-2xs"
+                        title="Agendar diretamente na agenda semanal da clínica"
+                      >
+                        <CalendarCheck className="w-3.5 h-3.5" />
+                        <span>Agendar</span>
+                      </button>
+
+                      <a
+                        href={generateDirectProcWhatsAppLink(proc)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="py-2 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-2xs hover:shadow-xs shrink-0"
+                        title="Falar direto no WhatsApp"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                      </a>
                     </div>
 
                   </div>
@@ -961,12 +1070,19 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
                 disabled={selectedProcedures.length === 0}
                 className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
               >
-                <Send className="w-4 h-4" />
-                <span>Solicitar Orçamento & Agendamento</span>
+                <FileText className="w-4 h-4" />
+                <span>Enviar Orçamento para Gestão da Clínica</span>
               </button>
 
+              <div className="bg-indigo-50/70 p-2.5 rounded-xl border border-indigo-100 text-[11px] text-indigo-900 flex items-start gap-2">
+                <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                <p>
+                  Esta solicitação não entra na agenda e <strong>aparece na gestão da clínica e leads</strong> informando o procedimento selecionado, seu nome, contato e e-mail.
+                </p>
+              </div>
+
               <p className="text-[10px] text-center text-slate-400 leading-tight">
-                🔒 Seus dados são protegidos conforme a LGPD e enviados com segurança à equipe médica.
+                🔒 Seus dados são protegidos conforme a LGPD e enviados com segurança à equipe da clínica.
               </p>
             </form>
 
@@ -975,17 +1091,35 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
         </div>
       )}
 
-      {/* TAB 2: SOLICITAÇÃO DIRETA DE AGENDAMENTO */}
+      {/* TAB 2: AGENDAMENTO DO PROCEDIMENTO NA AGENDA SEMANAL */}
       {activeTab === 'agendamento' && (
         <div className="max-w-3xl mx-auto bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
           <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100 shrink-0">
               <CalendarCheck className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-slate-900">Solicitação Direta de Consulta / Avaliação</h3>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md">
+                  Agenda Semanal
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md">
+                  Cadastro na Recepção
+                </span>
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 mt-1">Agendamento do Procedimento</h3>
               <p className="text-xs text-slate-500">
-                Escolha o procedimento e o melhor dia. Nossa recepção entrará em contato para confirmar o horário exato.
+                Seu horário será inserido <strong>direto na agenda semanal da clínica</strong>. Ao comparecer na recepção, seguiremos com seu cadastro completo.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-blue-50/80 border border-blue-200 p-3.5 rounded-2xl flex items-start gap-3 text-xs text-blue-900">
+            <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <strong className="block font-bold text-blue-950">Aviso Importante:</strong>
+              <p className="text-blue-800 text-[11px] leading-relaxed">
+                Ao selecionar o agendamento, seu horário vai direto para a grade semanal da clínica. Ao ser recepcionado(a) no dia do atendimento, nossa equipe preencherá seu <strong>cadastro completo</strong> (documentos, termo e ficha de anamnese).
               </p>
             </div>
           </div>
@@ -1079,7 +1213,7 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
               className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-xl text-sm font-bold shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
             >
               <CalendarCheck className="w-4 h-4" />
-              <span>Enviar Solicitação de Agendamento</span>
+              <span>Confirmar e Lançar na Agenda Semanal</span>
             </button>
           </form>
         </div>
@@ -1328,47 +1462,86 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {orçamentos.map(quote => (
-              <div key={quote.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3.5 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2">
+              <div key={quote.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
+                <div className="space-y-3">
+                  {/* Lead Header: Nome e Data */}
+                  <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2.5">
                       <img
                         src={quote.paciente_avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80'}
                         alt={quote.paciente_nome}
-                        className="w-9 h-9 rounded-full object-cover border border-slate-200"
+                        className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0"
                       />
                       <div>
-                        <h4 className="text-sm font-bold text-slate-900">{quote.paciente_nome}</h4>
-                        <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                          <Mail className="w-3 h-3 text-slate-400" /> {quote.paciente_email}
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md">
+                          Lead do Portal
                         </span>
+                        <h4 className="text-sm font-bold text-slate-900 mt-0.5">{quote.paciente_nome}</h4>
                       </div>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-medium">
+                      {new Date(quote.data_solicitacao).toLocaleDateString('pt-BR')}
+                    </span>
+                  </div>
+
+                  {/* Dados de Contato: Telefone e Email */}
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 space-y-1 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500 font-medium">Número de Contato:</span>
+                      <a 
+                        href={`tel:${quote.paciente_telefone}`} 
+                        className="font-bold text-slate-800 hover:text-indigo-600 flex items-center gap-1 font-mono text-[11px]"
+                      >
+                        <Phone className="w-3 h-3 text-emerald-600" />
+                        {quote.paciente_telefone || 'Não informado'}
+                      </a>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500 font-medium">E-mail Informado:</span>
+                      <a 
+                        href={`mailto:${quote.paciente_email}`} 
+                        className="font-medium text-slate-700 hover:text-indigo-600 truncate max-w-[170px] flex items-center gap-1 text-[11px]"
+                        title={quote.paciente_email}
+                      >
+                        <Mail className="w-3 h-3 text-indigo-500 shrink-0" />
+                        {quote.paciente_email || 'Não informado'}
+                      </a>
                     </div>
                   </div>
 
-                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1 text-xs">
-                    <div className="flex items-center justify-between font-bold text-slate-700 mb-1">
-                      <span>{(quote.procedimentos_selecionados || []).length} Procedimento(s):</span>
-                      <span className="font-mono text-indigo-700">
+                  {/* Procedimento Selecionado */}
+                  <div className="bg-indigo-50/50 p-3 rounded-xl border border-indigo-100/80 space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between font-bold text-indigo-950">
+                      <span className="flex items-center gap-1">
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Procedimento Selecionado:</span>
+                      </span>
+                      <span className="font-mono text-indigo-700 font-bold">
                         R$ {(quote.valor_total_estimado || quote.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
-                    {(quote.procedimentos_selecionados || []).map((p, i) => (
-                      <p key={i} className="text-[11px] text-slate-600 truncate">
-                        • {p.nome}
-                      </p>
-                    ))}
+
+                    {(quote.procedimentos_selecionados || []).length > 0 ? (
+                      (quote.procedimentos_selecionados || []).map((p, i) => (
+                        <div key={i} className="flex items-center justify-between bg-white px-2.5 py-1.5 rounded-lg border border-indigo-100 text-[11px]">
+                          <span className="font-semibold text-slate-800">• {p.nome}</span>
+                          <span className="text-slate-500 font-mono text-[10px]">R$ {p.valor_unitario?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-[11px] text-slate-600 italic">Procedimento geral de avaliação</p>
+                    )}
                   </div>
 
                   {quote.queixa_principal && (
-                    <p className="text-xs text-slate-600 mt-2 bg-amber-50/70 p-2.5 rounded-lg border border-amber-200/60">
-                      <strong>Queixa:</strong> {quote.queixa_principal}
-                    </p>
+                    <div className="text-xs text-slate-600 bg-amber-50/60 p-2.5 rounded-xl border border-amber-200/60 space-y-0.5">
+                      <strong className="block text-[11px] text-amber-900 font-bold">Queixa / Objetivos informados:</strong>
+                      <p className="text-[11px] text-amber-950 leading-relaxed">{quote.queixa_principal}</p>
+                    </div>
                   )}
 
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2">
-                    <span>Preferência: <strong>{quote.periodo_preferencia || 'Flexível'}</strong></span>
-                    <span>{new Date(quote.data_solicitacao).toLocaleDateString('pt-BR')}</span>
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
+                    <span>Horário Preferido: <strong>{quote.periodo_preferencia || 'Flexível'}</strong></span>
                   </div>
                 </div>
 
@@ -1860,34 +2033,45 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 p-6 text-center space-y-4">
             
-            <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-100">
-              <CheckCircle2 className="w-8 h-8" />
+            <div className="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto border border-indigo-100">
+              <FileText className="w-8 h-8" />
             </div>
 
             <div>
-              <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md inline-block mb-1">
-                Status: Pendente
+              <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-md inline-block mb-1">
+                Gestão da Clínica e Leads
               </span>
-              <h3 className="text-lg font-bold text-slate-900">Orçamento Registrado com Sucesso!</h3>
+              <h3 className="text-lg font-bold text-slate-900">Orçamento Enviado com Sucesso!</h3>
               <p className="text-xs text-slate-500 mt-1">
-                Olá <strong>{lastSubmittedQuote.paciente_nome}</strong>, seu pedido foi registrado no sistema e já está disponível para o WhatsApp oficial do Studio.
+                Olá <strong>{lastSubmittedQuote.paciente_nome}</strong>, seu pedido foi enviado exclusivamente para a <strong>Gestão da Clínica e Leads</strong> informando o procedimento selecionado, seu contato e e-mail.
               </p>
             </div>
 
-            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 text-left text-xs space-y-1.5">
-              <div className="flex justify-between font-bold text-slate-800">
-                <span>WhatsApp de Contato:</span>
-                <span className="font-mono text-slate-900">{lastSubmittedQuote.paciente_telefone}</span>
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 text-left text-xs space-y-2">
+              <div>
+                <span className="text-[11px] font-semibold text-slate-500 block">Procedimento(s) Selecionado(s):</span>
+                <p className="font-bold text-slate-800">
+                  {(lastSubmittedQuote.procedimentos_selecionados || []).map(p => p.nome).join(', ')}
+                </p>
               </div>
-              <div className="flex justify-between font-bold text-slate-800">
-                <span>Total Estimado:</span>
+
+              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/60">
+                <div>
+                  <span className="text-[10px] text-slate-400 block">Número de Contato:</span>
+                  <span className="font-bold text-slate-800 font-mono text-[11px]">{lastSubmittedQuote.paciente_telefone}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">E-mail Informado:</span>
+                  <span className="font-medium text-slate-700 truncate block text-[11px]">{lastSubmittedQuote.paciente_email}</span>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center pt-1 border-t border-slate-200/60 font-bold">
+                <span className="text-slate-600">Investimento Estimado:</span>
                 <span className="font-mono text-indigo-700">
                   R$ {(lastSubmittedQuote.valor_total_estimado || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </span>
               </div>
-              <p className="text-slate-500">
-                Procedimentos: {(lastSubmittedQuote.procedimentos_selecionados || []).map(p => p.nome).join(', ')}
-              </p>
             </div>
 
             <div className="space-y-2 pt-2">
@@ -1898,7 +2082,7 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
                 className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all cursor-pointer"
               >
                 <MessageCircle className="w-4 h-4" />
-                <span>Abrir Conversa no WhatsApp Oficial</span>
+                <span>Abrir Conversa no WhatsApp da Clínica</span>
               </a>
 
               <button
@@ -1926,9 +2110,12 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
             </div>
 
             <div>
-              <h3 className="text-lg font-bold text-slate-900">Agendamento Solicitado!</h3>
+              <span className="text-[10px] font-extrabold text-blue-700 uppercase tracking-wider bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-md inline-block mb-1">
+                Lançado na Agenda Semanal
+              </span>
+              <h3 className="text-lg font-bold text-slate-900">Agendamento Realizado com Sucesso!</h3>
               <p className="text-xs text-slate-500 mt-1">
-                Olá <strong>{lastSubmittedBooking.pacienteNome}</strong>, sua solicitação de consulta foi enviada à recepção.
+                Olá <strong>{lastSubmittedBooking.pacienteNome}</strong>, seu horário foi agendado e inserido diretamente na <strong>Agenda Semanal da Clínica</strong>.
               </p>
             </div>
 
@@ -1936,16 +2123,39 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
               <p className="font-bold text-slate-800">Procedimento: {lastSubmittedBooking.procedimentoNome}</p>
               <p className="text-slate-600">Data Preferencial: {lastSubmittedBooking.data} ({lastSubmittedBooking.periodo})</p>
               <p className="text-slate-600">Profissional: {lastSubmittedBooking.profissionalNome}</p>
-              <p className="font-mono text-blue-700 font-bold">Investimento: R$ {lastSubmittedBooking.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+              <p className="font-mono text-blue-700 font-bold">Investimento Estimado: R$ {lastSubmittedBooking.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+            </div>
+
+            <div className="bg-amber-50 p-3.5 rounded-2xl border border-amber-200 text-left text-xs text-amber-900 space-y-1">
+              <strong className="block text-amber-950 flex items-center gap-1.5 font-bold">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                Cadastro Completo na Recepção:
+              </strong>
+              <p className="text-[11px] leading-relaxed text-amber-800">
+                Ao comparecer na clínica no dia marcado, nossa equipe da recepção dará continuidade preenchendo o seu <strong>cadastro completo</strong> (documentação, ficha de anamnese e termos).
+              </p>
             </div>
 
             <div className="space-y-2 pt-2">
+              {onGoToAgendaSemanal && (
+                <button
+                  onClick={() => {
+                    setBookingSuccessModal(false);
+                    onGoToAgendaSemanal(lastSubmittedBooking.data);
+                  }}
+                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Calendar className="w-4 h-4" />
+                  <span>🗓️ Ir para a Agenda Semanal da Clínica</span>
+                </button>
+              )}
+
               <button
                 onClick={() => {
                   setBookingSuccessModal(false);
                   setActiveTab('meus_orcamentos');
                 }}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md transition-colors cursor-pointer"
+                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
               >
                 Acompanhar Minha Solicitação
               </button>

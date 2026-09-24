@@ -176,17 +176,17 @@ export const NewInventoryModal: React.FC<NewInventoryModalProps> = ({
                 onChange={(e) => setCategoria(e.target.value)}
                 className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 cursor-pointer"
               >
-                <option value="Injetáveis">Injetáveis</option>
-                <option value="Preenchedores">Preenchedores</option>
-                <option value="Bioestimuladores">Bioestimuladores</option>
-                <option value="Pigmento">Pigmento</option>
                 <option value="Agulhas">Agulhas & Lâminas</option>
-                <option value="Descartáveis">Descartáveis</option>
+                <option value="Bioestimuladores">Bioestimuladores</option>
                 <option value="Cosméticos">Cosméticos</option>
-                <option value="Tópicos & Anestésicos">Tópicos & Anestésicos</option>
+                <option value="Descartáveis">Descartáveis</option>
                 <option value="Diluentes">Diluentes</option>
                 <option value="Geral">Geral</option>
+                <option value="Injetáveis">Injetáveis</option>
                 <option value="Outros">Outros</option>
+                <option value="Pigmento">Pigmento</option>
+                <option value="Preenchedores">Preenchedores</option>
+                <option value="Tópicos & Anestésicos">Tópicos & Anestésicos</option>
               </select>
             </div>
 

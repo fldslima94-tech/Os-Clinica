@@ -303,6 +303,8 @@ export default function App() {
   const [patientForPackages, setPatientForPackages] = useState<Paciente | null>(null);
   const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState(false);
   const [isNewPatientOpen, setIsNewPatientOpen] = useState(false);
+  const [isReceptionModeActive, setIsReceptionModeActive] = useState(false);
+  const [appointmentViewFormat, setAppointmentViewFormat] = useState<'cards' | 'profissionais' | 'calendario' | 'balcao'>('cards');
   const [patientToEdit, setPatientToEdit] = useState<Paciente | null>(null);
   const [isNewSupplierOpen, setIsNewSupplierOpen] = useState(false);
   const [supplierToEdit, setSupplierToEdit] = useState<Fornecedor | null>(null);
@@ -380,7 +382,12 @@ export default function App() {
           setEstoque(prev => prev.length === 0 ? cachedEstoque : prev);
         }
         if (cachedProcedimentos && cachedProcedimentos.length > 0) {
-          setProcedimentos(prev => prev.length === 0 ? cachedProcedimentos : prev);
+          const sanitizedCached = cachedProcedimentos.map(p => ({
+            ...p,
+            categoria: p.categoria === 'Limpesa de pele' ? 'Limpeza de pele' : p.categoria,
+            nome: p.nome ? p.nome.replace('Limpesa de Pele', 'Limpeza de Pele') : p.nome,
+          }));
+          setProcedimentos(prev => prev.length === 0 ? sanitizedCached : prev);
         }
 
         // Release initial skeleton if local cached records are available instantly
@@ -488,7 +495,21 @@ export default function App() {
     const unsubProcedimentos = subscribeToCollection<ProcedimentoClinico>(
       COLLECTIONS.PROCEDIMENTOS, 
       (data) => {
-        setProcedimentos(data);
+        // Auto-heal any procedure with category 'Limpesa de pele' to 'Limpeza de pele'
+        const sanitized = (data || []).map(p => {
+          let updated = p;
+          if (p.categoria === 'Limpesa de pele') {
+            updated = { ...updated, categoria: 'Limpeza de pele' };
+          }
+          if (p.nome && p.nome.includes('Limpesa de Pele')) {
+            updated = { ...updated, nome: updated.nome.replace('Limpesa de Pele', 'Limpeza de Pele') };
+          }
+          if (updated !== p) {
+            saveDocument(COLLECTIONS.PROCEDIMENTOS, updated);
+          }
+          return updated;
+        });
+        setProcedimentos(sanitized);
         markCollectionReady(COLLECTIONS.PROCEDIMENTOS);
       }, 
       []
@@ -497,7 +518,27 @@ export default function App() {
     const unsubOrcamentos = subscribeToCollection<SolicitacaoOrcamento>(
       COLLECTIONS.ORCAMENTOS, 
       (data) => {
-        setOrcamentos(data);
+        const sanitized = (data || []).map(o => {
+          let hasChange = false;
+          const procs = (o.procedimentos_selecionados || []).map(ps => {
+            if (ps.categoria === 'Limpesa de pele' || ps.nome?.includes('Limpesa')) {
+              hasChange = true;
+              return {
+                ...ps,
+                categoria: ps.categoria === 'Limpesa de pele' ? 'Limpeza de pele' : ps.categoria,
+                nome: ps.nome ? ps.nome.replace('Limpesa de Pele', 'Limpeza de Pele') : ps.nome,
+              };
+            }
+            return ps;
+          });
+          if (hasChange) {
+            const updated = { ...o, procedimentos_selecionados: procs };
+            saveDocument(COLLECTIONS.ORCAMENTOS, updated);
+            return updated;
+          }
+          return o;
+        });
+        setOrcamentos(sanitized);
         markCollectionReady(COLLECTIONS.ORCAMENTOS);
       }, 
       []
@@ -1273,6 +1314,29 @@ export default function App() {
         });
         saveDocument(COLLECTIONS.PACIENTES, updatedPatient);
 
+        // Se houver agendamento pendente de cadastro na recepção para este cliente, atualiza
+        setAgendamentos(prev => prev.map(ag => {
+          if (
+            ag.paciente_id === updatedPatient.id || 
+            ag.paciente?.id === updatedPatient.id || 
+            (ag.paciente?.email && ag.paciente?.email === updatedPatient.email) ||
+            (ag.paciente?.telefone && ag.paciente?.telefone === updatedPatient.telefone)
+          ) {
+            const upAg: Agendamento = {
+              ...ag,
+              necessita_cadastro_completo: false,
+              cadastro_completo_realizado: true,
+              paciente: {
+                ...(ag.paciente || {}),
+                ...updatedPatient,
+              }
+            };
+            saveDocument(COLLECTIONS.AGENDAMENTOS, upAg);
+            return upAg;
+          }
+          return ag;
+        }));
+
         if (selectedPatientForDetails?.id === updatedPatient.id) {
           setSelectedPatientForDetails(updatedPatient);
         }
@@ -1290,7 +1354,7 @@ export default function App() {
       endereco: novo.endereco?.trim() || undefined,
       profissao: novo.profissao?.trim() || undefined,
       contato_emergencia: novo.contato_emergencia,
-      historico_clinico: novo.historico_clinico || 'Ficha clínica inicial cadastrada.',
+      historico_clinico: novo.historico_clinico || 'Ficha clínica inicial cadastrada na recepção.',
       criado_em: new Date().toISOString(),
       email: novo.email?.trim() || undefined,
       cpf: novo.cpf?.trim() || undefined,
@@ -1312,6 +1376,27 @@ export default function App() {
       payload: createdPatient,
     });
     saveDocument(COLLECTIONS.PACIENTES, createdPatient);
+
+    // Se houver agendamento pendente de cadastro originado do portal, atualiza
+    setAgendamentos(prev => prev.map(ag => {
+      if (
+        ag.paciente_id === createdPatient.id || 
+        ag.paciente?.id === createdPatient.id ||
+        (ag.paciente?.email && ag.paciente?.email === createdPatient.email) ||
+        (ag.paciente?.telefone && ag.paciente?.telefone === createdPatient.telefone)
+      ) {
+        const upAg: Agendamento = {
+          ...ag,
+          paciente_id: createdPatient.id,
+          necessita_cadastro_completo: false,
+          cadastro_completo_realizado: true,
+          paciente: createdPatient,
+        };
+        saveDocument(COLLECTIONS.AGENDAMENTOS, upAg);
+        return upAg;
+      }
+      return ag;
+    }));
     showToast(`Ficha do cliente "${createdPatient.nome}" cadastrada e gravada no banco em tempo real!`);
   };
 
@@ -2448,6 +2533,25 @@ export default function App() {
               onDeleteAppointment={handleDeleteAppointment}
               onRescheduleAppointment={handleRescheduleAppointment}
               currentUser={currentUser}
+              initialViewFormat={appointmentViewFormat}
+              onOpenCadastroCompleto={(ag) => {
+                const pat = ag.paciente || pacientes.find(p => p.id === ag.paciente_id);
+                if (pat) {
+                  setPatientToEdit(pat);
+                } else {
+                  setPatientToEdit({
+                    id: ag.paciente_id,
+                    nome: ag.paciente?.nome || 'Cliente do Portal',
+                    telefone: ag.paciente?.telefone || '',
+                    email: ag.paciente?.email || '',
+                    data_nascimento: '1995-01-01',
+                    criado_em: new Date().toISOString(),
+                    historico_clinico: 'Cadastro a ser completado na recepção.',
+                  });
+                }
+                setIsReceptionModeActive(true);
+                setIsNewPatientOpen(true);
+              }}
             />
           )}
 
@@ -2544,31 +2648,56 @@ export default function App() {
               onConverterEmAgendamento={(orc) => handleConverterOrcamentoEmAgendamento(orc)}
               onDeleteOrcamento={handleDeleteOrcamento}
               onCriarAgendamento={(novoAg) => {
+                const pacienteId = novoAg.pacienteId || `pac-${Date.now()}`;
+                const pacienteObj: Paciente = {
+                  id: pacienteId,
+                  nome: novoAg.pacienteNome,
+                  telefone: novoAg.pacienteTelefone,
+                  email: novoAg.pacienteEmail,
+                  data_nascimento: '1995-01-01',
+                  historico_clinico: novoAg.observacoes || 'Cadastro preliminar gerado via agendamento no Portal do Cliente. Aguardando recepção presencial para cadastro completo.',
+                  criado_em: new Date().toISOString(),
+                };
+
+                // Garante que o cliente seja registrado preliminarmente na base de pacientes
+                setPacientes(prev => {
+                  const exists = prev.some(p => 
+                    (novoAg.pacienteEmail && p.email?.toLowerCase() === novoAg.pacienteEmail.toLowerCase()) || 
+                    (novoAg.pacienteTelefone && p.telefone?.replace(/\D/g, '') === novoAg.pacienteTelefone.replace(/\D/g, ''))
+                  );
+                  if (!exists) {
+                    saveDocument(COLLECTIONS.PACIENTES, pacienteObj);
+                    return [pacienteObj, ...prev];
+                  }
+                  return prev;
+                });
+
                 const createdAg: Agendamento = {
                   id: `ag-portal-${Date.now()}`,
-                  paciente_id: novoAg.pacienteId || `pac-${Date.now()}`,
+                  paciente_id: pacienteId,
                   data_hora: `${novoAg.data}T${novoAg.hora || '09:00'}:00`,
                   procedimento: novoAg.procedimentoNome,
-                  status: 'pendente',
+                  status: 'confirmado',
                   criado_em: new Date().toISOString(),
                   duracao_minutos: novoAg.duracaoMinutos || 45,
                   valor_estimado: novoAg.valor || 0,
                   profissional_id: novoAg.profissionalId,
                   profissional_nome: novoAg.profissionalNome,
-                  observacoes: novoAg.observacoes,
-                  paciente: {
-                    id: novoAg.pacienteId || `pac-${Date.now()}`,
-                    nome: novoAg.pacienteNome,
-                    telefone: novoAg.pacienteTelefone,
-                    email: novoAg.pacienteEmail,
-                    data_nascimento: '1995-01-01',
-                    historico_clinico: novoAg.observacoes || 'Cadastro gerado via solicitação no Portal do Paciente Google.',
-                    criado_em: new Date().toISOString(),
-                  }
+                  observacoes: novoAg.observacoes || 'Agendamento direto realizado no Portal do Cliente.',
+                  origem_portal: true,
+                  necessita_cadastro_completo: true,
+                  cadastro_completo_realizado: false,
+                  paciente: pacienteObj,
                 };
+
                 setAgendamentos(prev => [createdAg, ...prev]);
                 saveDocument(COLLECTIONS.AGENDAMENTOS, createdAg);
-                showToast(`Solicitação de agendamento de ${novoAg.pacienteNome} recebida com sucesso!`);
+                showToast(`Agendamento de ${novoAg.pacienteNome} inserido na Agenda Semanal com sucesso!`);
+              }}
+              onGoToAgendaSemanal={(targetDate) => {
+                setAppointmentViewFormat('calendario');
+                setActiveTab('agendamentos');
+                showToast('Redirecionado para a Agenda Semanal da Clínica.', 'info');
               }}
               currentUser={currentUser}
               clinicaConfig={clinicaConfig}
@@ -2828,12 +2957,21 @@ export default function App() {
         onClose={() => {
           setIsNewPatientOpen(false);
           setPatientToEdit(null);
+          setIsReceptionModeActive(false);
         }}
-        onSave={handleSavePatient}
-        onSavePatient={handleSavePatient}
+        onSave={(novo) => {
+          handleSavePatient(novo);
+          setIsReceptionModeActive(false);
+        }}
+        onSavePatient={(novo) => {
+          handleSavePatient(novo);
+          setIsReceptionModeActive(false);
+        }}
         patientToEdit={patientToEdit}
+        isReceptionMode={isReceptionModeActive}
         onOpenAnamneseCompleta={() => {
           setIsNewPatientOpen(false);
+          setIsReceptionModeActive(false);
           setSelectedPatientForAnamnese(null);
           setIsAnamneseModalOpen(true);
         }}

@@ -31,6 +31,7 @@ interface NewPatientModalProps {
   configuracaoCampos?: ConfiguracaoCampos;
   currentUser?: UsuarioEquipe;
   patientToEdit?: Paciente | null;
+  isReceptionMode?: boolean;
 }
 
 export const NewPatientModal: React.FC<NewPatientModalProps> = ({
@@ -42,6 +43,7 @@ export const NewPatientModal: React.FC<NewPatientModalProps> = ({
   configuracaoCampos,
   currentUser,
   patientToEdit,
+  isReceptionMode,
 }) => {
   const [nome, setNome] = useState('');
   const [telefone, setTelefone] = useState('');
@@ -205,6 +207,24 @@ export const NewPatientModal: React.FC<NewPatientModalProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Banner Opcional de Recepção do Paciente */}
+        {isReceptionMode && (
+          <div className="bg-amber-500/10 border-b border-amber-500/20 p-3.5 px-6 flex items-center justify-between gap-3 shrink-0">
+            <div className="flex items-center gap-2.5">
+              <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />
+              <div className="text-xs">
+                <strong className="text-amber-950 block">Recepção do Paciente • Cadastro Completo</strong>
+                <span className="text-amber-800">
+                  Preencha o CPF, data de nascimento, endereço, contatos e histórico para concluir a recepção do atendimento.
+                </span>
+              </div>
+            </div>
+            <span className="text-[10px] font-extrabold uppercase tracking-wider bg-amber-600 text-white px-2 py-0.5 rounded-full shrink-0">
+              Fluxo Recepção
+            </span>
+          </div>
+        )}
 
         {/* Banner Opcional de Anamnese Completa com Assinatura */}
         {onOpenAnamneseCompleta && (

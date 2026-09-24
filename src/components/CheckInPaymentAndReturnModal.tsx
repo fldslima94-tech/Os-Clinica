@@ -22,6 +22,7 @@ interface CheckInPaymentAndReturnModalProps {
   agendamento: Agendamento | null;
   paciente?: Paciente;
   profissionais?: UsuarioEquipe[];
+  onOpenCadastroCompleto?: (agendamento: Agendamento) => void;
   onConfirmCheckIn: (data: {
     agendamentoId: string;
     pagamento: {
@@ -48,6 +49,7 @@ export const CheckInPaymentAndReturnModal: React.FC<CheckInPaymentAndReturnModal
   agendamento,
   paciente,
   profissionais = [],
+  onOpenCadastroCompleto,
   onConfirmCheckIn,
 }) => {
   const [valor, setValor] = useState<number>(agendamento?.valor_estimado || 1200);
@@ -160,6 +162,28 @@ export const CheckInPaymentAndReturnModal: React.FC<CheckInPaymentAndReturnModal
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Banner de Cadastro Completo para agendamentos do Portal */}
+        {(agendamento?.necessita_cadastro_completo || agendamento?.origem_portal || !paciente?.cpf) && (
+          <div className="bg-amber-50 border-b border-amber-200 p-3 px-5 flex items-center justify-between gap-3 text-xs text-amber-900">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>Agendamento do <strong>Portal do Cliente</strong>: lembre-se de conferir e preencher o <strong>cadastro completo</strong> na recepção.</span>
+            </div>
+            {onOpenCadastroCompleto && agendamento && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenCadastroCompleto(agendamento);
+                }}
+                className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold shrink-0 shadow-2xs transition-colors cursor-pointer"
+              >
+                Preencher Cadastro
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5 text-xs sm:text-sm max-h-[80vh] overflow-y-auto">

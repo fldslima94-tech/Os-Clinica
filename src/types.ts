@@ -474,6 +474,10 @@ export interface Agendamento {
   concluido_em?: string;
   // Populated relation
   paciente?: Paciente;
+  // Integração com Portal do Cliente e Recepção
+  origem_portal?: boolean;
+  necessita_cadastro_completo?: boolean;
+  cadastro_completo_realizado?: boolean;
 }
 
 export type CategoriaInsumo = 
@@ -741,13 +745,13 @@ export interface ProcedimentoInsumoVinculado {
 }
 
 export const CATEGORIAS_PROCEDIMENTOS_PERMITIDAS = [
-  'Micropigmentação',
-  'Cilios',
-  'Sombrancelhas',
-  'Limpesa de pele',
   'Cabelo',
+  'Cilios',
+  'Limpeza de pele',
+  'Micropigmentação',
   'penteado',
-  'procedimento estetico'
+  'procedimento estetico',
+  'Sombrancelhas'
 ] as const;
 
 export type CategoriaProcedimento = typeof CATEGORIAS_PROCEDIMENTOS_PERMITIDAS[number];

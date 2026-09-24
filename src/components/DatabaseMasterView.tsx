@@ -170,19 +170,19 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
   const procedureCategories = useMemo(() => {
     const cats = new Set<string>();
     (procedimentos || []).forEach(p => { if (p && p.categoria) cats.add(p.categoria); });
-    return Array.from(cats);
+    return Array.from(cats).sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true, sensitivity: 'base' }));
   }, [procedimentos]);
 
   const estoqueCategories = useMemo(() => {
     const cats = new Set<string>();
     (estoque || []).forEach(e => { if (e && e.categoria) cats.add(e.categoria); });
-    return Array.from(cats);
+    return Array.from(cats).sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true, sensitivity: 'base' }));
   }, [estoque]);
 
   const financialCategories = useMemo(() => {
     const cats = new Set<string>();
     (financeiro || []).forEach(f => { if (f && f.categoria) cats.add(f.categoria); });
-    return Array.from(cats);
+    return Array.from(cats).sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true, sensitivity: 'base' }));
   }, [financeiro]);
 
   // Paciente selecionado para inspeção e exclusão de históricos

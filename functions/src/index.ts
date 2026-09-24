@@ -3,6 +3,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { onRequest } from 'firebase-functions/v2/https';
+import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import * as logger from 'firebase-functions/logger';
 
 // Inicialização do Firebase Admin com o Database e Storage configurados
@@ -219,6 +220,92 @@ export async function processarDumpCriticoParaStorage(origem: 'cloud_function_03
     estatisticas
   };
 }
+
+// ==========================================
+// INTEGRAÇÃO WHATSAPP — Notificação automática de novo agendamento
+// ==========================================
+// Configure estes secrets nas Cloud Functions:
+//   firebase functions:secrets:set WHATSAPP_TOKEN
+//   firebase functions:secrets:set WHATSAPP_PHONE_NUMBER_ID
+const WHATSAPP_API_VERSION = process.env.WHATSAPP_API_VERSION || 'v21.0';
+const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN || '';
+const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
+
+async function enviarWhatsAppNotificacao(telefone: string, texto: string): Promise<void> {
+  if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
+    logger.warn('[whatsapp] WHATSAPP_TOKEN/WHATSAPP_PHONE_NUMBER_ID não configurados nas Cloud Functions — notificação não enviada.');
+    return;
+  }
+  const numero = (telefone || '').replace(/\D/g, '');
+  if (!numero) return;
+
+  try {
+    const resp = await fetch(
+      `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          to: numero,
+          type: 'text',
+          text: { body: texto, preview_url: false },
+        }),
+      }
+    );
+    if (!resp.ok) {
+      const data = await resp.json().catch(() => ({}));
+      logger.error('[whatsapp] Falha ao enviar notificação automática de agendamento:', data);
+    }
+  } catch (err) {
+    logger.error('[whatsapp] Exceção ao enviar notificação automática de agendamento:', err);
+  }
+}
+
+/**
+ * 0. CLOUD FUNCTION DE GATILHO (FIRESTORE TRIGGER)
+ * Dispara automaticamente sempre que um novo documento é criado na coleção 'agendamentos',
+ * e envia uma mensagem de confirmação via WhatsApp para o telefone do paciente.
+ */
+export const notificarNovoAgendamentoWhatsApp = onDocumentCreated(
+  { document: 'agendamentos/{agendamentoId}', database: FIRESTORE_DATABASE_ID },
+  async (event) => {
+    const agendamento = event.data?.data() as any;
+    if (!agendamento) return;
+
+    const db = getDbInstance();
+    let telefone: string | undefined = agendamento.paciente?.telefone;
+
+    if (!telefone && agendamento.paciente_id) {
+      try {
+        const pacienteDoc = await db.collection('pacientes').doc(agendamento.paciente_id).get();
+        telefone = pacienteDoc.data()?.telefone;
+      } catch (err) {
+        logger.warn('[whatsapp] Erro ao buscar telefone do paciente para notificação:', err);
+      }
+    }
+
+    if (!telefone) {
+      logger.info('[whatsapp] Agendamento sem telefone de paciente associado — notificação pulada.');
+      return;
+    }
+
+    const dataObj = new Date(agendamento.data_hora);
+    const dataStr = dataObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    const horaStr = dataObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const procedimento = agendamento.procedimento || 'seu procedimento';
+
+    const mensagem =
+      `Olá! Seu agendamento de *${procedimento}* foi confirmado para *${dataStr}* às *${horaStr}*. ✨\n\n` +
+      `Responda *1* para confirmar presença ou *2* se precisar remarcar.`;
+
+    await enviarWhatsAppNotificacao(telefone, mensagem);
+    logger.info(`[whatsapp] Notificação automática enviada para ${telefone} sobre agendamento ${event.params.agendamentoId}.`);
+  }
+);
 
 /**
  * 1. CLOUD FUNCTION AGENDADA (SCHEDULED V2)

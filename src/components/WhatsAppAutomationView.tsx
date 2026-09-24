@@ -31,6 +31,9 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
   const [activeTemplate, setActiveTemplate] = useState<'confirmacao' | 'pre_cuidados' | 'pos_cuidados' | 'retorno'>('confirmacao');
   const [selectedFilter, setSelectedFilter] = useState<'todos' | 'hoje' | 'amanha'>('todos');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [sendingApiId, setSendingApiId] = useState<string | null>(null);
+  const [apiSentIds, setApiSentIds] = useState<Set<string>>(new Set());
+  const [apiErrorId, setApiErrorId] = useState<string | null>(null);
 
   const formatMessage = (ag: Agendamento, templateType: string) => {
     const clinicName = clinicaConfig?.nome || 'nossa clínica';
@@ -70,6 +73,34 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
 
     onMarkReminderSent(ag.id);
     window.open(url, '_blank');
+  };
+
+  /** Envia direto pela API oficial (sem precisar abrir o WhatsApp manualmente) */
+  const handleSendWhatsAppApi = async (ag: Agendamento) => {
+    const patient = ag.paciente || pacientes.find(p => p.id === ag.paciente_id);
+    if (!patient?.telefone) return;
+
+    setApiErrorId(null);
+    setSendingApiId(ag.id);
+    try {
+      const message = formatMessage(ag, activeTemplate);
+      const resp = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telefone: `55${patient.telefone.replace(/\D/g, '')}`, mensagem: message }),
+      });
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        throw new Error(data?.error || 'Falha ao enviar mensagem.');
+      }
+      onMarkReminderSent(ag.id);
+      setApiSentIds(prev => new Set(prev).add(ag.id));
+    } catch (err) {
+      console.error('[WhatsAppAutomationView] Erro ao enviar via API:', err);
+      setApiErrorId(ag.id);
+    } finally {
+      setSendingApiId(null);
+    }
   };
 
   const handleCopyText = (ag: Agendamento) => {
@@ -280,11 +311,35 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
 
                   <button
                     onClick={() => handleSendWhatsApp(ag)}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
+                    className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+                    title="Abre o WhatsApp Web/App com a mensagem pronta para você enviar manualmente"
                   >
                     <MessageCircle className="w-4 h-4" />
-                    <span>Enviar WhatsApp</span>
+                    <span>Abrir no WhatsApp</span>
                   </button>
+
+                  <button
+                    onClick={() => handleSendWhatsAppApi(ag)}
+                    disabled={sendingApiId === ag.id}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-60 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
+                    title="Envia automaticamente via API oficial do WhatsApp, sem precisar abrir o app"
+                  >
+                    {sendingApiId === ag.id ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : apiSentIds.has(ag.id) ? (
+                      <CheckCircle2 className="w-4 h-4" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                    <span>
+                      {sendingApiId === ag.id ? 'Enviando...' : apiSentIds.has(ag.id) ? 'Enviado!' : 'Enviar Automático'}
+                    </span>
+                  </button>
+                  {apiErrorId === ag.id && (
+                    <span className="text-[11px] text-rose-600 font-semibold max-w-[140px]">
+                      Falha ao enviar. Verifique a configuração do WhatsApp.
+                    </span>
+                  )}
                 </div>
 
               </div>

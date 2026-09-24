@@ -30,7 +30,9 @@ interface ProcedureModalProps {
   estoqueDisponivel?: EstoqueInsumo[];
 }
 
-const CATEGORIAS_PADRAO = CATEGORIAS_PROCEDIMENTOS_PERMITIDAS;
+const CATEGORIAS_PADRAO = [...CATEGORIAS_PROCEDIMENTOS_PERMITIDAS].sort((a, b) =>
+  a.localeCompare(b, 'pt-BR', { numeric: true, sensitivity: 'base' })
+);
 
 interface ModeloProcedimento {
   nome: string;
@@ -95,8 +97,8 @@ const MODELOS_PROCEDIMENTOS: ModeloProcedimento[] = [
     cuidados_pos: 'Evitar lavar a região com sabonete adstringente nas primeiras 8 horas para maior durabilidade da henna.',
   },
   {
-    nome: 'Limpesa de Pele Profunda + Peeling Ultrassônico & LED',
-    categoria: 'Limpesa de pele',
+    nome: 'Limpeza de Pele Profunda + Peeling Ultrassônico & LED',
+    categoria: 'Limpeza de pele',
     duracao_minutos: 60,
     dias_retorno: 30,
     valor_tabela: 220,

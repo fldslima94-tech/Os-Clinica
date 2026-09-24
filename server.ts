@@ -1,4 +1,8 @@
+// Disable Vite HMR in AI Studio container to prevent iframe WebSocket connection errors
+process.env.DISABLE_HMR = "true";
+
 import express from "express";
+import http from "http";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { requireAuth, AuthRequest } from "./src/middleware/auth.ts";
@@ -11,9 +15,15 @@ import {
   salvarDumpLocal,
   iniciarAgendador03h
 } from "./server/cloudStorageBackup.ts";
+import {
+  enviarMensagemWhatsApp,
+  handleWhatsAppWebhookVerify,
+  handleWhatsAppWebhookReceive
+} from "./server/whatsapp.ts";
 
 async function startServer() {
   const app = express();
+  const httpServer = http.createServer(app);
   const PORT = 3000;
 
   // Support JSON and large base64 payload for image editing
@@ -187,10 +197,41 @@ async function startServer() {
   // Inicializa o agendador das 03:00 (America/Sao_Paulo)
   iniciarAgendador03h();
 
+  // ==========================================
+  // Rotas da Integração WhatsApp (Cloud API oficial da Meta)
+  // ==========================================
+
+  // 1. Verificação do webhook (chamada uma vez pela Meta ao configurar o webhook)
+  app.get("/api/whatsapp/webhook", handleWhatsAppWebhookVerify);
+
+  // 2. Recebimento de mensagens/pedidos dos clientes (chamado pela Meta a cada mensagem)
+  app.post("/api/whatsapp/webhook", handleWhatsAppWebhookReceive);
+
+  // 3. Envio manual/interno de mensagens (usado pela tela de Automação WhatsApp do app)
+  app.post("/api/whatsapp/send", async (req, res) => {
+    try {
+      const { telefone, mensagem } = req.body;
+      if (!telefone || !mensagem) {
+        return res.status(400).json({ error: "Os campos 'telefone' e 'mensagem' são obrigatórios." });
+      }
+      const resultado = await enviarMensagemWhatsApp(telefone, mensagem);
+      if (!resultado.sucesso) {
+        return res.status(502).json({ error: resultado.erro || "Falha ao enviar mensagem via WhatsApp" });
+      }
+      res.json({ sucesso: true, id: resultado.id });
+    } catch (error: any) {
+      console.error("Erro ao enviar mensagem WhatsApp:", error);
+      res.status(500).json({ error: error.message || "Erro ao enviar mensagem WhatsApp" });
+    }
+  });
+
   // Vite middleware for development vs static serve for production
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: false,
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);
@@ -202,7 +243,7 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
   });
 }
