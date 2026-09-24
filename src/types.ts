@@ -919,5 +919,27 @@ export interface FirebaseStorageDump {
   agendamento?: string;
 }
 
+export type WhatsAppTemplateCategoria = 
+  | 'confirmacao' 
+  | 'pre_cuidados' 
+  | 'pos_cuidados' 
+  | 'retorno' 
+  | 'personalizado';
+
+export interface WhatsAppTemplate {
+  id: string;
+  titulo: string;
+  categoria: WhatsAppTemplateCategoria;
+  descricao?: string;
+  mensagem: string;
+  ativo: boolean;
+  padrao?: boolean;
+  gatilho_sugerido?: string; // ex: '24h antes', '2h antes', 'Imediato pós', '15 dias pós'
+  ordem?: number;
+  criado_em?: string;
+  atualizado_em?: string;
+}
+
+
 
 

@@ -113,6 +113,7 @@ import {
   ensureSuperAdminInFirestore,
   executarVerificacaoBackupAutomatico,
   getGestoresLocaisParaSelecao,
+  canUserAssignRole,
   SUPER_ADMIN_EMAILS,
   COLLECTIONS,
   auth,
@@ -2151,6 +2152,13 @@ export default function App() {
 
   // User Management Handlers
   const handleSaveUser = async (novo: Omit<UsuarioEquipe, 'id' | 'created_at'>) => {
+    // Validação estrita de hierarquia:
+    // Apenas o Super Admin pode criar outro Super Admin; os demais apenas igual ou inferior.
+    if (!canUserAssignRole(currentUser, novo.role)) {
+      showToast('Apenas o Super Admin pode criar um novo Super Admin. Você só pode criar usuários de nível igual ou inferior ao seu.', 'error');
+      return;
+    }
+
     const cleanEmail = (novo.email || '').trim().toLowerCase();
     const created: UsuarioEquipe = {
       ...novo,
@@ -2175,6 +2183,13 @@ export default function App() {
   };
 
   const handleUpdateUser = async (updated: UsuarioEquipe) => {
+    // Validação estrita de hierarquia ao atualizar role:
+    const existing = usuarios.find(u => u.id === updated.id);
+    if (existing && existing.role !== updated.role && !canUserAssignRole(currentUser, updated.role)) {
+      showToast('Apenas o Super Admin pode atribuir o cargo de Super Admin. Você só pode atribuir cargos de classe igual à sua ou inferior.', 'error');
+      return;
+    }
+
     const cleanEmail = (updated.email || '').trim().toLowerCase();
     const sanitized = { ...updated, email: cleanEmail };
     setUsuarios(prev =>
@@ -2759,6 +2774,10 @@ export default function App() {
               pacientes={pacientes}
               onMarkReminderSent={handleMarkReminderSent}
               clinicaConfig={clinicaConfig}
+              procedimentos={procedimentos}
+              usuarios={usuarios}
+              currentUser={currentUser}
+              showToast={showToast}
             />
           )}
 
@@ -3049,6 +3068,7 @@ export default function App() {
         onClose={() => setIsNewUserOpen(false)}
         onSave={handleSaveUser}
         onSaveUser={handleSaveUser}
+        currentUser={currentUser}
       />
 
       <EditUserModal
@@ -3058,6 +3078,7 @@ export default function App() {
         usuario={userToEdit}
         onSave={handleUpdateUser}
         onSaveUser={handleUpdateUser}
+        currentUser={currentUser}
       />
 
       <ErrorBoundary fallbackTitle="Prontuário e Ficha Clínica do Paciente">

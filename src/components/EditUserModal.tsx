@@ -16,9 +16,11 @@ import {
   Crown,
   Building2,
   UserCheck,
-  UserCircle
+  UserCircle,
+  AlertCircle
 } from 'lucide-react';
 import { UsuarioEquipe, UserRole, PermissoesUsuario } from '../types';
+import { canUserAssignRole, isUserAdminTotal } from '../services/firebaseService';
 
 interface EditUserModalProps {
   isOpen: boolean;
@@ -27,6 +29,7 @@ interface EditUserModalProps {
   user?: UsuarioEquipe | null;
   onSaveUser?: (updatedUser: UsuarioEquipe) => void;
   onSave?: (updatedUser: UsuarioEquipe) => void;
+  currentUser?: UsuarioEquipe;
 }
 
 export const EditUserModal: React.FC<EditUserModalProps> = ({
@@ -36,6 +39,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
   user: propUser,
   onSaveUser,
   onSave,
+  currentUser,
 }) => {
   const usuario = propUsuario || propUser || null;
   const saveHandler = onSaveUser || onSave;
@@ -46,6 +50,14 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
   const [telefone, setTelefone] = useState('');
   const [senha, setSenha] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const isSuperAdmin = isUserAdminTotal(currentUser);
+  const isTargetSuperAdmin = isUserAdminTotal(usuario);
+  const canAssignMaster = canUserAssignRole(currentUser, 'admin_master');
+  const canAssignAdminLocal = canUserAssignRole(currentUser, 'admin_local');
+  const canAssignUsuario = canUserAssignRole(currentUser, 'usuario');
+  const canAssignCliente = canUserAssignRole(currentUser, 'cliente');
 
   const [permissoes, setPermissoes] = useState<PermissoesUsuario>({
     ver_financeiro_completo: false,
@@ -76,6 +88,15 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
   if (!isOpen || !usuario) return null;
 
   const handleRoleChange = (newRole: UserRole) => {
+    if (role !== newRole && !canUserAssignRole(currentUser, newRole)) {
+      if (newRole === 'admin_master' || newRole === 'admin_total') {
+        setErrorMsg('Permissão negada: Apenas o Super Admin pode atribuir o cargo de Super Admin.');
+      } else {
+        setErrorMsg('Permissão negada: Você só pode atribuir cargos de classe igual à sua ou inferior.');
+      }
+      return;
+    }
+    setErrorMsg(null);
     setRole(newRole);
     if (newRole === 'admin_master' || newRole === 'admin_total') {
       setCargo('Admin Master (Acesso Total)');
@@ -119,6 +140,11 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nome.trim() || !email.trim() || !usuario) return;
+
+    if (role !== usuario.role && !canUserAssignRole(currentUser, role)) {
+      setErrorMsg('Apenas o Super Admin pode atribuir a função de Super Admin. Você só pode atribuir cargos de classe igual à sua ou inferior.');
+      return;
+    }
 
     if (saveHandler) {
       saveHandler({
@@ -167,87 +193,152 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           
+          {/* Alerta de Erro de Permissão */}
+          {errorMsg && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2.5 text-xs text-rose-800 font-medium animate-in fade-in">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {/* Banner de Proteção do Super Admin */}
+          {isTargetSuperAdmin && !isSuperAdmin && (
+            <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-xl flex items-start gap-2.5 text-xs text-amber-900">
+              <Crown className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block">Usuário Super Admin Protegido</span>
+                <span>Apenas o próprio Super Admin pode alterar a classe hierárquica ou privilégios de outro Super Admin.</span>
+              </div>
+            </div>
+          )}
+
           {/* Perfil / Nível de Acesso (4 Níveis da Hierarquia) */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
-              Nível Hierárquico no Sistema *
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                Nível Hierárquico no Sistema *
+              </label>
+              {!isSuperAdmin && (
+                <span className="text-[10px] text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200 flex items-center gap-1">
+                  <Lock className="w-3 h-3 text-amber-600" />
+                  Super Admin restrito
+                </span>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               
               {/* Nível 1: Admin Master */}
               <button
                 type="button"
+                disabled={!canAssignMaster || (isTargetSuperAdmin && !isSuperAdmin)}
                 onClick={() => handleRoleChange('admin_master')}
-                className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between cursor-pointer ${
-                  role === 'admin_master' || role === 'admin_total'
-                    ? 'border-amber-500 bg-amber-50/80 text-amber-950 ring-2 ring-amber-500/20 shadow-xs'
-                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                  !canAssignMaster || (isTargetSuperAdmin && !isSuperAdmin)
+                    ? 'border-slate-200 bg-slate-100/70 text-slate-400 opacity-60 cursor-not-allowed'
+                    : role === 'admin_master' || role === 'admin_total'
+                    ? 'border-amber-500 bg-amber-50/80 text-amber-950 ring-2 ring-amber-500/20 shadow-xs cursor-pointer'
+                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700 cursor-pointer'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-amber-800">
+                  <span className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${canAssignMaster ? 'text-amber-800' : 'text-slate-500'}`}>
                     <Crown className="w-4 h-4 text-amber-600" />
                     <span>1. Admin Master</span>
                   </span>
-                  {(role === 'admin_master' || role === 'admin_total') && <CheckCircle2 className="w-4 h-4 text-amber-600" />}
+                  {!canAssignMaster ? (
+                    <span className="text-[10px] font-bold text-slate-500 bg-slate-200/80 px-1.5 py-0.5 rounded flex items-center gap-1">
+                      <Lock className="w-3 h-3" />
+                      Super Admin
+                    </span>
+                  ) : (role === 'admin_master' || role === 'admin_total') ? (
+                    <CheckCircle2 className="w-4 h-4 text-amber-600" />
+                  ) : null}
                 </div>
                 <p className="text-[11px] text-slate-600 leading-tight">
-                  Acesso total: libera módulos, cadastra/exclui usuários, altera nomes de campos e permissões.
+                  {canAssignMaster
+                    ? 'Acesso total: libera módulos, cadastra/exclui usuários, altera permissões.'
+                    : 'Exclusivo: Apenas o Super Admin pode atribuir perfil de Super Admin.'}
                 </p>
               </button>
 
               {/* Nível 2: Admin Local */}
               <button
                 type="button"
+                disabled={!canAssignAdminLocal || (isTargetSuperAdmin && !isSuperAdmin)}
                 onClick={() => handleRoleChange('admin_local')}
-                className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between cursor-pointer ${
-                  role === 'admin_local'
-                    ? 'border-indigo-600 bg-indigo-50/80 text-indigo-950 ring-2 ring-indigo-600/20 shadow-xs'
-                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                  !canAssignAdminLocal || (isTargetSuperAdmin && !isSuperAdmin)
+                    ? 'border-slate-200 bg-slate-100/70 text-slate-400 opacity-60 cursor-not-allowed'
+                    : role === 'admin_local'
+                    ? 'border-indigo-600 bg-indigo-50/80 text-indigo-950 ring-2 ring-indigo-600/20 shadow-xs cursor-pointer'
+                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700 cursor-pointer'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-indigo-800">
+                  <span className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${canAssignAdminLocal ? 'text-indigo-800' : 'text-slate-500'}`}>
                     <Building2 className="w-4 h-4 text-indigo-600" />
                     <span>2. Admin Local</span>
                   </span>
-                  {role === 'admin_local' && <CheckCircle2 className="w-4 h-4 text-indigo-600" />}
+                  {!canAssignAdminLocal ? (
+                    <span className="text-[10px] font-bold text-slate-500 bg-slate-200/80 px-1.5 py-0.5 rounded flex items-center gap-1">
+                      <Lock className="w-3 h-3" />
+                      Bloqueado
+                    </span>
+                  ) : role === 'admin_local' ? (
+                    <CheckCircle2 className="w-4 h-4 text-indigo-600" />
+                  ) : null}
                 </div>
                 <p className="text-[11px] text-slate-600 leading-tight">
-                  Acesso baseado no que o Admin Master liberar. Gerencia equipe e operações da unidade.
+                  {canAssignAdminLocal
+                    ? 'Gestor da unidade: gerencia equipe, caixa e operações da unidade.'
+                    : 'Permitido apenas para Super Admin e Admin Local.'}
                 </p>
               </button>
 
               {/* Nível 3: Usuário */}
               <button
                 type="button"
+                disabled={!canAssignUsuario || (isTargetSuperAdmin && !isSuperAdmin)}
                 onClick={() => handleRoleChange('usuario')}
-                className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between cursor-pointer ${
-                  role === 'usuario' || role === 'profissional' || role === 'recepcao' || role === 'operador'
-                    ? 'border-emerald-600 bg-emerald-50/80 text-emerald-950 ring-2 ring-emerald-600/20 shadow-xs'
-                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                  !canAssignUsuario || (isTargetSuperAdmin && !isSuperAdmin)
+                    ? 'border-slate-200 bg-slate-100/70 text-slate-400 opacity-60 cursor-not-allowed'
+                    : role === 'usuario' || role === 'profissional' || role === 'recepcao' || role === 'operador'
+                    ? 'border-emerald-600 bg-emerald-50/80 text-emerald-950 ring-2 ring-emerald-600/20 shadow-xs cursor-pointer'
+                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700 cursor-pointer'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-emerald-800">
+                  <span className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${canAssignUsuario ? 'text-emerald-800' : 'text-slate-500'}`}>
                     <UserCheck className="w-4 h-4 text-emerald-600" />
-                    <span>3. Usuário</span>
+                    <span>3. Profissional / Equipe</span>
                   </span>
-                  {(role === 'usuario' || role === 'profissional' || role === 'recepcao' || role === 'operador') && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
+                  {!canAssignUsuario ? (
+                    <span className="text-[10px] font-bold text-slate-500 bg-slate-200/80 px-1.5 py-0.5 rounded flex items-center gap-1">
+                      <Lock className="w-3 h-3" />
+                      Bloqueado
+                    </span>
+                  ) : (role === 'usuario' || role === 'profissional' || role === 'recepcao' || role === 'operador') ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  ) : null}
                 </div>
                 <p className="text-[11px] text-slate-600 leading-tight">
-                  Acesso baseado no que o Admin Master ou Admin Local liberar (profissionais, recepção, operadores).
+                  Acesso aos atendimentos, agenda por profissional, anamneses e evolução de clientes.
                 </p>
               </button>
 
               {/* Nível 4: Cliente */}
               <button
                 type="button"
+                disabled={!canAssignCliente || (isTargetSuperAdmin && !isSuperAdmin)}
                 onClick={() => handleRoleChange('cliente')}
-                className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between cursor-pointer ${
-                  role === 'cliente'
-                    ? 'border-blue-600 bg-blue-50/80 text-blue-950 ring-2 ring-blue-600/20 shadow-xs'
-                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                  !canAssignCliente || (isTargetSuperAdmin && !isSuperAdmin)
+                    ? 'border-slate-200 bg-slate-100/70 text-slate-400 opacity-60 cursor-not-allowed'
+                    : role === 'cliente'
+                    ? 'border-blue-600 bg-blue-50/80 text-blue-950 ring-2 ring-blue-600/20 shadow-xs cursor-pointer'
+                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700 cursor-pointer'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">

@@ -100,6 +100,7 @@ export const COLLECTIONS = {
   COMUNICADOS_INTERNOS: 'comunicados_internos',
   ALERTAS_RETORNO: 'alertas_retorno',
   BACKUPS: 'backups_sistema',
+  WHATSAPP_TEMPLATES: 'whatsapp_templates',
 } as const;
 
 export enum OperationType {
@@ -1476,6 +1477,64 @@ export function getGestoresLocaisParaSelecao(usuarios: UsuarioEquipe[] = []): Us
     const role = (u.role || '').toLowerCase().trim();
     return role === 'admin_total' || role === 'admin_master' || role === 'admin' || isUserAdminTotal(u);
   });
+}
+
+/**
+ * Níveis de classe de usuário na hierarquia do sistema:
+ * 4: Super Admin (Admin Master / Admin Total)
+ * 3: Admin Local (Gestor Local / Gerente)
+ * 2: Equipe Clínica / Operacional (Profissional, Recepção, Operador, Usuário)
+ * 1: Cliente (Portal do Paciente)
+ */
+export function getUserHierarchyRank(userOrRole?: UsuarioEquipe | UserRole | string | null): number {
+  if (!userOrRole) return 1;
+
+  if (typeof userOrRole === 'object') {
+    if (isUserAdminTotal(userOrRole)) return 4;
+    const role = (userOrRole.role || '').toLowerCase().trim();
+    if (role === 'admin_master' || role === 'admin_total') return 4;
+    if (role === 'admin_local' || role === 'gestor' || role === 'admin') return 3;
+    if (role === 'usuario' || role === 'profissional' || role === 'recepcao' || role === 'operador') return 2;
+    if (role === 'cliente') return 1;
+    return 2;
+  }
+
+  const role = String(userOrRole).toLowerCase().trim();
+  if (role === 'admin_master' || role === 'admin_total') return 4;
+  if (role === 'admin_local' || role === 'gestor' || role === 'admin') return 3;
+  if (role === 'usuario' || role === 'profissional' || role === 'recepcao' || role === 'operador') return 2;
+  if (role === 'cliente') return 1;
+  return 2;
+}
+
+/**
+ * Valida a regra de criação e atribuição de cargos:
+ * - Apenas o Super Admin pode criar um novo Super Admin.
+ * - Os demais só podem criar/atribuir classe igual a sua ou inferior.
+ */
+export function canUserAssignRole(
+  creator?: UsuarioEquipe | null,
+  targetRole?: UserRole | string | null
+): boolean {
+  if (!creator) return false;
+  
+  const creatorRank = getUserHierarchyRank(creator);
+  const targetRank = getUserHierarchyRank(targetRole);
+
+  // 1. Apenas o Super Admin (Rank 4) pode criar/atribuir outro Super Admin (Rank 4)
+  if (targetRank >= 4) {
+    return creatorRank >= 4;
+  }
+
+  // 2. Os demais só podem criar apenas classe igual a sua ou inferior
+  return targetRank <= creatorRank;
+}
+
+/**
+ * Retorna se o usuário é estritamente Super Admin (Master / Total)
+ */
+export function isSuperAdminUser(user?: UsuarioEquipe | null): boolean {
+  return isUserAdminTotal(user);
 }
 
 /**
