@@ -53,7 +53,8 @@ import {
   saveClientPortalProfile,
   fetchClientPortalProfile,
   formatPhoneBR,
-  isValidPhoneBR
+  isValidPhoneBR,
+  getGestoresLocaisParaSelecao
 } from '../services/firebaseService';
 
 interface PatientPortalViewProps {
@@ -84,6 +85,7 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
   onGoToAgendaSemanal,
 }) => {
   const isAdmin = !currentUser || isUserAdminTotal(currentUser) || isUserAdminLocalOrTotal(currentUser) || currentUser.role === 'admin_master' || currentUser.role === 'admin_total' || currentUser.role === 'admin' || currentUser.role === 'gestor' || currentUser.role === 'recepcao';
+  const gestoresLocais = useMemo(() => getGestoresLocaisParaSelecao(profissionais), [profissionais]);
   
   // Active Tab: simulador (Orçamento) | agendamento | mapa | meus_orcamentos | gestao_clinica
   const [activeTab, setActiveTab] = useState<'simulador' | 'agendamento' | 'mapa' | 'meus_orcamentos' | 'gestao_clinica'>('simulador');
@@ -432,8 +434,11 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
     }
 
     const selectedProc = procedimentos.find(p => p.id === bookingProcedureId);
-    const selectedProf = profissionais.find(p => p.id === bookingProfessionalId);
+    const selectedProf = gestoresLocais.find(p => p.id === bookingProfessionalId) || profissionais.find(p => p.id === bookingProfessionalId);
     const valorEstimado = selectedProc ? (selectedProc.valor_promocional || selectedProc.valor_tabela) : 0;
+
+    const finalProfId = selectedProc?.profissional_id || selectedProf?.id || gestoresLocais[0]?.id || (profissionais[0]?.id || 'prof-geral');
+    const finalProfNome = selectedProc?.profissional_nome || selectedProf?.nome || gestoresLocais[0]?.nome || (profissionais[0]?.nome || 'Equipe Médica');
 
     // Agendamento direto na clínica (vai direto para a agenda semanal da clínica)
     if (onCriarAgendamento && selectedProc) {
@@ -445,8 +450,8 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
         pacienteEmail: googleProfile.email,
         procedimentoId: selectedProc.id,
         procedimentoNome: selectedProc.nome,
-        profissionalId: selectedProf?.id || (profissionais[0]?.id || 'prof-geral'),
-        profissionalNome: selectedProf?.nome || (profissionais[0]?.nome || 'Equipe Médica'),
+        profissionalId: finalProfId,
+        profissionalNome: finalProfNome,
         data: bookingDate,
         hora: horaPadrao,
         duracaoMinutos: selectedProc.duracao_minutos || 45,
@@ -1176,22 +1181,45 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
               </div>
             </div>
 
+            {/* Profissional Responsável (Gestor Local) */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Profissional de Preferência
-              </label>
-              <select
-                value={bookingProfessionalId}
-                onChange={(e) => setBookingProfessionalId(e.target.value)}
-                className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 font-medium"
-              >
-                <option value="qualquer">Qualquer profissional disponível (Mais rápido)</option>
-                {profissionais.filter(u => u.status === 'ativo' && u.role !== 'cliente').map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.nome} — {p.especialidade || p.cargo || 'Especialista'}
-                  </option>
-                ))}
-              </select>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Profissional Responsável
+                </label>
+                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                  Gestor Local
+                </span>
+              </div>
+              {(() => {
+                const selProc = procedimentos.find(p => p.id === bookingProcedureId);
+                if (selProc?.profissional_nome) {
+                  return (
+                    <div className="w-full px-3.5 py-2.5 bg-indigo-50/70 border border-indigo-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-800 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                        <span>{selProc.profissional_nome}</span>
+                      </div>
+                      <span className="text-[10px] uppercase font-bold text-indigo-700 bg-white border border-indigo-200 px-2 py-0.5 rounded-md">
+                        Definido no Procedimento
+                      </span>
+                    </div>
+                  );
+                }
+                return (
+                  <select
+                    value={bookingProfessionalId}
+                    onChange={(e) => setBookingProfessionalId(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 font-medium"
+                  >
+                    {gestoresLocais.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.nome} — {p.cargo || 'Gestor Local'}
+                      </option>
+                    ))}
+                  </select>
+                );
+              })()}
             </div>
 
             <div className="space-y-1.5">

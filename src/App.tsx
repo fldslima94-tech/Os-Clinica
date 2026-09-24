@@ -112,6 +112,7 @@ import {
   logoutFirebase,
   ensureSuperAdminInFirestore,
   executarVerificacaoBackupAutomatico,
+  getGestoresLocaisParaSelecao,
   SUPER_ADMIN_EMAILS,
   COLLECTIONS,
   auth,
@@ -221,7 +222,7 @@ export default function App() {
   const [transacoes, setTransacoes] = useState<TransacaoFinanceira[]>([]);
   const [despesasRecorrentes, setDespesasRecorrentes] = useState<DespesaRecorrente[]>([]);
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
-  const [usuarios, setUsuarios] = useState<UsuarioEquipe[]>([MOCK_USUARIOS[0], MOCK_USUARIOS[1]]);
+  const [usuarios, setUsuarios] = useState<UsuarioEquipe[]>(MOCK_USUARIOS);
   const [avisos, setAvisos] = useState<AvisoQuadro[]>([]);
   const [alertasRetorno, setAlertasRetorno] = useState<AlertaRetornoPos[]>([]);
   const [configuracaoCampos, setConfiguracaoCampos] = useState<ConfiguracaoCampos>({
@@ -566,7 +567,7 @@ export default function App() {
       COLLECTIONS.USUARIOS, 
       (data) => {
         if (!data || data.length === 0) {
-          setUsuarios([MOCK_USUARIOS[0], MOCK_USUARIOS[1]]);
+          setUsuarios(MOCK_USUARIOS);
           markCollectionReady(COLLECTIONS.USUARIOS);
           return;
         }
@@ -634,7 +635,7 @@ export default function App() {
           return prevUser;
         });
       }, 
-      [MOCK_USUARIOS[0], MOCK_USUARIOS[1]]
+      MOCK_USUARIOS
     );
 
     const unsubAvisos = subscribeToCollection<AvisoQuadro>(
@@ -1234,6 +1235,20 @@ export default function App() {
     }
 
     const patientObj = pacientes.find(p => p.id === novo.paciente_id);
+    const matchingProc = procedimentos.find(p => 
+      (p.nome || '').toLowerCase().trim() === (novo.procedimento || '').toLowerCase().trim() ||
+      p.id === novo.procedimento
+    );
+    const gestores = getGestoresLocaisParaSelecao(usuarios);
+    const fallbackGestor = gestores[0];
+
+    const finalProfId = matchingProc?.profissional_id || novo.profissional_id || fallbackGestor?.id || currentUser?.id;
+    const finalProfUser = finalProfId ? usuarios.find(u => u.id === finalProfId) : null;
+    const finalProfNome = matchingProc?.profissional_nome || novo.profissional_nome || finalProfUser?.nome || fallbackGestor?.nome || currentUser?.nome || 'Profissional Responsável';
+    const finalProfCargo = matchingProc?.profissional_id 
+      ? (finalProfUser?.cargo || 'Gestor Local') 
+      : (novo.profissional_cargo || finalProfUser?.cargo || fallbackGestor?.cargo || currentUser?.cargo);
+
     const createdAgendamento: Agendamento = {
       id: `ag-${Date.now()}`,
       paciente_id: novo.paciente_id,
@@ -1244,9 +1259,9 @@ export default function App() {
       duracao_minutos: novo.duracao_minutos || 45,
       valor_estimado: novo.valor_estimado,
       observacoes: novo.observacoes,
-      profissional_id: novo.profissional_id || currentUser?.id,
-      profissional_nome: novo.profissional_nome || currentUser?.nome || 'Profissional Clínico',
-      profissional_cargo: novo.profissional_cargo || currentUser?.cargo,
+      profissional_id: finalProfId,
+      profissional_nome: finalProfNome,
+      profissional_cargo: finalProfCargo,
       contrato_vinculado: novo.contrato_vinculado,
       contrato_assinado: novo.contrato_assinado ?? false,
       paciente: patientObj || {
@@ -1984,6 +1999,8 @@ export default function App() {
         valor_tabela: val,
         duracao_minutos: novo.duracao_minutos ?? existing?.duracao_minutos ?? 45,
         dias_retorno_padrao: novo.dias_retorno_padrao ?? existing?.dias_retorno_padrao ?? 15,
+        profissional_id: novo.profissional_id ?? existing?.profissional_id,
+        profissional_nome: novo.profissional_nome ?? existing?.profissional_nome,
       } as ProcedimentoClinico;
       setProcedimentos(prev => prev.map(p => (p.id === targetId ? updated : p)));
       saveDocument(COLLECTIONS.PROCEDIMENTOS, updated);
@@ -2011,6 +2028,8 @@ export default function App() {
         insumos_vinculados: novo.insumos_vinculados,
         exige_contrato: novo.exige_contrato ?? true,
         contrato_padrao: novo.contrato_padrao,
+        profissional_id: novo.profissional_id,
+        profissional_nome: novo.profissional_nome,
       };
       setProcedimentos(prev => [created, ...prev]);
       saveDocument(COLLECTIONS.PROCEDIMENTOS, created);
@@ -3022,6 +3041,7 @@ export default function App() {
         onSave={handleSaveProcedure}
         procedimentoToEdit={procedureToEdit}
         estoqueDisponivel={estoque}
+        usuarios={usuarios}
       />
 
       <NewUserModal

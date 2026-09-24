@@ -1441,6 +1441,44 @@ export function canAccessFinancials(user?: UsuarioEquipe | null): boolean {
 }
 
 /**
+ * Retorna se o usuário é Gestor Local (Admin Local ou Gestor)
+ */
+export function isUserGestorLocal(user?: UsuarioEquipe | null): boolean {
+  if (!user || user.status === 'inativo' || user.role === 'cliente') return false;
+  const role = (user.role || '').toLowerCase().trim();
+  const cargo = (user.cargo || '').toLowerCase().trim();
+  return (
+    role === 'admin_local' ||
+    role === 'gestor' ||
+    cargo.includes('admin local') ||
+    cargo.includes('gestor local') ||
+    cargo.includes('gestor')
+  );
+}
+
+/**
+ * Filtra a lista de usuários para obter ESTRITAMENTE os Gestores Locais.
+ * Os demais usuários (recepção, outros profissionais clínicos, operadores, clientes)
+ * não devem ser opções de seleção para o Profissional Responsável.
+ * 
+ * Caso nenhum usuário com role 'admin_local' ou 'gestor' tenha sido cadastrado ainda,
+ * faz fallback seguro para o Admin Master / Administrador da clínica para evitar lista vazia.
+ */
+export function getGestoresLocaisParaSelecao(usuarios: UsuarioEquipe[] = []): UsuarioEquipe[] {
+  const gestores = usuarios.filter(u => isUserGestorLocal(u));
+  if (gestores.length > 0) {
+    return gestores;
+  }
+  // Fallback se ainda não houver gestor local cadastrado no banco:
+  // Mostra apenas o Admin Master / Administrador, NUNCA recepção, operador, cliente ou profissional comum.
+  return usuarios.filter(u => {
+    if (!u || u.status === 'inativo' || u.role === 'cliente') return false;
+    const role = (u.role || '').toLowerCase().trim();
+    return role === 'admin_total' || role === 'admin_master' || role === 'admin' || isUserAdminTotal(u);
+  });
+}
+
+/**
  * Auto-cura e garantia de existência do Super Admin no Firestore
  */
 export async function ensureSuperAdminInFirestore(): Promise<void> {

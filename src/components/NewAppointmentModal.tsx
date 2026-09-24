@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, 
   Calendar as CalendarIcon, 
@@ -12,9 +12,11 @@ import {
   ShieldCheck,
   Layers,
   AlertCircle,
-  Edit3
+  Edit3,
+  Lock
 } from 'lucide-react';
 import { Agendamento, Paciente, ProcedimentoClinico, StatusAgendamento, UsuarioEquipe } from '../types';
+import { getGestoresLocaisParaSelecao } from '../services/firebaseService';
 
 interface NewAppointmentModalProps {
   isOpen: boolean;
@@ -42,6 +44,9 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
   // Lista de procedimentos ativos
   const availableProcedures = procedimentos.filter(p => p.ativo !== false);
   const adminProcedures = availableProcedures.length > 0 ? availableProcedures : procedimentos;
+
+  // Filtra apenas Gestores Locais para o Profissional Responsável
+  const gestoresLocais = useMemo(() => getGestoresLocaisParaSelecao(profissionais), [profissionais]);
 
   const [pacienteId, setPacienteId] = useState<string>('');
   const [profissionalId, setProfissionalId] = useState<string>('');
@@ -83,14 +88,11 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
       setPacienteId('');
     }
 
-    // 2. Profissional ID
+    // 2. Profissional ID - Inicializa com base no procedimento ou Gestor Local
     if (initialData?.profissional_id) {
       setProfissionalId(initialData.profissional_id);
-    } else if (profissionais.length > 0) {
-      setProfissionalId(prev => {
-        if (prev && profissionais.some(pr => pr.id === prev)) return prev;
-        return profissionais[0].id;
-      });
+    } else if (gestoresLocais.length > 0) {
+      setProfissionalId(gestoresLocais[0].id);
     }
 
     // 3. Data e Hora
@@ -169,25 +171,40 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
     }
   }, [isOpen, pacientes, pacienteId]);
 
-  // Atualiza profissionalId caso a lista de profissionais mude
+  // Atualiza profissionalId caso a lista de gestores locais mude
   useEffect(() => {
-    if (isOpen && profissionais.length > 0 && !profissionalId) {
-      setProfissionalId(profissionais[0].id);
+    if (isOpen && gestoresLocais.length > 0 && !profissionalId) {
+      setProfissionalId(gestoresLocais[0].id);
     }
-  }, [isOpen, profissionais, profissionalId]);
+  }, [isOpen, gestoresLocais, profissionalId]);
 
   // Procedimento atual selecionado do catálogo
   const currentProc = adminProcedures.find(p => p.id === selectedProcId) || adminProcedures[0];
 
-  // Quando troca o procedimento do catálogo, atualiza valor e duração padrões
+  // Quando troca o procedimento do catálogo, atualiza valor, duração e sincroniza o Profissional Responsável (Gestor Local)
   useEffect(() => {
     if (!isCustomProc && currentProc) {
       setDuracao(currentProc.duracao_minutos || 45);
       setSelectedVariationId('');
       const defaultVal = currentProc.valor_promocional || currentProc.valor_tabela || currentProc.preco_sugerido || 0;
       setValor(String(defaultVal));
+
+      // Sincroniza obrigatoriamente o profissional responsável cadastrado no procedimento (Gestor Local)
+      if (currentProc.profissional_id) {
+        setProfissionalId(currentProc.profissional_id);
+      } else if (currentProc.profissional_nome) {
+        const found = gestoresLocais.find(g => g.nome === currentProc.profissional_nome) || profissionais.find(p => p.nome === currentProc.profissional_nome);
+        if (found) setProfissionalId(found.id);
+        else if (gestoresLocais.length > 0) setProfissionalId(gestoresLocais[0].id);
+      } else if (gestoresLocais.length > 0) {
+        setProfissionalId(gestoresLocais[0].id);
+      }
+    } else if (isCustomProc) {
+      if (gestoresLocais.length > 0 && !gestoresLocais.some(g => g.id === profissionalId)) {
+        setProfissionalId(gestoresLocais[0].id);
+      }
     }
-  }, [selectedProcId, isCustomProc, currentProc]);
+  }, [selectedProcId, isCustomProc, currentProc, gestoresLocais]);
 
   const handleVariationChange = (varId: string) => {
     setSelectedVariationId(varId);
@@ -248,7 +265,13 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
       }
     }
 
-    const selectedProf = profissionais.find(p => p.id === profissionalId);
+    const matchedProf = gestoresLocais.find(p => p.id === profissionalId) || profissionais.find(p => p.id === profissionalId) || gestoresLocais[0];
+    const finalProfId = (!isCustomProc && currentProc?.profissional_id) ? currentProc.profissional_id : (matchedProf?.id || profissionalId || undefined);
+    const finalProfNome = (!isCustomProc && currentProc?.profissional_nome) ? currentProc.profissional_nome : (matchedProf?.nome || undefined);
+    const finalProfCargo = (!isCustomProc && currentProc?.profissional_id) 
+      ? (gestoresLocais.find(g => g.id === currentProc.profissional_id)?.cargo || matchedProf?.cargo || 'Gestor Local') 
+      : (matchedProf?.cargo || undefined);
+
     const saveFunction = onSave || onSaveAppointment;
 
     if (saveFunction) {
@@ -260,9 +283,9 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
         duracao_minutos: Number(duracao) || 45,
         valor_estimado: isRetorno && !cobrarTaxaRetorno ? 0 : (valor ? parseFloat(valor) : 0),
         observacoes: observacoes.trim() || undefined,
-        profissional_id: profissionalId || undefined,
-        profissional_nome: selectedProf?.nome || undefined,
-        profissional_cargo: selectedProf?.cargo || undefined,
+        profissional_id: finalProfId,
+        profissional_nome: finalProfNome,
+        profissional_cargo: finalProfCargo,
         contrato_vinculado: contratoPadrao,
         contrato_assinado: false,
       });
@@ -367,34 +390,6 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
             )}
           </div>
 
-          {/* Profissional Responsável */}
-          <div>
-            <label className="font-semibold text-slate-700 block mb-1.5 flex items-center gap-1.5">
-              <User className="w-4 h-4 text-purple-600" />
-              <span>Profissional Responsável *</span>
-            </label>
-            {profissionais.length > 0 ? (
-              <select
-                value={profissionalId}
-                onChange={(e) => setProfissionalId(e.target.value)}
-                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-medium"
-              >
-                {profissionais.map((prof) => (
-                  <option key={prof.id} value={prof.id}>
-                    {prof.nome} — {prof.cargo || 'Especialista'} ({prof.role === 'admin' || prof.role === 'admin_total' ? 'Responsável Técnico / Admin' : 'Profissional Clínico'})
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                type="text"
-                value="Equipe Clínica"
-                disabled
-                className="w-full px-3 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-slate-600 font-medium cursor-not-allowed"
-              />
-            )}
-          </div>
-
           {/* Procedimento (Catálogo ou Personalizado) */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
@@ -462,18 +457,77 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
                     <select
                       value={selectedVariationId}
                       onChange={(e) => handleVariationChange(e.target.value)}
-                      className="w-full px-2.5 py-1.5 bg-indigo-50/50 border border-indigo-200 rounded-lg text-slate-800 text-xs font-medium focus:outline-none"
+                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
                     >
-                      <option value="">Padrão (R$ {currentProc.valor_tabela || currentProc.preco_sugerido || 0})</option>
+                      <option value="">Padrão (Sem variação)</option>
                       {currentProc.variacoes.map((v) => (
                         <option key={v.id} value={v.id}>
-                          {v.nome} — R$ {v.valor} ({v.duracao_minutos || currentProc.duracao_minutos}min)
+                          {v.nome} - R$ {v.valor} {v.duracao_minutos ? `(${v.duracao_minutos} min)` : ''}
                         </option>
                       ))}
                     </select>
                   </div>
                 )}
               </div>
+            )}
+          </div>
+
+          {/* Profissional Responsável (Gestor Local definido no Procedimento) */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="font-semibold text-slate-700 flex items-center gap-1.5">
+                <User className="w-4 h-4 text-purple-600" />
+                <span>Profissional Responsável *</span>
+              </label>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                Gestor Local
+              </span>
+            </div>
+
+            {!isCustomProc && (currentProc?.profissional_nome || currentProc?.profissional_id) ? (
+              <div className="w-full px-3.5 py-3 bg-purple-50/80 border border-purple-200 rounded-xl text-purple-950 font-medium">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-purple-600 animate-pulse" />
+                    <span className="font-bold text-sm text-slate-900">
+                      {currentProc.profissional_nome || gestoresLocais.find(g => g.id === currentProc.profissional_id)?.nome || gestoresLocais[0]?.nome || 'Gestor Local'}
+                    </span>
+                  </div>
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-white border border-purple-200 text-purple-700 shadow-2xs flex items-center gap-1">
+                    <Lock className="w-3 h-3 text-purple-600" />
+                    Definido no Procedimento
+                  </span>
+                </div>
+                <p className="text-[11px] text-purple-800/80 mt-1.5">
+                  Profissional vinculado automaticamente conforme cadastrado no procedimento.
+                </p>
+              </div>
+            ) : (
+              gestoresLocais.length > 0 ? (
+                <div>
+                  <select
+                    value={profissionalId}
+                    onChange={(e) => setProfissionalId(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-medium"
+                  >
+                    {gestoresLocais.map((prof) => (
+                      <option key={prof.id} value={prof.id}>
+                        {prof.nome} — {prof.cargo || 'Gestor Local'} ({prof.role === 'admin_local' ? 'Gestor Local' : 'Administrador Responsável'})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Apenas Gestores Locais podem ser selecionados como profissional responsável.
+                  </p>
+                </div>
+              ) : (
+                <input
+                  type="text"
+                  value="Nenhum Gestor Local ativo"
+                  disabled
+                  className="w-full px-3 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-slate-600 font-medium cursor-not-allowed"
+                />
+              )
             )}
           </div>
 

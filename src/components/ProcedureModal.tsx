@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   X, 
   Sparkles, 
@@ -15,11 +15,14 @@ import {
   FileText,
   Upload,
   Star,
-  Loader2
+  Loader2,
+  UserCheck,
+  ShieldCheck
 } from 'lucide-react';
-import { ProcedimentoClinico, EstoqueInsumo, UnidadeMedida, CATEGORIAS_PROCEDIMENTOS_PERMITIDAS } from '../types';
+import { ProcedimentoClinico, EstoqueInsumo, UnidadeMedida, CATEGORIAS_PROCEDIMENTOS_PERMITIDAS, UsuarioEquipe } from '../types';
 import { compressImageFile } from '../lib/image-utils';
 import { useConnectionStatus } from '../hooks/useConnectionStatus';
+import { getGestoresLocaisParaSelecao } from '../services/firebaseService';
 import { Wifi, WifiOff, Database, CloudCheck } from 'lucide-react';
 
 interface ProcedureModalProps {
@@ -28,6 +31,7 @@ interface ProcedureModalProps {
   onSave: (procedimento: Partial<ProcedimentoClinico>, idToEdit?: string) => void;
   procedimentoToEdit?: ProcedimentoClinico | null;
   estoqueDisponivel?: EstoqueInsumo[];
+  usuarios?: UsuarioEquipe[];
 }
 
 const CATEGORIAS_PADRAO = [...CATEGORIAS_PROCEDIMENTOS_PERMITIDAS].sort((a, b) =>
@@ -152,8 +156,12 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
   onSave,
   procedimentoToEdit,
   estoqueDisponivel = [],
+  usuarios = [],
 }) => {
   const { isOnline, pendingCount, isSyncing } = useConnectionStatus();
+  const gestoresLocais = useMemo(() => getGestoresLocaisParaSelecao(usuarios), [usuarios]);
+  const [profissionalId, setProfissionalId] = useState<string>('');
+  const [profissionalNome, setProfissionalNome] = useState<string>('');
   const [nome, setNome] = useState('');
   const [categoria, setCategoria] = useState<string>(CATEGORIAS_PADRAO[0]);
   const [duracaoMinutos, setDuracaoMinutos] = useState(45);
@@ -213,6 +221,12 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
       setExigeContrato(procedimentoToEdit.exige_contrato ?? true);
       setContratoPadrao(procedimentoToEdit.contrato_padrao || `TERMO DE CONSENTIMENTO LIVRE E ESCLARECIDO & CONTRATO DE SERVIÇOS ESTÉTICOS\n\n1. PROCEDIMENTO: ${procedimentoToEdit.nome}\n2. ESCLARECIMENTO: O paciente declara ter sido orientado(a) sobre indicações, contraindicações e cuidados pós-procedimento.\n3. CUSTOS E PRODUTOS: Os valores acordados e produtos aplicados constam em ficha e recibo financeiro.\n4. PRIVACIDADE: O paciente autoriza registros clínicos para histórico no prontuário eletrônico.`);
       setInsumosVinculados(procedimentoToEdit.insumos_vinculados || []);
+
+      // Profissional Responsável (Gestor Local)
+      const targetProfId = procedimentoToEdit.profissional_id || (gestoresLocais[0]?.id || '');
+      const matchedProf = gestoresLocais.find(g => g.id === targetProfId) || gestoresLocais[0];
+      setProfissionalId(matchedProf?.id || '');
+      setProfissionalNome(procedimentoToEdit.profissional_nome || matchedProf?.nome || '');
     } else {
       setNome('');
       setCategoria(CATEGORIAS_PADRAO[0]);
@@ -233,8 +247,12 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
       setExigeContrato(true);
       setContratoPadrao('TERMO DE CONSENTIMENTO LIVRE E ESCLARECIDO & CONTRATO DE PRESTAÇÃO DE SERVIÇOS ESTÉTICOS\n\n1. OBJETO E TRATAMENTO: O presente contrato tem por objeto a prestação de serviços estéticos especializados conforme avaliação e plano de aplicação acordado.\n2. CIÊNCIA E ESCLARECIMENTOS: O(A) paciente declara ter sido devidamente orientado(a) quanto à técnica utilizada, número de sessões recomendadas, cuidados pré e pós-procedimento, bem como possíveis reações temporárias esperadas (edema, rubor ou sensibilidade local).\n3. OBRIGAÇÕES DO PACIENTE: O(A) paciente compromete-se a seguir integralmente as recomendações e cuidados domiciliares fornecidos pelo profissional, bem como retornar nas datas agendadas para reavaliação clínica.\n4. CONDIÇÕES FINANCEIRAS: Os valores acordados e formas de pagamento contratadas encontram-se discriminados no recibo do procedimento.\n5. AUTORIZAÇÃO E PRONTUÁRIO: Fica autorizada a inclusão das fotos de evolução clínica e dados de aplicação no prontuário eletrônico confidencial.');
       setInsumosVinculados([]);
+
+      // Inicializa com o primeiro Gestor Local disponível
+      setProfissionalId(gestoresLocais[0]?.id || '');
+      setProfissionalNome(gestoresLocais[0]?.nome || '');
     }
-  }, [procedimentoToEdit, isOpen]);
+  }, [procedimentoToEdit, isOpen, gestoresLocais]);
 
   if (!isOpen) return null;
 
@@ -368,6 +386,8 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
       insumos_vinculados: insumosVinculados.length > 0 ? insumosVinculados : undefined,
       exige_contrato: exigeContrato,
       contrato_padrao: contratoPadrao.trim() || undefined,
+      profissional_id: profissionalId || gestoresLocais[0]?.id || undefined,
+      profissional_nome: profissionalNome || (gestoresLocais.find(g => g.id === profissionalId)?.nome) || gestoresLocais[0]?.nome || undefined,
     };
 
     onSave(dataToSave, procedimentoToEdit?.id);
@@ -459,6 +479,47 @@ export const ProcedureModal: React.FC<ProcedureModalProps> = ({
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* Profissional Responsável (Exclusivo Gestor Local) */}
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50/50 p-4 sm:p-5 rounded-2xl border border-amber-200/90 space-y-2.5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+              <label className="text-xs font-bold text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
+                <UserCheck className="w-4 h-4 text-amber-600" />
+                <span>Profissional Responsável (Gestor Local) *</span>
+              </label>
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 w-fit">
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+                Exclusivo Gestor Local
+              </span>
+            </div>
+            <p className="text-xs text-amber-800 leading-relaxed">
+              O profissional responsável só pode ser escolhido entre os <strong>Gestores Locais</strong> da clínica. A partir do cadastro deste procedimento, todos os agendamentos, atendimentos e financeiro puxarão automaticamente este profissional.
+            </p>
+            {gestoresLocais.length > 0 ? (
+              <select
+                value={profissionalId}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setProfissionalId(id);
+                  const selected = gestoresLocais.find(g => g.id === id);
+                  if (selected) {
+                    setProfissionalNome(selected.nome);
+                  }
+                }}
+                className="w-full px-3.5 py-2.5 text-sm bg-white border border-amber-300 rounded-xl text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500/20 cursor-pointer shadow-xs"
+              >
+                {gestoresLocais.map(gestor => (
+                  <option key={gestor.id} value={gestor.id}>
+                    {gestor.nome} — {gestor.cargo || 'Gestor Local'} ({gestor.role === 'admin_local' ? 'Gestor Local' : 'Administrador Responsável'})
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="p-3 bg-amber-100/70 border border-amber-300 rounded-xl text-xs text-amber-900 font-medium">
+                Nenhum Gestor Local ativo cadastrado. Cadastre um usuário com perfil de Gestor Local na tela Usuários & Equipe.
+              </div>
+            )}
           </div>
 
           {/* Precificação Única e Duração */}

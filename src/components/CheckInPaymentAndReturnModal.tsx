@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, 
   UserCheck, 
@@ -9,12 +9,13 @@ import {
   User, 
   Sparkles, 
   CreditCard, 
-  ArrowRight,
-  ShieldCheck,
-  AlertCircle,
-  CalendarPlus
+  ArrowRight, 
+  ShieldCheck, 
+  AlertCircle, 
+  CalendarPlus 
 } from 'lucide-react';
 import { Agendamento, FormaPagamento, StatusPagamento, UsuarioEquipe, Paciente } from '../types';
+import { getGestoresLocaisParaSelecao } from '../services/firebaseService';
 
 interface CheckInPaymentAndReturnModalProps {
   isOpen: boolean;
@@ -52,6 +53,8 @@ export const CheckInPaymentAndReturnModal: React.FC<CheckInPaymentAndReturnModal
   onOpenCadastroCompleto,
   onConfirmCheckIn,
 }) => {
+  const gestoresLocais = useMemo(() => getGestoresLocaisParaSelecao(profissionais), [profissionais]);
+
   const [valor, setValor] = useState<number>(agendamento?.valor_estimado || 1200);
   const [formaPagamento, setFormaPagamento] = useState<FormaPagamento>(agendamento?.forma_pagamento || 'pix');
   const [statusPagamento, setStatusPagamento] = useState<StatusPagamento>('pago');
@@ -79,7 +82,7 @@ export const CheckInPaymentAndReturnModal: React.FC<CheckInPaymentAndReturnModal
       setFormaPagamento(agendamento.forma_pagamento || 'pix');
       setStatusPagamento('pago');
       setProcedimentoRetorno(`Revisão / Retorno de ${agendamento.procedimento}`);
-      setProfissionalRetornoId(agendamento.profissional_id || (profissionais[0]?.id || ''));
+      setProfissionalRetornoId(agendamento.profissional_id || (gestoresLocais[0]?.id || ''));
       setAgendarRetorno(false);
       setCobrarTaxaRetorno(false);
       setValorTaxaRetorno(0);
@@ -89,7 +92,7 @@ export const CheckInPaymentAndReturnModal: React.FC<CheckInPaymentAndReturnModal
       d.setDate(d.getDate() + 15);
       setDataRetorno(d.toISOString().slice(0, 10));
     }
-  }, [agendamento, profissionais]);
+  }, [agendamento, gestoresLocais]);
 
   if (!isOpen || !agendamento) return null;
 
@@ -448,17 +451,22 @@ export const CheckInPaymentAndReturnModal: React.FC<CheckInPaymentAndReturnModal
                 {/* Profissional e Procedimento do Retorno */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1 text-[11px] uppercase tracking-wide">
-                      Profissional do Retorno
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="font-bold text-slate-700 block text-[11px] uppercase tracking-wide">
+                        Profissional do Retorno
+                      </label>
+                      <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-100">
+                        Gestor Local
+                      </span>
+                    </div>
                     <select
                       value={profissionalRetornoId}
                       onChange={(e) => setProfissionalRetornoId(e.target.value)}
                       className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
                     >
-                      {profissionais.map(p => (
+                      {gestoresLocais.map(p => (
                         <option key={p.id} value={p.id}>
-                          {p.nome} ({p.cargo})
+                          {p.nome} — {p.cargo || 'Gestor Local'} ({p.role === 'admin_local' ? 'Gestor Local' : 'Administrador'})
                         </option>
                       ))}
                     </select>
