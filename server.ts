@@ -4,7 +4,7 @@ process.env.DISABLE_HMR = "true";
 import express from "express";
 import http from "http";
 import path from "path";
-import { createServer as createViteServer } from "vite";
+import { createServer as createViteServer, createLogger } from "vite";
 import { requireAuth, AuthRequest } from "./src/middleware/auth.ts";
 import { getOrCreateUser, getUsers } from "./src/db/users.ts";
 import { handleGeminiChat, handleMapsGrounding, handleGenerateImage } from "./server/gemini.ts";
@@ -256,12 +256,42 @@ async function startServer() {
 
   // Vite middleware for development vs static serve for production
   if (process.env.NODE_ENV !== "production") {
+    const customViteLogger = createLogger();
+    const origError = customViteLogger.error.bind(customViteLogger);
+    const origWarn = customViteLogger.warn.bind(customViteLogger);
+    const origInfo = customViteLogger.info.bind(customViteLogger);
+
+    customViteLogger.error = (msg, opts) => {
+      const str = typeof msg === 'string' ? msg : (msg && (msg as any).message) || String(msg);
+      if (str.includes('WebSocket') || str.includes('ws error') || str.includes('vite-hmr') || str.includes('EADDRINUSE')) {
+        return;
+      }
+      origError(msg, opts);
+    };
+
+    customViteLogger.warn = (msg, opts) => {
+      const str = typeof msg === 'string' ? msg : (msg && (msg as any).message) || String(msg);
+      if (str.includes('WebSocket') || str.includes('ws error') || str.includes('vite-hmr')) {
+        return;
+      }
+      origWarn(msg, opts);
+    };
+
+    customViteLogger.info = (msg, opts) => {
+      const str = typeof msg === 'string' ? msg : (msg && (msg as any).message) || String(msg);
+      if (str.includes('WebSocket') || str.includes('ws error') || str.includes('vite-hmr')) {
+        return;
+      }
+      origInfo(msg, opts);
+    };
+
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
         hmr: false,
       },
       appType: "spa",
+      customLogger: customViteLogger,
     });
     app.use(vite.middlewares);
   } else {
