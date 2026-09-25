@@ -1080,7 +1080,18 @@ export const DatabaseMasterView: React.FC<DatabaseMasterViewProps> = ({
               <tbody className="divide-y divide-slate-100">
                 {filteredEstoque.map(item => (
                   <tr key={item.id} className="hover:bg-slate-50/80 transition">
-                    <td className="py-3 px-4 font-bold text-slate-900">{item.nome_item || (item as any).nome}</td>
+                    <td className="py-3 px-4 font-bold text-slate-900">
+                      <div>{item.nome_item || (item as any).nome}</div>
+                      {(((item.categoria?.toLowerCase() || '').includes('pigment')) || ((item.categoria?.toLowerCase() || '').includes('piguim'))) && (item.cor || item.cor_tonalidade || item.tom_cor) && (
+                        <div className="flex items-center gap-1.5 mt-0.5 text-[10px] font-normal text-slate-600">
+                          <span 
+                            className="w-2.5 h-2.5 rounded-full border border-black/20 shrink-0" 
+                            style={{ backgroundColor: item.cor_hex || '#3E2723' }} 
+                          />
+                          <span>Cor: {item.cor || item.cor_tonalidade || item.tom_cor}</span>
+                        </div>
+                      )}
+                    </td>
                     <td className="py-3 px-4">
                       <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-bold text-[10px]">
                         {item.categoria}

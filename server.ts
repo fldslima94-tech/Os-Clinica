@@ -18,7 +18,9 @@ import {
 import {
   enviarMensagemWhatsApp,
   handleWhatsAppWebhookVerify,
-  handleWhatsAppWebhookReceive
+  handleWhatsAppWebhookReceive,
+  getWhatsAppConfigStatus,
+  testarConexaoWhatsApp
 } from "./server/whatsapp.ts";
 
 async function startServer() {
@@ -200,6 +202,33 @@ async function startServer() {
   // ==========================================
   // Rotas da Integração WhatsApp (Cloud API oficial da Meta)
   // ==========================================
+
+  // Status das variáveis de ambiente configuradas no AI Studio / servidor
+  app.get("/api/whatsapp/status", (req, res) => {
+    try {
+      const status = getWhatsAppConfigStatus();
+      const host = req.get('host') || 'localhost:3000';
+      const forwardedProto = req.headers['x-forwarded-proto'];
+      const protocol = forwardedProto ? String(forwardedProto).split(',')[0] : (req.secure ? 'https' : 'http');
+      res.json({
+        sucesso: true,
+        ...status,
+        webhookUrl: `${protocol}://${host}/api/whatsapp/webhook`,
+      });
+    } catch (err: any) {
+      res.status(500).json({ sucesso: false, erro: err.message });
+    }
+  });
+
+  // Testar conexão oficial com a Graph API da Meta usando as credenciais salvas
+  app.post("/api/whatsapp/test-connection", async (req, res) => {
+    try {
+      const resultado = await testarConexaoWhatsApp();
+      res.json(resultado);
+    } catch (err: any) {
+      res.status(500).json({ sucesso: false, mensagem: err.message || 'Erro ao testar conexão com o WhatsApp' });
+    }
+  });
 
   // 1. Verificação do webhook (chamada uma vez pela Meta ao configurar o webhook)
   app.get("/api/whatsapp/webhook", handleWhatsAppWebhookVerify);

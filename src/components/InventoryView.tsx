@@ -112,7 +112,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       (item.nome_item || '').toLowerCase().includes(q) ||
       (item.categoria?.toLowerCase() || '').includes(q) ||
       (item.procedimento_vinculado_nome?.toLowerCase() || '').includes(q) ||
-      (item.lote?.toLowerCase() || '').includes(q)
+      (item.lote?.toLowerCase() || '').includes(q) ||
+      (item.cor?.toLowerCase() || '').includes(q) ||
+      (item.cor_tonalidade?.toLowerCase() || '').includes(q) ||
+      (item.tom_cor?.toLowerCase() || '').includes(q) ||
+      (item.marca?.toLowerCase() || '').includes(q)
     );
   });
 
@@ -620,6 +624,22 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     <h3 className="text-sm font-bold text-slate-900 mb-1 leading-snug">
                       {item.nome_item}
                     </h3>
+
+                    {/* OPÇÃO DE COR: EXCLUSIVO PARA ITENS CLASSIFICADOS COMO PIGMENTO */}
+                    {((item.categoria?.toLowerCase() || '').includes('pigment') || (item.categoria?.toLowerCase() || '').includes('piguim')) && (item.cor || item.cor_tonalidade || item.tom_cor) && (
+                      <div className="flex items-center gap-1.5 my-1.5">
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-800 bg-amber-50/90 border border-amber-200/90 px-2.5 py-0.5 rounded-lg shadow-2xs">
+                          <span 
+                            className="w-3.5 h-3.5 rounded-full border border-black/20 shrink-0 shadow-2xs" 
+                            style={{ backgroundColor: item.cor_hex || '#3E2723' }}
+                            title={`Tom: ${item.cor_hex || ''}`}
+                          />
+                          <span>
+                            Cor: <strong className="text-amber-950 font-bold">{item.cor || item.cor_tonalidade || item.tom_cor}</strong>
+                          </span>
+                        </span>
+                      </div>
+                    )}
 
                     {/* VALIDADE & LOTE BADGES */}
                     <div className="flex flex-wrap items-center gap-1.5 my-2">

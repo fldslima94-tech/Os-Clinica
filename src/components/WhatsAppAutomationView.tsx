@@ -39,7 +39,9 @@ import {
   Square,
   ShieldCheck,
   TrendingUp,
-  Clock4
+  Clock4,
+  KeyRound,
+  Webhook
 } from 'lucide-react';
 import { 
   Agendamento, 
@@ -64,6 +66,11 @@ import {
   persistWhatsAppCampanha
 } from '../services/whatsappTemplateService';
 import { WhatsAppTemplateModal } from './WhatsAppTemplateModal';
+import { 
+  WhatsAppCloudApiConfigModal, 
+  WhatsAppCloudApiConfigGuide 
+} from './WhatsAppCloudApiConfigModal';
+import { WhatsAppWebhookSetupModal } from './WhatsAppWebhookSetupModal';
 import { COLLECTIONS, subscribeToCollection } from '../services/firebaseService';
 
 interface WhatsAppAutomationViewProps {
@@ -79,7 +86,7 @@ interface WhatsAppAutomationViewProps {
   transacoes?: TransacaoFinanceira[];
 }
 
-type TabType = 'agenda' | 'campanhas' | 'aniversarios' | 'retornos' | 'templates' | 'historico';
+type TabType = 'agenda' | 'campanhas' | 'aniversarios' | 'retornos' | 'templates' | 'historico' | 'configuracao';
 type AudienceFilter = 'toda_base' | 'ativos' | 'inativos' | 'leads' | 'vip' | 'aniversariantes';
 
 export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
@@ -96,6 +103,24 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
 }) => {
   // Aba ativa principal
   const [activeTab, setActiveTab] = useState<TabType>('agenda');
+
+  // Modal de Configuração Cloud API (Secrets AI Studio) & Status da Conexão
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [isWebhookModalOpen, setIsWebhookModalOpen] = useState(false);
+  const [cloudApiConfigured, setCloudApiConfigured] = useState<boolean | null>(null);
+
+  const checkCloudApiStatus = () => {
+    fetch('/api/whatsapp/status')
+      .then(r => r.json())
+      .then(d => {
+        setCloudApiConfigured(Boolean(d?.configured));
+      })
+      .catch(() => setCloudApiConfigured(false));
+  };
+
+  useEffect(() => {
+    checkCloudApiStatus();
+  }, []);
 
   // Templates
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>(() => getStoredWhatsAppTemplates());
@@ -373,7 +398,11 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
       });
       if (!resp.ok) {
         const data = await resp.json().catch(() => ({}));
-        throw new Error(data?.error || 'Falha ao enviar mensagem.');
+        const errMsg = data?.error || 'Falha ao enviar mensagem.';
+        if (errMsg.includes('WHATSAPP_TOKEN') || errMsg.includes('não configurado') || errMsg.includes('credenciais')) {
+          setIsConfigModalOpen(true);
+        }
+        throw new Error(errMsg);
       }
       setApiSentIds(prev => new Set(prev).add(id));
       if (onDone) onDone();
@@ -613,7 +642,32 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-wrap">
+            <button
+              type="button"
+              onClick={() => setIsWebhookModalOpen(true)}
+              className="px-3.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer border border-indigo-200"
+              title="Instruções para configurar a URL do Webhook na Meta e expor os endpoints de server/whatsapp.ts"
+            >
+              <Webhook className="w-4 h-4 text-indigo-600" />
+              <span>Instruções Webhook Meta</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsConfigModalOpen(true)}
+              className="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer border border-slate-700"
+              title="Como obter e cadastrar WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID e WHATSAPP_VERIFY_TOKEN no AI Studio"
+            >
+              <KeyRound className="w-4 h-4 text-emerald-400" />
+              <span>Configurar Cloud API (Secrets)</span>
+              {cloudApiConfigured === true ? (
+                <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-emerald-400/30" title="API Meta Conectada"></span>
+              ) : cloudApiConfigured === false ? (
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse ring-2 ring-amber-400/30" title="Variáveis Pendentes no AI Studio"></span>
+              ) : null}
+            </button>
+
             <button
               type="button"
               onClick={() => {
@@ -771,6 +825,29 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
           >
             <History className="w-3.5 h-3.5 text-slate-400" />
             <span>6. Histórico de Disparos</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('configuracao')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shrink-0 cursor-pointer ${
+              activeTab === 'configuracao'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900'
+            }`}
+          >
+            <KeyRound className="w-3.5 h-3.5 text-emerald-500" />
+            <span>7. Guia Cloud API (Secrets)</span>
+            {cloudApiConfigured === false && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500/20 text-amber-600 font-semibold">
+                Configurar
+              </span>
+            )}
+            {cloudApiConfigured === true && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/20 text-emerald-600 font-semibold">
+                Ativo
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -1995,6 +2072,18 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
         </div>
       )}
 
+      {/* ========================================================
+          ABA 7: GUIA CLOUD API & VARIÁVEIS DE AMBIENTE (SECRETS)
+         ======================================================== */}
+      {activeTab === 'configuracao' && (
+        <div className="space-y-4">
+          <WhatsAppCloudApiConfigGuide
+            showToast={showToast}
+            onClose={() => setActiveTab('agenda')}
+          />
+        </div>
+      )}
+
       {/* Modal de Criação / Edição de Mensagem Automática */}
       <WhatsAppTemplateModal
         isOpen={isModalOpen}
@@ -2076,6 +2165,27 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal Completo do Guia de Configuração da API do WhatsApp Cloud */}
+      <WhatsAppCloudApiConfigModal
+        isOpen={isConfigModalOpen}
+        onClose={() => {
+          setIsConfigModalOpen(false);
+          checkCloudApiStatus();
+        }}
+        showToast={showToast}
+        onOpenWebhookGuide={() => {
+          setIsConfigModalOpen(false);
+          setIsWebhookModalOpen(true);
+        }}
+      />
+
+      {/* Modal Dedicado de Instruções do Webhook URL (Meta Developers Console & server/whatsapp.ts) */}
+      <WhatsAppWebhookSetupModal
+        isOpen={isWebhookModalOpen}
+        onClose={() => setIsWebhookModalOpen(false)}
+        showToast={showToast}
+      />
 
     </div>
   );

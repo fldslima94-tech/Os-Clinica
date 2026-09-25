@@ -1652,6 +1652,9 @@ export default function App() {
     if (novo.id) {
       const existing = estoque.find(e => e.id === novo.id);
       if (existing) {
+        const targetCategoria = novo.categoria === 'Piguimento' ? 'Pigmento' : (novo.categoria || existing.categoria || 'Geral');
+        const isPigmentItem = targetCategoria.toLowerCase().includes('pigment') || targetCategoria.toLowerCase().includes('piguim');
+
         const updatedItem: EstoqueInsumo = {
           ...existing,
           ...novo,
@@ -1659,13 +1662,15 @@ export default function App() {
           quantidade: novo.quantidade !== undefined ? Number(novo.quantidade) : existing.quantidade,
           unidade_medida: novo.unidade_medida || existing.unidade_medida,
           alerta_minimo: novo.alerta_minimo !== undefined ? Number(novo.alerta_minimo) : existing.alerta_minimo,
-          categoria: novo.categoria || existing.categoria,
+          categoria: targetCategoria,
           lote: novo.lote !== undefined ? novo.lote : existing.lote,
           validade: novo.validade !== undefined ? novo.validade : existing.validade,
           custo_unitario: novo.custo_unitario !== undefined ? Number(novo.custo_unitario) : existing.custo_unitario,
           marca: novo.marca !== undefined ? novo.marca : existing.marca,
-          tom_cor: novo.tom_cor !== undefined ? novo.tom_cor : existing.tom_cor,
-          cor_tonalidade: novo.cor_tonalidade !== undefined ? novo.cor_tonalidade : existing.cor_tonalidade,
+          tom_cor: isPigmentItem ? (novo.tom_cor !== undefined ? novo.tom_cor : existing.tom_cor) : undefined,
+          cor_tonalidade: isPigmentItem ? (novo.cor_tonalidade !== undefined ? novo.cor_tonalidade : existing.cor_tonalidade) : undefined,
+          cor: isPigmentItem ? (novo.cor !== undefined ? novo.cor : (novo.cor_tonalidade || existing.cor || existing.cor_tonalidade)) : undefined,
+          cor_hex: isPigmentItem ? (novo.cor_hex !== undefined ? novo.cor_hex : existing.cor_hex) : undefined,
           procedimento_vinculado_id: novo.procedimento_vinculado_id !== undefined ? novo.procedimento_vinculado_id : existing.procedimento_vinculado_id,
           procedimento_vinculado_nome: novo.procedimento_vinculado_nome !== undefined ? novo.procedimento_vinculado_nome : existing.procedimento_vinculado_nome,
           quantidade_por_procedimento: novo.quantidade_por_procedimento !== undefined ? Number(novo.quantidade_por_procedimento) : existing.quantidade_por_procedimento,
@@ -1687,19 +1692,24 @@ export default function App() {
       }
     }
 
+    const createdCategoria = novo.categoria === 'Piguimento' ? 'Pigmento' : (novo.categoria || 'Geral');
+    const isPigmentCreated = createdCategoria.toLowerCase().includes('pigment') || createdCategoria.toLowerCase().includes('piguim');
+
     const createdItem: EstoqueInsumo = {
       id: novo.id || `est-${Date.now()}`,
       nome_item: novo.nome_item || 'Novo Insumo',
       quantidade: Number(novo.quantidade) || 0,
       unidade_medida: novo.unidade_medida || 'unidade',
       alerta_minimo: Number(novo.alerta_minimo) || 5,
-      categoria: novo.categoria || 'Geral',
+      categoria: createdCategoria,
       lote: novo.lote || undefined,
       validade: novo.validade || undefined,
       custo_unitario: novo.custo_unitario !== undefined ? Number(novo.custo_unitario) : undefined,
       marca: novo.marca || undefined,
-      tom_cor: novo.tom_cor || undefined,
-      cor_tonalidade: novo.cor_tonalidade || undefined,
+      tom_cor: isPigmentCreated ? (novo.tom_cor || novo.cor || undefined) : undefined,
+      cor_tonalidade: isPigmentCreated ? (novo.cor_tonalidade || novo.cor || undefined) : undefined,
+      cor: isPigmentCreated ? (novo.cor || novo.cor_tonalidade || undefined) : undefined,
+      cor_hex: isPigmentCreated ? (novo.cor_hex || undefined) : undefined,
       procedimento_vinculado_id: novo.procedimento_vinculado_id || undefined,
       procedimento_vinculado_nome: novo.procedimento_vinculado_nome || undefined,
       quantidade_por_procedimento: novo.quantidade_por_procedimento !== undefined ? Number(novo.quantidade_por_procedimento) : undefined,

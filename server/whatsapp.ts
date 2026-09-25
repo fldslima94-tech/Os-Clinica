@@ -14,6 +14,78 @@ const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN || '';
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
 const WHATSAPP_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || '';
 
+export function getWhatsAppConfigStatus() {
+  const token = process.env.WHATSAPP_TOKEN || WHATSAPP_TOKEN;
+  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || WHATSAPP_PHONE_NUMBER_ID;
+  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN || WHATSAPP_VERIFY_TOKEN;
+  const apiVersion = process.env.WHATSAPP_API_VERSION || WHATSAPP_API_VERSION;
+
+  return {
+    configured: Boolean(token && phoneId),
+    hasToken: Boolean(token),
+    hasPhoneNumberId: Boolean(phoneId),
+    hasVerifyToken: Boolean(verifyToken),
+    tokenPrefix: token ? `${token.slice(0, 7)}...${token.slice(-4)}` : null,
+    phoneNumberId: phoneId ? phoneId : null,
+    verifyTokenConfigured: Boolean(verifyToken),
+    apiVersion,
+  };
+}
+
+export async function testarConexaoWhatsApp(): Promise<{ sucesso: boolean; mensagem: string; dados?: any }> {
+  const token = process.env.WHATSAPP_TOKEN || WHATSAPP_TOKEN;
+  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || WHATSAPP_PHONE_NUMBER_ID;
+  const apiVer = process.env.WHATSAPP_API_VERSION || WHATSAPP_API_VERSION;
+
+  if (!token) {
+    return {
+      sucesso: false,
+      mensagem: 'Variável WHATSAPP_TOKEN não foi encontrada no painel de Secrets ou no ambiente.',
+    };
+  }
+  if (!phoneId) {
+    return {
+      sucesso: false,
+      mensagem: 'Variável WHATSAPP_PHONE_NUMBER_ID não foi encontrada no painel de Secrets ou no ambiente.',
+    };
+  }
+
+  try {
+    const url = `https://graph.facebook.com/${apiVer}/${phoneId}?fields=verified_name,display_phone_number,quality_rating,code_verification_status`;
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data: any = await resp.json();
+    if (!resp.ok) {
+      const errDetail = data?.error?.message || 'A Meta rejeitou a requisição com o token e ID fornecidos.';
+      return {
+        sucesso: false,
+        mensagem: `Erro retornado pela Meta: ${errDetail}`,
+        dados: data?.error,
+      };
+    }
+
+    const nome = data.verified_name || 'Número WhatsApp Business';
+    const numero = data.display_phone_number || phoneId;
+    const qualidade = data.quality_rating || 'GREEN';
+
+    return {
+      sucesso: true,
+      mensagem: `Conexão bem-sucedida! WhatsApp Cloud API conectada ao número: ${numero} (${nome}) - Qualidade: ${qualidade}`,
+      dados: data,
+    };
+  } catch (err: any) {
+    return {
+      sucesso: false,
+      mensagem: err.message || 'Falha de rede ao conectar à API da Meta (Graph API).',
+    };
+  }
+}
+
 const COLLECTIONS = {
   CONVERSAS: 'whatsapp_conversas',
   MENSAGENS: 'whatsapp_mensagens',
@@ -23,7 +95,9 @@ const COLLECTIONS = {
 };
 
 function whatsappConfigurado(): boolean {
-  return !!(WHATSAPP_TOKEN && WHATSAPP_PHONE_NUMBER_ID);
+  const token = process.env.WHATSAPP_TOKEN || WHATSAPP_TOKEN;
+  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || WHATSAPP_PHONE_NUMBER_ID;
+  return !!(token && phoneId);
 }
 
 /** Normaliza um telefone para o formato usado como ID de documento (só dígitos) */
@@ -46,6 +120,10 @@ export async function enviarMensagemWhatsApp(telefone: string, texto: string): P
     return { sucesso: false, erro: msg };
   }
 
+  const token = process.env.WHATSAPP_TOKEN || WHATSAPP_TOKEN;
+  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || WHATSAPP_PHONE_NUMBER_ID;
+  const apiVersion = process.env.WHATSAPP_API_VERSION || WHATSAPP_API_VERSION;
+
   const numero = normalizarTelefone(telefone);
   if (!numero) {
     return { sucesso: false, erro: 'Telefone inválido.' };
@@ -53,11 +131,11 @@ export async function enviarMensagemWhatsApp(telefone: string, texto: string): P
 
   try {
     const resp = await fetch(
-      `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
+      `https://graph.facebook.com/${apiVersion}/${phoneId}/messages`,
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -108,12 +186,13 @@ export function handleWhatsAppWebhookVerify(req: Request, res: Response) {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
+  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN || WHATSAPP_VERIFY_TOKEN;
 
-  if (mode === 'subscribe' && token === WHATSAPP_VERIFY_TOKEN && WHATSAPP_VERIFY_TOKEN) {
+  if (mode === 'subscribe' && token === verifyToken && verifyToken) {
     console.log('[whatsapp] Webhook verificado com sucesso pela Meta.');
     res.status(200).send(String(challenge));
   } else {
-    console.warn('[whatsapp] Falha na verificação do webhook (token não confere).');
+    console.warn('[whatsapp] Falha na verificação do webhook (token não confere). Esperado:', verifyToken ? '[definido]' : '[não configurado]', 'Recebido:', token);
     res.sendStatus(403);
   }
 }

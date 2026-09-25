@@ -509,6 +509,8 @@ export interface EstoqueInsumo {
   marca?: string;
   tom_cor?: string;
   cor_tonalidade?: string;
+  cor?: string;
+  cor_hex?: string;
   lote?: string;
   validade?: string;
   custo_unitario?: number;
