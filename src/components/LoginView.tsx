@@ -350,12 +350,31 @@ export const LoginView: React.FC<LoginViewProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between p-4 sm:p-6 lg:p-8 relative selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-[#faf8f5] text-slate-900 flex flex-col justify-between p-4 sm:p-6 lg:p-8 relative selection:bg-amber-200 selection:text-amber-950 overflow-hidden">
       
-      {/* Background Decorative Gradients */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-indigo-600/10 blur-3xl" />
-        <div className="absolute -bottom-40 -right-40 w-96 h-96 rounded-full bg-blue-600/10 blur-3xl" />
+      {/* Background Decorative Gradients - Paleta Dourada da Clínica */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0" aria-hidden="true">
+        {/* Círculo / Arco Dourado Metálico Superior Direito */}
+        <div 
+          className="absolute -top-32 -right-32 sm:-top-52 sm:-right-52 lg:-top-64 lg:-right-64 w-[420px] h-[420px] sm:w-[600px] sm:h-[600px] lg:w-[750px] lg:h-[750px] rounded-full opacity-90 shadow-2xl pointer-events-none"
+          style={{
+            background: 'linear-gradient(135deg, #744210 0%, #985e1b 18%, #c58e37 42%, #e5b768 68%, #f3d08e 82%, #a86f24 100%)',
+            boxShadow: '0 30px 80px -20px rgba(184, 134, 11, 0.28)'
+          }}
+        />
+        <div 
+          className="absolute -top-10 -right-10 w-96 h-96 sm:w-[500px] sm:h-[500px] rounded-full blur-3xl opacity-35 pointer-events-none"
+          style={{
+            background: 'radial-gradient(circle, rgba(229, 183, 104, 0.45) 0%, rgba(197, 142, 55, 0.2) 50%, transparent 75%)'
+          }}
+        />
+        <div 
+          className="absolute -bottom-48 -left-48 w-80 h-80 sm:w-[480px] sm:h-[480px] rounded-full blur-3xl opacity-20 pointer-events-none"
+          style={{
+            background: 'radial-gradient(circle, rgba(197, 142, 55, 0.35) 0%, rgba(243, 208, 142, 0.15) 55%, transparent 80%)'
+          }}
+        />
+        <div className="absolute inset-0 bg-[#faf8f5]/40 backdrop-blur-[0.5px]" />
       </div>
 
       {/* Top Header Branding */}
@@ -366,28 +385,28 @@ export const LoginView: React.FC<LoginViewProps> = ({
               src={clinicaConfig.logomarca_url}
               alt={clinicaConfig.nome || 'Logo da Clínica'}
               referrerPolicy="no-referrer"
-              className="w-10 h-10 rounded-2xl object-contain bg-white border border-slate-700/80 shadow-lg p-0.5"
+              className="w-10 h-10 rounded-2xl object-contain bg-white border border-amber-900/15 shadow-md p-0.5"
             />
           ) : (
-            <div className="w-10 h-10 rounded-2xl bg-indigo-600 border border-indigo-400/40 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-indigo-600/20">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-600 to-amber-800 border border-amber-400/40 flex items-center justify-center text-white font-bold text-lg shadow-md shadow-amber-700/20">
               {(clinicaConfig?.nome || 'A').charAt(0).toUpperCase()}
             </div>
           )}
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xl font-bold tracking-tight text-white font-serif">
+              <span className="text-xl font-bold tracking-tight text-slate-900 font-serif">
                 {clinicaConfig?.nome || 'AuraEstética Studio'}
               </span>
-              <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-400/30">
+              <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-100/90 text-amber-900 px-2 py-0.5 rounded-full border border-amber-300/80">
                 Sistema
               </span>
             </div>
-            <p className="text-xs text-slate-400">Portal de Acesso & Gestão da Clínica</p>
+            <p className="text-xs text-slate-600 font-medium">Portal de Acesso & Gestão da Clínica</p>
           </div>
         </div>
 
-        <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400 bg-slate-900/80 px-3.5 py-1.5 rounded-xl border border-slate-800 backdrop-blur-md">
-          <ShieldCheck className="w-4 h-4 text-emerald-400" />
+        <div className="hidden sm:flex items-center gap-2 text-xs text-slate-700 bg-white/90 px-3.5 py-1.5 rounded-xl border border-amber-900/10 shadow-xs backdrop-blur-md">
+          <ShieldCheck className="w-4 h-4 text-emerald-600" />
           <span>Acesso Seguro com Criptografia</span>
         </div>
       </header>
@@ -567,11 +586,11 @@ export const LoginView: React.FC<LoginViewProps> = ({
       </main>
 
       {/* Footer */}
-      <footer className="max-w-6xl w-full mx-auto text-center py-2 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-slate-800/80 pt-4 relative z-10">
+      <footer className="max-w-6xl w-full mx-auto text-center py-2 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-amber-900/10 pt-4 relative z-10">
         <div>
           <span>{clinicaConfig?.nome || 'AuraEstética Studio'} • Sistema de Gestão Clínica</span>
         </div>
-        <div className="flex items-center gap-4 text-slate-400">
+        <div className="flex items-center gap-4 text-slate-500">
           <span>Termos de Uso</span>
           <span>•</span>
           <span>Privacidade & LGPD</span>

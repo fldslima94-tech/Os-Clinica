@@ -41,7 +41,9 @@ import {
   TrendingUp,
   Clock4,
   KeyRound,
-  Webhook
+  Webhook,
+  Wifi,
+  AlertTriangle
 } from 'lucide-react';
 import { 
   Agendamento, 
@@ -109,6 +111,15 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
   const [isWebhookModalOpen, setIsWebhookModalOpen] = useState(false);
   const [cloudApiConfigured, setCloudApiConfigured] = useState<boolean | null>(null);
 
+  // Teste em tempo real da conexão com a API da Meta (testarConexaoWhatsApp)
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [testConnectionResult, setTestConnectionResult] = useState<{
+    sucesso: boolean;
+    mensagem: string;
+    dados?: any;
+  } | null>(null);
+  const [isTestResultModalOpen, setIsTestResultModalOpen] = useState(false);
+
   const checkCloudApiStatus = () => {
     fetch('/api/whatsapp/status')
       .then(r => r.json())
@@ -116,6 +127,43 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
         setCloudApiConfigured(Boolean(d?.configured));
       })
       .catch(() => setCloudApiConfigured(false));
+  };
+
+  const handleTestWhatsAppConnection = async () => {
+    setTestingConnection(true);
+    try {
+      const resp = await fetch('/api/whatsapp/test-connection', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      const data = await resp.json();
+      setTestConnectionResult(data);
+      setIsTestResultModalOpen(true);
+      if (data.sucesso) {
+        setCloudApiConfigured(true);
+        if (showToast) {
+          showToast(data.mensagem || 'Conexão com a Meta realizada com sucesso!', 'success');
+        }
+      } else {
+        if (showToast) {
+          showToast(data.mensagem || 'Falha ao validar credenciais do WhatsApp.', 'error');
+        }
+      }
+    } catch (err: any) {
+      const erroMsg = err.message || 'Erro de comunicação ao disparar o teste da Graph API.';
+      setTestConnectionResult({
+        sucesso: false,
+        mensagem: erroMsg,
+      });
+      setIsTestResultModalOpen(true);
+      if (showToast) {
+        showToast(erroMsg, 'error');
+      }
+    } finally {
+      setTestingConnection(false);
+    }
   };
 
   useEffect(() => {
@@ -643,6 +691,28 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-wrap">
+            {/* Botão de Teste em Tempo Real da Conexão com a Meta (testarConexaoWhatsApp) */}
+            <button
+              type="button"
+              onClick={handleTestWhatsAppConnection}
+              disabled={testingConnection}
+              className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer border ${
+                testingConnection 
+                  ? 'bg-amber-100 text-amber-800 border-amber-300 opacity-90 cursor-wait' 
+                  : cloudApiConfigured === true
+                  ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
+                  : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
+              }`}
+              title="Testar em tempo real se o Token e Phone Number ID estão válidos na Graph API da Meta (server/whatsapp.ts)"
+            >
+              {testingConnection ? (
+                <RefreshCw className="w-4 h-4 text-amber-600 animate-spin" />
+              ) : (
+                <Wifi className="w-4 h-4 text-emerald-600" />
+              )}
+              <span>{testingConnection ? 'Testando Conexão...' : 'Testar Conexão Meta'}</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setIsWebhookModalOpen(true)}
@@ -2186,6 +2256,118 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
         onClose={() => setIsWebhookModalOpen(false)}
         showToast={showToast}
       />
+
+      {/* Modal de Diagnóstico em Tempo Real do Teste de Conexão WhatsApp Meta */}
+      {isTestResultModalOpen && testConnectionResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden space-y-0">
+            <div className={`p-6 flex items-start gap-4 border-b ${
+              testConnectionResult.sucesso 
+                ? 'bg-emerald-50/80 border-emerald-100' 
+                : 'bg-rose-50/80 border-rose-100'
+            }`}>
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${
+                testConnectionResult.sucesso 
+                  ? 'bg-emerald-600 text-white' 
+                  : 'bg-rose-600 text-white'
+              }`}>
+                {testConnectionResult.sucesso ? (
+                  <Check className="w-6 h-6 stroke-[3]" />
+                ) : (
+                  <AlertTriangle className="w-6 h-6" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className={`text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mb-1 border ${
+                  testConnectionResult.sucesso
+                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                    : 'bg-rose-100 text-rose-800 border-rose-300'
+                }`}>
+                  {testConnectionResult.sucesso ? 'Conexão Bem-Sucedida' : 'Falha na Validação'}
+                </span>
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-snug">
+                  Teste da Graph API da Meta (server/whatsapp.ts)
+                </h3>
+                <p className="text-xs text-slate-600 mt-1">
+                  Validação direta de Token e WhatsApp Phone Number ID
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTestResultModalOpen(false)}
+                className="p-1 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className={`p-4 rounded-2xl border text-xs sm:text-sm leading-relaxed ${
+                testConnectionResult.sucesso
+                  ? 'bg-emerald-50 text-emerald-950 border-emerald-200'
+                  : 'bg-rose-50 text-rose-950 border-rose-200'
+              }`}>
+                {testConnectionResult.mensagem}
+              </div>
+
+              {testConnectionResult.dados && (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-slate-700">Detalhes Retornados pela Meta:</p>
+                  <pre className="p-3 bg-slate-900 text-slate-200 font-mono text-xs rounded-xl overflow-x-auto max-h-48 scrollbar-thin">
+                    {JSON.stringify(testConnectionResult.dados, null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              {!testConnectionResult.sucesso && (
+                <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1">
+                  <p className="font-bold flex items-center gap-1.5">
+                    <Info className="w-4 h-4 text-amber-700 shrink-0" />
+                    Como Resolver:
+                  </p>
+                  <p className="text-slate-600">
+                    Verifique se cadastrou o <strong>WHATSAPP_TOKEN</strong> (Token Permanente de System User com permissão <code className="text-indigo-600 font-bold">whatsapp_business_messaging</code>) e o <strong>WHATSAPP_PHONE_NUMBER_ID</strong> (ID numérico gerado pela Meta) nas Variáveis de Ambiente/Secrets.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsTestResultModalOpen(false);
+                    setIsConfigModalOpen(true);
+                  }}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <KeyRound className="w-4 h-4 text-emerald-600" />
+                  <span>Abrir Guia de Secrets</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleTestWhatsAppConnection}
+                    disabled={testingConnection}
+                    className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-colors shadow-sm cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${testingConnection ? 'animate-spin' : ''}`} />
+                    <span>Testar Novamente</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsTestResultModalOpen(false)}
+                    className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors shadow-sm cursor-pointer"
+                  >
+                    Fechar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

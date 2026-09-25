@@ -2458,7 +2458,38 @@ export default function App() {
 
   return (
     <MasterEditProvider currentUser={currentUser}>
-      <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col antialiased">
+      <div className="min-h-screen bg-[#faf8f5] text-slate-900 flex flex-col antialiased relative overflow-x-hidden">
+        
+        {/* Fundo Decorativo - Paleta Dourado/Bronze e Branco Nobre (conforme imagem de referência) */}
+        <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
+          {/* Círculo / Arco Dourado Metálico Superior Direito (réplica fiel da imagem) */}
+          <div 
+            className="absolute -top-32 -right-32 sm:-top-52 sm:-right-52 lg:-top-64 lg:-right-64 w-[420px] h-[420px] sm:w-[600px] sm:h-[600px] lg:w-[750px] lg:h-[750px] rounded-full opacity-90 shadow-2xl transition-all duration-700 pointer-events-none"
+            style={{
+              background: 'linear-gradient(135deg, #744210 0%, #985e1b 18%, #c58e37 42%, #e5b768 68%, #f3d08e 82%, #a86f24 100%)',
+              boxShadow: '0 30px 80px -20px rgba(184, 134, 11, 0.28)'
+            }}
+          />
+
+          {/* Difusão de luz quente dourada no canto superior */}
+          <div 
+            className="absolute -top-10 -right-10 w-96 h-96 sm:w-[500px] sm:h-[500px] rounded-full blur-3xl opacity-35 pointer-events-none"
+            style={{
+              background: 'radial-gradient(circle, rgba(229, 183, 104, 0.45) 0%, rgba(197, 142, 55, 0.2) 50%, transparent 75%)'
+            }}
+          />
+
+          {/* Suave brilho dourado e nuance perolada para profundidade harmoniosa no rodapé */}
+          <div 
+            className="absolute -bottom-48 -left-48 w-80 h-80 sm:w-[480px] sm:h-[480px] rounded-full blur-3xl opacity-20 pointer-events-none"
+            style={{
+              background: 'radial-gradient(circle, rgba(197, 142, 55, 0.35) 0%, rgba(243, 208, 142, 0.15) 55%, transparent 80%)'
+            }}
+          />
+
+          {/* Filtro de leveza perolada para garantir contraste impecável com todo o conteúdo */}
+          <div className="absolute inset-0 bg-[#faf8f5]/40 backdrop-blur-[0.5px]" />
+        </div>
       
       {/* Toast Notification */}
       {toastMessage && (

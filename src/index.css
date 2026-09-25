@@ -6,16 +6,32 @@
   --sar: env(safe-area-inset-right);
   --sab: env(safe-area-inset-bottom);
   --sal: env(safe-area-inset-left);
+  --aura-gold-deep: #784411;
+  --aura-gold-rich: #c58e37;
+  --aura-gold-light: #e5b768;
+  --aura-gold-shimmer: #f3d08e;
+  --aura-bg-canvas: #faf8f5;
+}
+
+/* Paleta Dourado/Bronze e Branco Nobre (conforme imagem de referência) */
+.aura-gold-gradient {
+  background: linear-gradient(135deg, #784411 0%, #9e641f 20%, #c58e37 45%, #e5b768 68%, #f3d08e 85%, #9e641f 100%);
+}
+
+.aura-gold-radial {
+  background: radial-gradient(circle at 75% 25%, #f3d08e 0%, #e5b768 25%, #c58e37 55%, #9e641f 78%, #784411 100%);
 }
 
 html {
   -webkit-tap-highlight-color: transparent;
   scroll-behavior: smooth;
+  background-color: #faf8f5;
 }
 
 body {
   overscroll-behavior-y: contain;
   -webkit-font-smoothing: antialiased;
+  background-color: #faf8f5;
 }
 
 /* Prevent text selection when tapping navigation tabs */
