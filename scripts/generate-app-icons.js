@@ -1,4 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+import { Resvg } from '@resvg/resvg-js';
+import fs from 'fs';
+import path from 'path';
+import { execSync } from 'child_process';
+
+// Master SVG template for the "STUDIO DE BELEZA FEMININA" luxury icon
+function createSvg({ maskable = false, width = 512, height = 512 } = {}) {
+  // If maskable, scale the inner artwork to 80% and center it so it stays strictly within the Android safe zone (circle of diameter 410px)
+  const transform = maskable 
+    ? 'translate(256, 256) scale(0.78) translate(-256, -244)' 
+    : 'translate(0, 0)';
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="${width}" height="${height}">
   <defs>
     <!-- Ultra-realistic metallic gold gradient matching the uploaded artwork -->
     <linearGradient id="goldGradient" x1="10%" y1="0%" x2="90%" y2="100%">
@@ -34,12 +46,14 @@
   </defs>
 
   <!-- Background: Pristine Rounded App Icon (Full bleed background for maskable, squircle for standard) -->
-  
+  ${maskable ? `
+  <rect width="512" height="512" fill="url(#bgGrad)" />
+  ` : `
   <rect width="512" height="512" rx="116" fill="url(#bgGrad)" />
   <rect x="2" y="2" width="508" height="508" rx="114" fill="none" stroke="#EAE2D3" stroke-width="2.5" />
-  
+  `}
 
-  <g transform="translate(0, 0)">
+  <g transform="${transform}">
     <!-- EMBLEM: LOTUS FLOWER + FEMALE PROFILE + EMBRACING PETALS -->
     <g transform="translate(256, 190)" filter="url(#goldDropShadow)" fill="none" stroke="url(#goldGradient)" stroke-linecap="round" stroke-linejoin="round">
       
@@ -123,4 +137,54 @@
       FEMININA
     </text>
   </g>
-</svg>
+</svg>`;
+}
+
+async function main() {
+  console.log('Generating App Icons for Mobile & Desktop PWA...');
+
+  // 1. Standard Logo SVG & Maskable SVG
+  const standardSvg = createSvg({ maskable: false });
+  const maskableSvg = createSvg({ maskable: true });
+
+  fs.writeFileSync('public/logo.svg', standardSvg, 'utf-8');
+  fs.writeFileSync('public/icon.svg', standardSvg, 'utf-8');
+  fs.writeFileSync('public/favicon.svg', standardSvg, 'utf-8');
+
+  // 2. Render PNG 512x512
+  const resvg512 = new Resvg(standardSvg, { fitTo: { mode: 'width', value: 512 } });
+  const png512 = resvg512.render().asPng();
+  fs.writeFileSync('public/pwa-512x512.png', png512);
+  console.log('✓ public/pwa-512x512.png created');
+
+  // 3. Render PNG 192x192
+  const resvg192 = new Resvg(standardSvg, { fitTo: { mode: 'width', value: 192 } });
+  const png192 = resvg192.render().asPng();
+  fs.writeFileSync('public/pwa-192x192.png', png192);
+  console.log('✓ public/pwa-192x192.png created');
+
+  // 4. Render Maskable 512x512 (with safe-zone margins for Android adaptive icons)
+  const resvgMaskable = new Resvg(maskableSvg, { fitTo: { mode: 'width', value: 512 } });
+  const pngMaskable = resvgMaskable.render().asPng();
+  fs.writeFileSync('public/pwa-maskable-512x512.png', pngMaskable);
+  console.log('✓ public/pwa-maskable-512x512.png created');
+
+  // 5. Render Apple Touch Icon 180x180 for iOS
+  const resvg180 = new Resvg(standardSvg, { fitTo: { mode: 'width', value: 180 } });
+  const png180 = resvg180.render().asPng();
+  fs.writeFileSync('public/apple-touch-icon.png', png180);
+  console.log('✓ public/apple-touch-icon.png created');
+
+  // 6. Generate Favicon ICO using convert
+  try {
+    execSync('convert public/pwa-192x192.png -define icon:auto-resize=64,48,32,16 public/favicon.ico');
+    console.log('✓ public/favicon.ico created');
+  } catch (e) {
+    console.warn('Could not generate multi-res ICO with ImageMagick, copying 192 as fallback ICO');
+    fs.copyFileSync('public/pwa-192x192.png', 'public/favicon.ico');
+  }
+
+  console.log('All PWA application icons generated successfully!');
+}
+
+main().catch(console.error);

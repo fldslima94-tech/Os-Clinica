@@ -130,13 +130,15 @@ export const Header: React.FC<HeaderProps> = ({
                   className="w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10 rounded-xl sm:rounded-2xl object-contain bg-white border border-slate-200/90 shadow-2xs shrink-0 p-0.5"
                 />
               ) : (
-                <div className="w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10 rounded-xl sm:rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-slate-900 flex items-center justify-center text-white font-bold text-sm sm:text-base lg:text-lg shadow-2xs border border-indigo-700/50 shrink-0">
-                  {(clinicaConfig?.nome || 'A').charAt(0).toUpperCase()}
-                </div>
+                <img
+                  src="/logo.svg"
+                  alt="Studio de Beleza Feminina"
+                  className="w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10 rounded-xl sm:rounded-2xl object-contain bg-white border border-slate-200/90 shadow-2xs shrink-0 p-0.5"
+                />
               )}
               <div className="min-w-0">
                 <h1 className="text-xs sm:text-sm md:text-base font-bold text-slate-900 tracking-tight truncate max-w-[140px] xs:max-w-[180px] sm:max-w-xs">
-                  {clinicaConfig?.nome || 'AuraEstética Studio'}
+                  {clinicaConfig?.nome || 'Studio de Beleza Feminina'}
                 </h1>
                 <p className="text-[10px] sm:text-[11px] text-indigo-600 font-semibold truncate">
                   Área do Cliente
@@ -159,9 +161,11 @@ export const Header: React.FC<HeaderProps> = ({
                     className="w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10 rounded-xl sm:rounded-2xl object-contain bg-white border border-slate-200/90 shadow-2xs group-hover:ring-2 ring-indigo-500/40 group-hover:border-indigo-400 transition-all shrink-0 p-0.5"
                   />
                 ) : (
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10 rounded-xl sm:rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-slate-900 flex items-center justify-center text-white font-bold text-sm sm:text-base lg:text-lg shadow-2xs border border-indigo-700/50 group-hover:ring-2 ring-indigo-500/40 transition-all shrink-0">
-                    {(clinicaConfig?.nome || 'A').charAt(0).toUpperCase()}
-                  </div>
+                  <img
+                    src="/logo.svg"
+                    alt="Studio de Beleza Feminina"
+                    className="w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10 rounded-xl sm:rounded-2xl object-contain bg-white border border-slate-200/90 shadow-2xs group-hover:ring-2 ring-amber-500/40 transition-all shrink-0 p-0.5"
+                  />
                 )}
                 {/* Settings icon badge on logo to indicate clickability */}
                 <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-white rounded-full shadow-xs border border-slate-200 flex items-center justify-center text-slate-500 group-hover:text-indigo-600 group-hover:border-indigo-300 transition-colors">
@@ -172,7 +176,7 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 min-w-0">
                   <h1 className="text-xs sm:text-sm md:text-base font-bold text-slate-900 tracking-tight group-hover:text-indigo-600 transition-colors truncate max-w-[105px] xs:max-w-[135px] sm:max-w-[170px] md:max-w-[210px] lg:max-w-xs">
-                    {clinicaConfig?.nome || 'AuraEstética Studio'}
+                    {clinicaConfig?.nome || 'Studio de Beleza Feminina'}
                   </h1>
                   <span className={`hidden xl:inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full border items-center gap-1 shrink-0 ${currentBadge.style}`}>
                     {currentBadge.label}

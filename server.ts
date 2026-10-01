@@ -22,6 +22,13 @@ import {
   getWhatsAppConfigStatus,
   testarConexaoWhatsApp
 } from "./server/whatsapp.ts";
+import {
+  carregarConfigEvolution,
+  handleEvolutionStatus,
+  handleEvolutionInstanciar,
+  handleEvolutionDesconectar,
+  handleEvolutionSimularConexao
+} from "./server/evolutionBaileys.ts";
 
 async function startServer() {
   const app = express();
@@ -200,13 +207,13 @@ async function startServer() {
   iniciarAgendador03h();
 
   // ==========================================
-  // Rotas da Integração WhatsApp (Cloud API oficial da Meta)
+  // Rotas da Integração WhatsApp via Evolution API (Baileys)
   // ==========================================
 
-  // Status das variáveis de ambiente configuradas no AI Studio / servidor
-  app.get("/api/whatsapp/status", (req, res) => {
+  // Status operacional da instância Evolution API (Baileys)
+  app.get("/api/whatsapp/status", async (req, res) => {
     try {
-      const status = getWhatsAppConfigStatus();
+      const status = await getWhatsAppConfigStatus();
       const host = req.get('host') || 'localhost:3000';
       const forwardedProto = req.headers['x-forwarded-proto'];
       const protocol = forwardedProto ? String(forwardedProto).split(',')[0] : (req.secure ? 'https' : 'http');
@@ -229,6 +236,23 @@ async function startServer() {
       res.status(500).json({ sucesso: false, mensagem: err.message || 'Erro ao testar conexão com o WhatsApp' });
     }
   });
+
+  // ==========================================
+  // Rotas Evolution API (Baileys) - Conexão por QR Code
+  // ==========================================
+  carregarConfigEvolution().catch(console.warn);
+
+  // Status e QR Code atual da instância
+  app.get("/api/whatsapp/evolution/status", handleEvolutionStatus);
+
+  // Instanciar ou conectar com Baileys (gera QR Code)
+  app.post("/api/whatsapp/evolution/instance", handleEvolutionInstanciar);
+
+  // Desconectar sessão Baileys
+  app.post("/api/whatsapp/evolution/logout", handleEvolutionDesconectar);
+
+  // Confirmação / teste rápido de pareamento
+  app.post("/api/whatsapp/evolution/simulate-pairing", handleEvolutionSimularConexao);
 
   // 1. Verificação do webhook (chamada uma vez pela Meta ao configurar o webhook)
   app.get("/api/whatsapp/webhook", handleWhatsAppWebhookVerify);

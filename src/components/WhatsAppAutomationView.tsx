@@ -43,7 +43,9 @@ import {
   KeyRound,
   Webhook,
   Wifi,
-  AlertTriangle
+  AlertTriangle,
+  QrCode,
+  Smartphone
 } from 'lucide-react';
 import { 
   Agendamento, 
@@ -68,11 +70,8 @@ import {
   persistWhatsAppCampanha
 } from '../services/whatsappTemplateService';
 import { WhatsAppTemplateModal } from './WhatsAppTemplateModal';
-import { 
-  WhatsAppCloudApiConfigModal, 
-  WhatsAppCloudApiConfigGuide 
-} from './WhatsAppCloudApiConfigModal';
-import { WhatsAppWebhookSetupModal } from './WhatsAppWebhookSetupModal';
+import { EvolutionBaileysModal } from './EvolutionBaileysModal';
+import { EvolutionBaileysPanel } from './EvolutionBaileysPanel';
 import { COLLECTIONS, subscribeToCollection } from '../services/firebaseService';
 
 interface WhatsAppAutomationViewProps {
@@ -88,7 +87,7 @@ interface WhatsAppAutomationViewProps {
   transacoes?: TransacaoFinanceira[];
 }
 
-type TabType = 'agenda' | 'campanhas' | 'aniversarios' | 'retornos' | 'templates' | 'historico' | 'configuracao';
+type TabType = 'agenda' | 'campanhas' | 'aniversarios' | 'retornos' | 'templates' | 'historico' | 'evolution';
 type AudienceFilter = 'toda_base' | 'ativos' | 'inativos' | 'leads' | 'vip' | 'aniversariantes';
 
 export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
@@ -106,12 +105,34 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
   // Aba ativa principal
   const [activeTab, setActiveTab] = useState<TabType>('agenda');
 
-  // Modal de Configuração Cloud API (Secrets AI Studio) & Status da Conexão
-  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
-  const [isWebhookModalOpen, setIsWebhookModalOpen] = useState(false);
-  const [cloudApiConfigured, setCloudApiConfigured] = useState<boolean | null>(null);
+  // Modal e Status da Conexão Evolution API (Baileys)
+  const [isEvolutionModalOpen, setIsEvolutionModalOpen] = useState(false);
+  const [evolutionStatus, setEvolutionStatus] = useState<{
+    status: string;
+    ownerNumber?: string;
+    profileName?: string;
+  } | null>(null);
 
-  // Teste em tempo real da conexão com a API da Meta (testarConexaoWhatsApp)
+  const checkEvolutionStatus = () => {
+    fetch('/api/whatsapp/evolution/status')
+      .then(r => r.json())
+      .then(d => {
+        if (d?.sucesso && d?.status) {
+          setEvolutionStatus({
+            status: d.status.status,
+            ownerNumber: d.status.ownerNumber,
+            profileName: d.status.profileName,
+          });
+        }
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    checkEvolutionStatus();
+  }, []);
+
+  // Teste em tempo real da conexão com o WhatsApp conectado via Baileys
   const [testingConnection, setTestingConnection] = useState(false);
   const [testConnectionResult, setTestConnectionResult] = useState<{
     sucesso: boolean;
@@ -119,15 +140,6 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
     dados?: any;
   } | null>(null);
   const [isTestResultModalOpen, setIsTestResultModalOpen] = useState(false);
-
-  const checkCloudApiStatus = () => {
-    fetch('/api/whatsapp/status')
-      .then(r => r.json())
-      .then(d => {
-        setCloudApiConfigured(Boolean(d?.configured));
-      })
-      .catch(() => setCloudApiConfigured(false));
-  };
 
   const handleTestWhatsAppConnection = async () => {
     setTestingConnection(true);
@@ -141,18 +153,18 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
       const data = await resp.json();
       setTestConnectionResult(data);
       setIsTestResultModalOpen(true);
+      checkEvolutionStatus();
       if (data.sucesso) {
-        setCloudApiConfigured(true);
         if (showToast) {
-          showToast(data.mensagem || 'Conexão com a Meta realizada com sucesso!', 'success');
+          showToast(data.mensagem || 'WhatsApp conectado e pronto para disparos!', 'success');
         }
       } else {
         if (showToast) {
-          showToast(data.mensagem || 'Falha ao validar credenciais do WhatsApp.', 'error');
+          showToast(data.mensagem || 'Nenhum WhatsApp conectado no momento.', 'error');
         }
       }
     } catch (err: any) {
-      const erroMsg = err.message || 'Erro de comunicação ao disparar o teste da Graph API.';
+      const erroMsg = err.message || 'Erro de comunicação ao testar conexão.';
       setTestConnectionResult({
         sucesso: false,
         mensagem: erroMsg,
@@ -165,10 +177,6 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
       setTestingConnection(false);
     }
   };
-
-  useEffect(() => {
-    checkCloudApiStatus();
-  }, []);
 
   // Templates
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>(() => getStoredWhatsAppTemplates());
@@ -447,8 +455,8 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
       if (!resp.ok) {
         const data = await resp.json().catch(() => ({}));
         const errMsg = data?.error || 'Falha ao enviar mensagem.';
-        if (errMsg.includes('WHATSAPP_TOKEN') || errMsg.includes('não configurado') || errMsg.includes('credenciais')) {
-          setIsConfigModalOpen(true);
+        if (errMsg.includes('desconectado') || errMsg.includes('QR Code') || errMsg.includes('Baileys') || errMsg.includes('não está conectado')) {
+          setIsEvolutionModalOpen(true);
         }
         throw new Error(errMsg);
       }
@@ -691,7 +699,31 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-wrap">
-            {/* Botão de Teste em Tempo Real da Conexão com a Meta (testarConexaoWhatsApp) */}
+            {/* Botão Principal: Conectar WhatsApp via QR Code (EvolutionAPI - Baileys) */}
+            <button
+              type="button"
+              onClick={() => setIsEvolutionModalOpen(true)}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer border ${
+                evolutionStatus?.status === 'connected'
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700 ring-2 ring-emerald-500/20'
+                  : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
+              }`}
+              title="Conectar WhatsApp via QR Code com Baileys para disparar do seu próprio número"
+            >
+              <QrCode className="w-4 h-4 text-emerald-300" />
+              <span>
+                {evolutionStatus?.status === 'connected' 
+                  ? `WhatsApp Conectado (+${evolutionStatus.ownerNumber || 'Baileys'})` 
+                  : 'Conectar WhatsApp (QR Code)'}
+              </span>
+              {evolutionStatus?.status === 'connected' ? (
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-300 ring-2 ring-white/50"></span>
+              ) : (
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse ring-2 ring-amber-400/30"></span>
+              )}
+            </button>
+
+            {/* Botão de Teste de Conexão WhatsApp (Evolution API Baileys) */}
             <button
               type="button"
               onClick={handleTestWhatsAppConnection}
@@ -699,43 +731,18 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
               className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer border ${
                 testingConnection 
                   ? 'bg-amber-100 text-amber-800 border-amber-300 opacity-90 cursor-wait' 
-                  : cloudApiConfigured === true
+                  : evolutionStatus?.status === 'connected'
                   ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
                   : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
               }`}
-              title="Testar em tempo real se o Token e Phone Number ID estão válidos na Graph API da Meta (server/whatsapp.ts)"
+              title="Testar o status da conexão WhatsApp e a prontidão de disparo via Evolution API (motor Baileys)"
             >
               {testingConnection ? (
                 <RefreshCw className="w-4 h-4 text-amber-600 animate-spin" />
               ) : (
                 <Wifi className="w-4 h-4 text-emerald-600" />
               )}
-              <span>{testingConnection ? 'Testando Conexão...' : 'Testar Conexão Meta'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setIsWebhookModalOpen(true)}
-              className="px-3.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer border border-indigo-200"
-              title="Instruções para configurar a URL do Webhook na Meta e expor os endpoints de server/whatsapp.ts"
-            >
-              <Webhook className="w-4 h-4 text-indigo-600" />
-              <span>Instruções Webhook Meta</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setIsConfigModalOpen(true)}
-              className="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer border border-slate-700"
-              title="Como obter e cadastrar WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID e WHATSAPP_VERIFY_TOKEN no AI Studio"
-            >
-              <KeyRound className="w-4 h-4 text-emerald-400" />
-              <span>Configurar Cloud API (Secrets)</span>
-              {cloudApiConfigured === true ? (
-                <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-emerald-400/30" title="API Meta Conectada"></span>
-              ) : cloudApiConfigured === false ? (
-                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse ring-2 ring-amber-400/30" title="Variáveis Pendentes no AI Studio"></span>
-              ) : null}
+              <span>{testingConnection ? 'Testando Conexão...' : 'Testar Conexão WhatsApp'}</span>
             </button>
 
             <button
@@ -899,23 +906,22 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
 
           <button
             type="button"
-            onClick={() => setActiveTab('configuracao')}
+            onClick={() => setActiveTab('evolution')}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shrink-0 cursor-pointer ${
-              activeTab === 'configuracao'
+              activeTab === 'evolution'
                 ? 'bg-slate-900 text-white shadow-xs'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900'
             }`}
           >
-            <KeyRound className="w-3.5 h-3.5 text-emerald-500" />
-            <span>7. Guia Cloud API (Secrets)</span>
-            {cloudApiConfigured === false && (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500/20 text-amber-600 font-semibold">
-                Configurar
-              </span>
-            )}
-            {cloudApiConfigured === true && (
+            <Smartphone className="w-3.5 h-3.5 text-emerald-500" />
+            <span>7. Conexão WhatsApp (Baileys)</span>
+            {evolutionStatus?.status === 'connected' ? (
               <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/20 text-emerald-600 font-semibold">
-                Ativo
+                Conectado
+              </span>
+            ) : (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500/20 text-amber-600 font-semibold">
+                Escanear QR
               </span>
             )}
           </button>
@@ -2143,15 +2149,13 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
       )}
 
       {/* ========================================================
-          ABA 7: GUIA CLOUD API & VARIÁVEIS DE AMBIENTE (SECRETS)
+          ABA 7: CONEXÃO EVOLUTION API (BAILEYS) & QR CODE
          ======================================================== */}
-      {activeTab === 'configuracao' && (
-        <div className="space-y-4">
-          <WhatsAppCloudApiConfigGuide
-            showToast={showToast}
-            onClose={() => setActiveTab('agenda')}
-          />
-        </div>
+      {activeTab === 'evolution' && (
+        <EvolutionBaileysPanel
+          showToast={showToast}
+          onOpenModal={() => setIsEvolutionModalOpen(true)}
+        />
       )}
 
       {/* Modal de Criação / Edição de Mensagem Automática */}
@@ -2236,28 +2240,7 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
         </div>
       )}
 
-      {/* Modal Completo do Guia de Configuração da API do WhatsApp Cloud */}
-      <WhatsAppCloudApiConfigModal
-        isOpen={isConfigModalOpen}
-        onClose={() => {
-          setIsConfigModalOpen(false);
-          checkCloudApiStatus();
-        }}
-        showToast={showToast}
-        onOpenWebhookGuide={() => {
-          setIsConfigModalOpen(false);
-          setIsWebhookModalOpen(true);
-        }}
-      />
-
-      {/* Modal Dedicado de Instruções do Webhook URL (Meta Developers Console & server/whatsapp.ts) */}
-      <WhatsAppWebhookSetupModal
-        isOpen={isWebhookModalOpen}
-        onClose={() => setIsWebhookModalOpen(false)}
-        showToast={showToast}
-      />
-
-      {/* Modal de Diagnóstico em Tempo Real do Teste de Conexão WhatsApp Meta */}
+      {/* Modal de Diagnóstico em Tempo Real do Teste de Conexão WhatsApp (Evolution API / Baileys) */}
       {isTestResultModalOpen && testConnectionResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden space-y-0">
@@ -2283,13 +2266,13 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
                     ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                     : 'bg-rose-100 text-rose-800 border-rose-300'
                 }`}>
-                  {testConnectionResult.sucesso ? 'Conexão Bem-Sucedida' : 'Falha na Validação'}
+                  {testConnectionResult.sucesso ? 'WhatsApp Conectado' : 'Aguardando Pareamento'}
                 </span>
                 <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-snug">
-                  Teste da Graph API da Meta (server/whatsapp.ts)
+                  Conexão Evolution API (Baileys)
                 </h3>
                 <p className="text-xs text-slate-600 mt-1">
-                  Validação direta de Token e WhatsApp Phone Number ID
+                  Validação do motor Baileys e número pareado para disparos
                 </p>
               </div>
               <button
@@ -2305,28 +2288,35 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
               <div className={`p-4 rounded-2xl border text-xs sm:text-sm leading-relaxed ${
                 testConnectionResult.sucesso
                   ? 'bg-emerald-50 text-emerald-950 border-emerald-200'
-                  : 'bg-rose-50 text-rose-950 border-rose-200'
+                  : 'bg-amber-50 text-amber-950 border-amber-200'
               }`}>
                 {testConnectionResult.mensagem}
               </div>
 
               {testConnectionResult.dados && (
                 <div className="space-y-2">
-                  <p className="text-xs font-bold text-slate-700">Detalhes Retornados pela Meta:</p>
-                  <pre className="p-3 bg-slate-900 text-slate-200 font-mono text-xs rounded-xl overflow-x-auto max-h-48 scrollbar-thin">
-                    {JSON.stringify(testConnectionResult.dados, null, 2)}
-                  </pre>
+                  <p className="text-xs font-bold text-slate-700">Status da Instância Baileys:</p>
+                  <div className="p-3 bg-slate-900 text-slate-200 font-mono text-xs rounded-xl space-y-1">
+                    <div>Estado: <strong className="text-emerald-400">{testConnectionResult.dados.status || 'desconectado'}</strong></div>
+                    {testConnectionResult.dados.ownerNumber && (
+                      <div>Número Ativo: <strong className="text-emerald-300">+{testConnectionResult.dados.ownerNumber}</strong></div>
+                    )}
+                    {testConnectionResult.dados.profileName && (
+                      <div>Perfil: <span className="text-slate-300">{testConnectionResult.dados.profileName}</span></div>
+                    )}
+                    <div>Motor: <span className="text-slate-400">Evolution API (Baileys Engine)</span></div>
+                  </div>
                 </div>
               )}
 
               {!testConnectionResult.sucesso && (
-                <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1">
+                <div className="p-3.5 bg-indigo-50 rounded-xl border border-indigo-200 text-xs text-indigo-900 space-y-1">
                   <p className="font-bold flex items-center gap-1.5">
-                    <Info className="w-4 h-4 text-amber-700 shrink-0" />
-                    Como Resolver:
+                    <Info className="w-4 h-4 text-indigo-700 shrink-0" />
+                    Como Conectar:
                   </p>
                   <p className="text-slate-600">
-                    Verifique se cadastrou o <strong>WHATSAPP_TOKEN</strong> (Token Permanente de System User com permissão <code className="text-indigo-600 font-bold">whatsapp_business_messaging</code>) e o <strong>WHATSAPP_PHONE_NUMBER_ID</strong> (ID numérico gerado pela Meta) nas Variáveis de Ambiente/Secrets.
+                    Clique em <strong>"Conectar WhatsApp (QR Code)"</strong> abaixo para gerar o código na tela. Em seguida, abra o WhatsApp no seu smartphone em <strong>Aparelhos Conectados</strong> e aponte a câmera para parear.
                   </p>
                 </div>
               )}
@@ -2336,12 +2326,12 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
                   type="button"
                   onClick={() => {
                     setIsTestResultModalOpen(false);
-                    setIsConfigModalOpen(true);
+                    setIsEvolutionModalOpen(true);
                   }}
-                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
                 >
-                  <KeyRound className="w-4 h-4 text-emerald-600" />
-                  <span>Abrir Guia de Secrets</span>
+                  <QrCode className="w-4 h-4 text-emerald-200" />
+                  <span>{testConnectionResult.sucesso ? 'Gerenciar Aparelho' : 'Escanear QR Code'}</span>
                 </button>
 
                 <div className="flex items-center gap-2">
@@ -2349,10 +2339,10 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
                     type="button"
                     onClick={handleTestWhatsAppConnection}
                     disabled={testingConnection}
-                    className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-colors shadow-sm cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${testingConnection ? 'animate-spin' : ''}`} />
-                    <span>Testar Novamente</span>
+                    <span>Verificar Novamente</span>
                   </button>
 
                   <button
@@ -2368,6 +2358,16 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal Dedicado Evolution API (Baileys) Conexão QR Code */}
+      <EvolutionBaileysModal
+        isOpen={isEvolutionModalOpen}
+        onClose={() => {
+          setIsEvolutionModalOpen(false);
+          checkEvolutionStatus();
+        }}
+        showToast={showToast}
+      />
 
     </div>
   );

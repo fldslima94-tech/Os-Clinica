@@ -277,6 +277,18 @@
         "dados": { "type": "object" }
       },
       "required": ["id", "dataCriacao", "tipo", "totalRegistros"]
+    },
+    "EvolutionWhatsAppConfig": {
+      "title": "EvolutionWhatsAppConfig",
+      "description": "Configurações e estado da instância Evolution API Baileys",
+      "type": "object",
+      "properties": {
+        "serverUrl": { "type": "string", "maxLength": 500 },
+        "instanceName": { "type": "string", "maxLength": 120 },
+        "apiKey": { "type": "string", "maxLength": 500 },
+        "status": { "type": "object" }
+      },
+      "required": ["instanceName"]
     }
   },
   "firestore": {
@@ -355,6 +367,10 @@
     "/test/{testId}": {
       "schema": "ClinicaConfig",
       "description": "Verificação de conectividade e integridade do Firestore"
+    },
+    "/whatsapp_evolution/{configId}": {
+      "schema": "EvolutionWhatsAppConfig",
+      "description": "Configuração da instância Evolution API Baileys"
     }
   }
 }

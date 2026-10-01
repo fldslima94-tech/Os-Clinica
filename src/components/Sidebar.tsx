@@ -235,13 +235,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className="w-10 h-10 rounded-2xl object-contain bg-white border border-slate-200/90 shadow-xs shrink-0 p-0.5" 
               />
             ) : (
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-slate-900 rounded-2xl flex items-center justify-center text-white font-bold text-base shadow-xs shrink-0">
-                {(clinicaConfig?.nome || 'A').charAt(0).toUpperCase()}
-              </div>
+              <img 
+                src="/logo.svg" 
+                alt="Studio de Beleza Feminina" 
+                className="w-10 h-10 rounded-2xl object-contain bg-white border border-slate-200/90 shadow-xs shrink-0 p-0.5" 
+              />
             )}
             <div className="min-w-0 flex-1">
               <span className="text-sm font-bold tracking-tight text-slate-900 block truncate">
-                {clinicaConfig?.nome || 'AuraEstética Studio'}
+                {clinicaConfig?.nome || 'Studio de Beleza Feminina'}
               </span>
               <span className="text-[11px] text-indigo-600 font-semibold block truncate">
                 Área do Cliente
@@ -263,13 +265,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className="w-10 h-10 rounded-2xl object-contain bg-white border border-slate-200/90 shadow-xs group-hover:ring-2 ring-indigo-500/40 transition-all shrink-0 p-0.5" 
               />
             ) : (
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-slate-900 rounded-2xl flex items-center justify-center text-white font-bold text-base shadow-xs group-hover:ring-2 ring-indigo-500/40 transition-all shrink-0">
-                {(clinicaConfig?.nome || 'A').charAt(0).toUpperCase()}
-              </div>
+              <img 
+                src="/logo.svg" 
+                alt="Studio de Beleza Feminina" 
+                className="w-10 h-10 rounded-2xl object-contain bg-white border border-slate-200/90 shadow-xs group-hover:ring-2 ring-amber-500/40 transition-all shrink-0 p-0.5" 
+              />
             )}
             <div className="min-w-0 flex-1">
-              <span className="text-sm font-bold tracking-tight text-slate-900 block truncate group-hover:text-indigo-600 transition-colors">
-                {clinicaConfig?.nome || 'AuraEstética Studio'}
+              <span className="text-sm font-bold tracking-tight text-slate-900 block truncate group-hover:text-amber-700 transition-colors">
+                {clinicaConfig?.nome || 'Studio de Beleza Feminina'}
               </span>
               <span className="text-[11px] text-slate-400 block truncate">
                 Configurações da Clínica
