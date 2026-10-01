@@ -589,6 +589,212 @@ export const EvolutionBaileysPanel: React.FC<EvolutionBaileysPanelProps> = ({
         </div>
       </div>
 
+      {/* Guia de Configuração do Webhook Evolution API (Aura Atendente Virtual) */}
+      <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+              <Bot className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  Recepção Automática Ativa
+                </span>
+                <span className="text-xs text-slate-500 font-medium">Evolution API v1 & v2</span>
+              </div>
+              <h3 className="text-base sm:text-lg font-bold text-slate-900 mt-0.5">
+                Guia de Webhook: Apontamento para o Bot Aura Atendente Virtual
+              </h3>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={async () => {
+              const url = typeof window !== 'undefined' ? `${window.location.origin}/api/whatsapp/webhook` : '/api/whatsapp/webhook';
+              await navigator.clipboard.writeText(url);
+              setCopiedKey('webhook_url');
+              setTimeout(() => setCopiedKey(null), 2500);
+              showToast?.('URL do Webhook copiada para a área de transferência!', 'success');
+            }}
+            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer shrink-0"
+          >
+            {copiedKey === 'webhook_url' ? (
+              <>
+                <Check className="w-4 h-4" />
+                <span>URL Copiada!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-4 h-4" />
+                <span>Copiar URL do Webhook</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* URL do Webhook em Destaque */}
+        <div className="p-4 bg-slate-900 rounded-2xl text-slate-100 space-y-2">
+          <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
+            <span>Sua URL de Webhook (Cole no Painel da Evolution API):</span>
+            <span className="text-emerald-400 font-mono">Rota: /api/whatsapp/webhook</span>
+          </div>
+          <div className="flex items-center justify-between gap-3 bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+            <code className="text-xs sm:text-sm font-mono text-emerald-300 break-all select-all">
+              {typeof window !== 'undefined' ? `${window.location.origin}/api/whatsapp/webhook` : 'https://sua-clinica.app/api/whatsapp/webhook'}
+            </code>
+            <button
+              type="button"
+              onClick={async () => {
+                const url = typeof window !== 'undefined' ? `${window.location.origin}/api/whatsapp/webhook` : '/api/whatsapp/webhook';
+                await navigator.clipboard.writeText(url);
+                setCopiedKey('webhook_url_code');
+                setTimeout(() => setCopiedKey(null), 2500);
+              }}
+              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors shrink-0"
+              title="Copiar"
+            >
+              {copiedKey === 'webhook_url_code' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Passo a Passo de Configuração no Painel da Evolution API */}
+        <div className="space-y-4">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+            Passo a Passo no Painel / Evolution Manager:
+          </h4>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 space-y-2">
+              <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">
+                1
+              </div>
+              <h5 className="text-xs font-bold text-slate-900">Acesse a Instância</h5>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                No menu lateral do Evolution Manager, clique na sua instância (ex: <code className="text-indigo-600 font-semibold">{instanceName}</code>) e abra a aba <strong>Webhook</strong>.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 space-y-2">
+              <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">
+                2
+              </div>
+              <h5 className="text-xs font-bold text-slate-900">Ative o Webhook</h5>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                Marque <strong>Webhook Enabled</strong> como <strong className="text-emerald-700">ON</strong> e cole a URL acima no campo <strong>Webhook URL</strong>. Ative <strong>Webhook by Events</strong>.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 space-y-2">
+              <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">
+                3
+              </div>
+              <h5 className="text-xs font-bold text-slate-900">Selecione os 2 Eventos</h5>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                Na lista de eventos, marque estritamente:
+                <br />
+                • <strong className="text-indigo-700">MESSAGES_UPSERT</strong> (recepção do cliente)
+                <br />
+                • <strong className="text-indigo-700">CONNECTION_UPDATE</strong> (status do aparelho)
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Detalhamento dos Eventos */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+          <div className="p-4 bg-indigo-50/80 rounded-2xl border border-indigo-100 space-y-2">
+            <div className="flex items-center gap-2 text-indigo-900 font-bold text-xs">
+              <MessageSquare className="w-4 h-4 text-indigo-600" />
+              <span>Evento: messages.upsert (MESSAGES_UPSERT)</span>
+            </div>
+            <p className="text-xs text-indigo-950/80 leading-relaxed">
+              Dispara a cada mensagem de texto ou áudio enviada por um cliente para o seu WhatsApp. O servidor encaminha o texto para a <strong>Aura (Google Gemini)</strong>, que:
+            </p>
+            <ul className="text-[11px] text-indigo-900 space-y-1 list-disc list-inside">
+              <li>Confirma agendamentos (Opção 1)</li>
+              <li>Encaminha pedidos de remarcação (Opção 2)</li>
+              <li>Registra pedidos de insumos/produtos (Opção 3)</li>
+              <li>Transfere para atendente humano quando solicitado (Opção 4)</li>
+              <li>Responde dúvidas sobre procedimentos, valores e pós-atendimento</li>
+            </ul>
+          </div>
+
+          <div className="p-4 bg-amber-50/80 rounded-2xl border border-amber-100 space-y-2">
+            <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
+              <Wifi className="w-4 h-4 text-amber-600" />
+              <span>Evento: connection.update (CONNECTION_UPDATE)</span>
+            </div>
+            <p className="text-xs text-amber-950/80 leading-relaxed">
+              Dispara sempre que o estado da sessão WhatsApp Baileys mudar:
+            </p>
+            <ul className="text-[11px] text-amber-900 space-y-1 list-disc list-inside">
+              <li><strong>open:</strong> Atualiza instantaneamente a clínica para <span className="font-bold text-emerald-700">Conectado</span></li>
+              <li><strong>close:</strong> Alerta a recepção que o aparelho foi desconectado</li>
+              <li><strong>connecting:</strong> Mostra aviso de reconexão automática</li>
+              <li>Sincroniza número do chip e nome do perfil automaticamente</li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Configuração via API REST (cURL) */}
+        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <Server className="w-4 h-4 text-slate-600" />
+              Configuração Alternativa via API REST (cURL / Postman / Swagger):
+            </span>
+            <button
+              type="button"
+              onClick={async () => {
+                const curlCmd = `curl -X POST "${serverUrl || 'https://sua-evolution-api.com'}/webhook/set/${instanceName}" \\
+  -H "Content-Type: application/json" \\
+  -H "apikey: ${apiKey || 'SUA_API_KEY'}" \\
+  -d '{
+    "webhook": {
+      "enabled": true,
+      "url": "${typeof window !== 'undefined' ? window.location.origin : 'https://sua-clinica.app'}/api/whatsapp/webhook",
+      "byEvents": true,
+      "base64": false,
+      "events": [
+        "MESSAGES_UPSERT",
+        "CONNECTION_UPDATE"
+      ]
+    }
+  }'`;
+                await navigator.clipboard.writeText(curlCmd);
+                setCopiedKey('curl_code');
+                setTimeout(() => setCopiedKey(null), 2500);
+                showToast?.('Comando cURL copiado com sucesso!', 'success');
+              }}
+              className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 cursor-pointer"
+            >
+              {copiedKey === 'curl_code' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copiedKey === 'curl_code' ? 'Copiado!' : 'Copiar cURL'}</span>
+            </button>
+          </div>
+          <pre className="p-3 bg-slate-900 text-emerald-400 font-mono text-[11px] rounded-xl overflow-x-auto leading-relaxed">
+{`curl -X POST "${serverUrl || 'https://sua-evolution-api.com'}/webhook/set/${instanceName}" \\
+  -H "Content-Type: application/json" \\
+  -H "apikey: ${apiKey || 'SUA_API_KEY'}" \\
+  -d '{
+    "webhook": {
+      "enabled": true,
+      "url": "${typeof window !== 'undefined' ? window.location.origin : 'https://sua-clinica.app'}/api/whatsapp/webhook",
+      "byEvents": true,
+      "base64": false,
+      "events": [
+        "MESSAGES_UPSERT",
+        "CONNECTION_UPDATE"
+      ]
+    }
+  }'`}
+          </pre>
+        </div>
+      </div>
+
       {/* Configuração Avançada da Instância (Opcional) */}
       {showConfig && (
         <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-4 animate-in fade-in">

@@ -75,7 +75,7 @@ export async function carregarConfigEvolution() {
 }
 
 // Salva status no Firestore
-async function persistirStatusEvolution(status: Partial<EvolutionInstanceStatus>) {
+export async function persistirStatusEvolution(status: Partial<EvolutionInstanceStatus>) {
   currentStatus = {
     ...currentStatus,
     ...status,

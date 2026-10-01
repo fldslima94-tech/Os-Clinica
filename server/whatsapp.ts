@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { getAdminDb } from './firebaseAdmin.ts';
 import { getGeminiClient } from './gemini.ts';
-import { obterStatusEvolution, enviarMensagemEvolution } from './evolutionBaileys.ts';
+import { obterStatusEvolution, enviarMensagemEvolution, persistirStatusEvolution } from './evolutionBaileys.ts';
 
 // ==========================================
 // Constantes & Coleções Firestore
@@ -373,7 +373,32 @@ export async function handleWhatsAppWebhookReceive(req: Request, res: Response) 
     const body = req.body;
     if (!body) return;
 
-    // 1. Formato Evolution API v1 / v2: event "messages.upsert"
+    // 1. Formato Evolution API: event "connection.update"
+    if ((body.event === 'connection.update' || body.event === 'connection-update') && body.data) {
+      const state = body.data.state || body.data.status;
+      if (state === 'open' || state === 'connected') {
+        const rawOwner = body.data.ownerNumber || body.sender || body.data.wuid || '';
+        const cleanOwner = rawOwner ? String(rawOwner).replace(/\D/g, '') : undefined;
+        await persistirStatusEvolution({
+          status: 'connected',
+          active: true,
+          ownerNumber: cleanOwner,
+          profileName: body.data.profileName || undefined,
+        });
+      } else if (state === 'close' || state === 'disconnected') {
+        await persistirStatusEvolution({
+          status: 'disconnected',
+          active: false,
+        });
+      } else if (state === 'connecting') {
+        await persistirStatusEvolution({
+          status: 'connecting',
+        });
+      }
+      return;
+    }
+
+    // 2. Formato Evolution API v1 / v2: event "messages.upsert"
     if (body.event === 'messages.upsert' && body.data) {
       const data = body.data;
       const key = data.key;
