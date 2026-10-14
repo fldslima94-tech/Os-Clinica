@@ -26,7 +26,51 @@ export const MOCK_CLINICA_CONFIG: ClinicaConfig = {
   cnpj: '38.941.205/0001-94',
   email_contato: 'contato@studiodebelezafeminina.com.br',
   slogan: 'Alta Tecnologia e Excelência em Procedimentos Estéticos e Beleza Feminina',
-  tema_cor_primaria: '#c59b27'
+  tema_cor_primaria: '#c59b27',
+  hero_titulo: 'Realce sua beleza natural com sofisticação e precisão.',
+  hero_subtitulo: 'Unimos tecnologia moderna, produtos biocompatíveis certificados e um olhar artístico exclusivo para transformar sua autoestima com total segurança.',
+  hero_imagem_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=900&auto=format&fit=crop&q=80',
+  sobre_studio_texto: 'Localizado estrategicamente com fácil acesso e estacionamento, nosso studio conta com salas climatizadas, macas automatizadas com aquecimento lombar e autoclave hospitalar para esterilização grau máximo.',
+  horario_semana: 'Segunda a Sexta: 08:00 às 19:30',
+  horario_sabado: 'Sábados: 08:00 às 15:00',
+  fotos_ambiente: [
+    'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=600&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?w=600&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=600&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1512290900672-1f55b9959a4b?w=600&auto=format&fit=crop&q=80'
+  ],
+  depoimentos: [
+    {
+      id: 'dep-1',
+      nome: 'Carolina Mendes',
+      procedimento: 'Toxina Botulínica Terço Superior',
+      texto: 'Fiz a aplicação e o resultado ficou extremamente harmônico e sutil, exatamente como eu sonhava. A atenção e o cuidado dos profissionais são incomparáveis!',
+      nota: 5,
+      avatar_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&auto=format&fit=crop&q=80',
+      data: 'Atendida há 2 semanas',
+      destaque: true
+    },
+    {
+      id: 'dep-2',
+      nome: 'Mariana Duarte Alencar',
+      procedimento: 'Micropigmentação Labial Velvet',
+      texto: 'Minha boca ganhou um tom rosado saudável e natural. Não senti dor durante o procedimento e a cicatrização foi perfeita com as orientações pós-sessão.',
+      nota: 5,
+      avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
+      data: 'Atendida no mês passado',
+      destaque: true
+    },
+    {
+      id: 'dep-3',
+      nome: 'Beatriz Silveira',
+      procedimento: 'Limpeza de Pele Profunda',
+      texto: 'Ambiente maravilhoso, cheiroso e impecavelmente limpo! Minha pele renasceu após o protocolo, sem manchas nem vermelhidão. Já agendei a próxima.',
+      nota: 5,
+      avatar_url: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&auto=format&fit=crop&q=80',
+      data: 'Atendida recentemente',
+      destaque: true
+    }
+  ]
 };
 
 export const MOCK_USUARIOS: UsuarioEquipe[] = [

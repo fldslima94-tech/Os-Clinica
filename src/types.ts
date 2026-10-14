@@ -115,6 +115,17 @@ export interface ConfiguracaoCampos {
 
 export type PrioridadeAviso = 'urgente' | 'importante' | 'informativo';
 
+export interface DepoimentoCliente {
+  id: string;
+  nome: string;
+  procedimento: string;
+  texto: string;
+  nota: number; // 1 a 5 estrelas
+  avatar_url?: string;
+  data?: string;
+  destaque?: boolean;
+}
+
 export interface ClinicaConfig {
   id: string;
   nome: string;
@@ -131,6 +142,44 @@ export interface ClinicaConfig {
   titular_pix?: string;
   banco_pix?: string;
   cidade_pix?: string;
+  // Customizações do Site Oficial & Fotos
+  hero_titulo?: string;
+  hero_subtitulo?: string;
+  hero_imagem_url?: string;
+  sobre_studio_texto?: string;
+  horario_semana?: string;
+  horario_sabado?: string;
+  fotos_ambiente?: string[];
+  depoimentos?: DepoimentoCliente[];
+  // Seção "Quem Sou Eu" (Aba da Profissional Responsável & Serviços Desempenhados)
+  quem_sou_nome?: string;
+  quem_sou_titulo?: string;
+  quem_sou_registro?: string;
+  quem_sou_bio?: string;
+  quem_sou_foto_url?: string;
+  quem_sou_video_url?: string;
+  quem_sou_tipo_midia?: 'foto' | 'video';
+  quem_sou_instagram?: string;
+  quem_sou_servicos_ids?: string[];
+  quem_sou_diferenciais?: string[];
+  quem_sou_anos_experiencia?: string;
+  quem_sou_profissionais?: ProfissionalQuemSouEu[];
+}
+
+export interface ProfissionalQuemSouEu {
+  id: string;
+  nome: string;
+  titulo: string;
+  registro?: string;
+  bio?: string;
+  foto_url?: string;
+  video_url?: string;
+  tipo_midia?: 'foto' | 'video';
+  instagram?: string;
+  servicos_ids?: string[];
+  diferenciais?: string[];
+  anos_experiencia?: string;
+  ativo?: boolean;
 }
 
 export interface AvisoQuadro {
@@ -725,6 +774,7 @@ export type TabType =
   | 'quadro_avisos'
   | 'usuarios'
   | 'permissoes' // Módulo de Gestão de Permissões e Campos do admin_total
+  | 'site_admin' // Gestão de Fotos e Depoimentos da Home do Site (Super Admin)
   | 'banco_dados' // Edição & Banco de Dados Master Total
   | 'backups' // Backups Automáticos & Recuperação
   | 'perfil' // Meu Perfil / Minha Conta

@@ -55,9 +55,11 @@ import { PostCareReturnView } from './components/PostCareReturnView';
 import { SupabaseGuideView } from './components/SupabaseGuideView';
 import { UsersManagementView } from './components/UsersManagementView';
 import { PatientPortalView } from './components/PatientPortalView';
+import { ClientWebsiteView } from './components/ClientWebsiteView';
 import { NoticeBoardView } from './components/NoticeBoardView';
 import { AssetsView } from './components/AssetsView';
 import { PermissionsManagementView } from './components/PermissionsManagementView';
+import { SuperAdminWebsiteEditor } from './components/SuperAdminWebsiteEditor';
 import { UserProfileView } from './components/UserProfileView';
 import { LoginView } from './components/LoginView';
 import { UrgentAlertPopupModal } from './components/UrgentAlertPopupModal';
@@ -130,6 +132,9 @@ function getInitialTab(userRole?: string): TabType {
   if (typeof window !== 'undefined') {
     const params = new URLSearchParams(window.location.search);
     if (params.get('mode') === 'tv') return 'balcao_tv';
+    if (params.get('site') === 'true' || params.get('site_cliente') === 'true' || params.get('portal') === 'true' || params.get('cliente') === 'true') {
+      return 'portal_paciente';
+    }
     const tabFromUrl = params.get('tab') as TabType;
     if (tabFromUrl) return tabFromUrl;
 
@@ -2407,6 +2412,105 @@ export default function App() {
     );
   }
 
+  const isDirectSiteMode = typeof window !== 'undefined' && (
+    new URLSearchParams(window.location.search).get('site') === 'true' ||
+    new URLSearchParams(window.location.search).get('portal') === 'true' ||
+    new URLSearchParams(window.location.search).get('site_cliente') === 'true' ||
+    new URLSearchParams(window.location.search).get('cliente') === 'true'
+  );
+  const [isPublicSiteActive, setIsPublicSiteActive] = useState<boolean>(() => isDirectSiteMode);
+
+  const handleCriarAgendamentoDoSite = (novoAg: any) => {
+    const pacienteId = novoAg.pacienteId || `pac-${Date.now()}`;
+    const pacienteObj: Paciente = {
+      id: pacienteId,
+      nome: novoAg.pacienteNome,
+      telefone: novoAg.pacienteTelefone,
+      email: novoAg.pacienteEmail,
+      data_nascimento: '1995-01-01',
+      historico_clinico: novoAg.observacoes || 'Cadastro preliminar gerado via agendamento online no Site da Clínica.',
+      criado_em: new Date().toISOString(),
+    };
+
+    // Garante que o cliente seja registrado preliminarmente na base de pacientes
+    setPacientes(prev => {
+      const exists = prev.some(p => 
+        (novoAg.pacienteEmail && p.email?.toLowerCase() === novoAg.pacienteEmail.toLowerCase()) || 
+        (novoAg.pacienteTelefone && p.telefone?.replace(/\D/g, '') === novoAg.pacienteTelefone.replace(/\D/g, ''))
+      );
+      if (!exists) {
+        saveDocument(COLLECTIONS.PACIENTES, pacienteObj);
+        return [pacienteObj, ...prev];
+      }
+      return prev;
+    });
+
+    const createdAg: Agendamento = {
+      id: `ag-portal-${Date.now()}`,
+      paciente_id: pacienteId,
+      data_hora: `${novoAg.data}T${novoAg.hora || '09:00'}:00`,
+      procedimento: novoAg.procedimentoNome,
+      status: 'confirmado',
+      criado_em: new Date().toISOString(),
+      duracao_minutos: novoAg.duracaoMinutos || 45,
+      valor_estimado: novoAg.valor || 0,
+      profissional_id: novoAg.profissionalId,
+      profissional_nome: novoAg.profissionalNome,
+      observacoes: novoAg.observacoes || 'Agendamento direto realizado no Site da Clínica.',
+      origem_portal: true,
+      necessita_cadastro_completo: true,
+      cadastro_completo_realizado: false,
+      paciente: pacienteObj,
+    };
+
+    setAgendamentos(prev => [createdAg, ...prev]);
+    saveDocument(COLLECTIONS.AGENDAMENTOS, createdAg);
+    showToast(`Agendamento de ${novoAg.pacienteNome} inserido na Agenda Semanal com sucesso!`);
+  };
+
+  // Public Client Website Mode (Accessible directly without staff login)
+  if (!isAuthenticated && isPublicSiteActive) {
+    return (
+      <MasterEditProvider currentUser={currentUser}>
+        <div className="min-h-screen w-full bg-[#faf8f5] text-slate-900 flex flex-col antialiased">
+          {toastMessage && (
+            <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-4 duration-200">
+              <div className="flex items-center gap-2.5 px-4 py-3 bg-slate-900 text-white rounded-xl shadow-xl border border-slate-800 text-xs sm:text-sm font-medium">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{toastMessage.text}</span>
+              </div>
+            </div>
+          )}
+
+          <ClientWebsiteView
+            procedimentos={procedimentos}
+            orçamentos={orcamentos}
+            agendamentos={agendamentos}
+            onCriarOrcamento={handleCriarOrcamento}
+            onAtualizarStatusOrcamento={handleAtualizarStatusOrcamento}
+            onConverterEmAgendamento={(orc) => handleConverterOrcamentoEmAgendamento(orc)}
+            onDeleteOrcamento={handleDeleteOrcamento}
+            onCriarAgendamento={handleCriarAgendamentoDoSite}
+            currentUser={null}
+            clinicaConfig={clinicaConfig}
+            profissionais={usuarios}
+            isPublicVisitor={true}
+            onReturnToAdmin={() => {
+              if (isDirectSiteMode) {
+                const url = new URL(window.location.href);
+                url.searchParams.delete('site');
+                url.searchParams.delete('portal');
+                url.searchParams.delete('cliente');
+                window.history.replaceState({}, '', url.pathname);
+              }
+              setIsPublicSiteActive(false);
+            }}
+          />
+        </div>
+      </MasterEditProvider>
+    );
+  }
+
   // If user is not authenticated, display full secure Login screen
   if (!isAuthenticated) {
     return (
@@ -2423,6 +2527,7 @@ export default function App() {
           usuarios={usuarios} 
           onLoginSuccess={handleLoginSuccess} 
           clinicaConfig={clinicaConfig}
+          onOpenPublicSite={() => setIsPublicSiteActive(true)}
         />
 
         {/* PWA Floating Install Banner on Login Screen */}
@@ -2455,6 +2560,53 @@ export default function App() {
     b.requerManutencao && 
     (b.estado_conservacao === 'manutencao' || b.statusManutencao === 'em_manutencao' || (b.dataProximaManutencao && b.dataProximaManutencao <= limite15dAppStr))
   ).length;
+
+  // Site Oficial da Clínica / Área do Cliente em Tela Cheia
+  const isViewingClientSite = (activeTab as string) === 'portal_paciente' || (currentUser?.role as string) === 'cliente';
+  if (isViewingClientSite) {
+    return (
+      <MasterEditProvider currentUser={currentUser}>
+        <div className="min-h-screen w-full bg-[#faf8f5] text-slate-900 flex flex-col antialiased">
+          {toastMessage && (
+            <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-4 duration-200">
+              <div className="flex items-center gap-2.5 px-4 py-3 bg-slate-900 text-white rounded-xl shadow-xl border border-slate-800 text-xs sm:text-sm font-medium">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{toastMessage.text}</span>
+              </div>
+            </div>
+          )}
+
+          <ClientWebsiteView
+            procedimentos={procedimentos}
+            orçamentos={orcamentos}
+            agendamentos={agendamentos}
+            onCriarOrcamento={handleCriarOrcamento}
+            onAtualizarStatusOrcamento={handleAtualizarStatusOrcamento}
+            onConverterEmAgendamento={(orc) => handleConverterOrcamentoEmAgendamento(orc)}
+            onDeleteOrcamento={handleDeleteOrcamento}
+            onCriarAgendamento={handleCriarAgendamentoDoSite}
+            currentUser={currentUser}
+            clinicaConfig={clinicaConfig}
+            profissionais={usuarios}
+            isPublicVisitor={false}
+            onAtualizarClinicaConfig={handleSaveClinicConfig}
+            onAtualizarProcedimento={(proc) => {
+              setProcedimentos(prev => prev.map(p => p.id === proc.id ? proc : p));
+              saveDocument(COLLECTIONS.PROCEDIMENTOS, proc);
+            }}
+            onReturnToAdmin={() => {
+              setActiveTab('dashboard');
+            }}
+            onGoToAgendaSemanal={(targetDate) => {
+              setAppointmentViewFormat('calendario');
+              setActiveTab('agendamentos');
+              showToast('Redirecionado para a Agenda Semanal da Clínica.', 'info');
+            }}
+          />
+        </div>
+      </MasterEditProvider>
+    );
+  }
 
   return (
     <MasterEditProvider currentUser={currentUser}>
@@ -2777,6 +2929,11 @@ export default function App() {
               currentUser={currentUser}
               clinicaConfig={clinicaConfig}
               profissionais={usuarios}
+              onAtualizarClinicaConfig={handleSaveClinicConfig}
+              onAtualizarProcedimento={(proc) => {
+                setProcedimentos(prev => prev.map(p => p.id === proc.id ? proc : p));
+                saveDocument(COLLECTIONS.PROCEDIMENTOS, proc);
+              }}
             />
           )}
 
@@ -2904,6 +3061,10 @@ export default function App() {
               usuarios={usuarios}
               currentUser={currentUser}
               configuracaoCampos={configuracaoCampos}
+              clinicaConfig={clinicaConfig}
+              onSaveClinicaConfig={handleSaveClinicConfig}
+              procedimentos={procedimentos}
+              onPreviewSite={() => setActiveTab('portal_paciente')}
               onUpdateUserPermissions={(userId, perms, role) => {
                 setUsuarios(prev => prev.map(u => u.id === userId ? { 
                   ...u, 
@@ -2924,6 +3085,15 @@ export default function App() {
                 showToast('Configurações de visibilidade de campos atualizadas!');
               }}
               onDeleteUser={handleDeleteUser}
+            />
+          )}
+
+          {activeTab === 'site_admin' && (isUserAdminTotal(currentUser)) && (
+            <SuperAdminWebsiteEditor
+              clinicaConfig={clinicaConfig}
+              onSaveClinicaConfig={handleSaveClinicConfig}
+              procedimentos={procedimentos}
+              onPreviewSite={() => setActiveTab('portal_paciente')}
             />
           )}
 

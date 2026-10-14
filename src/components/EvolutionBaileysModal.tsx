@@ -17,7 +17,8 @@ import {
   ExternalLink,
   Sliders,
   Sparkles,
-  Info
+  Info,
+  Bot
 } from 'lucide-react';
 
 export interface EvolutionStatusResponse {
@@ -424,6 +425,38 @@ export const EvolutionBaileysModal: React.FC<EvolutionBaileysModalProps> = ({
               </div>
             </div>
           )}
+
+          {/* Webhook da Instância para a Atendente Virtual Aura */}
+          <div className="border border-emerald-200 rounded-2xl p-4 bg-emerald-50/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-2 text-xs font-bold text-emerald-950">
+                <Bot className="w-4 h-4 text-emerald-600" />
+                Webhook para Bot Aura (messages.upsert & connection.update)
+              </span>
+              <button
+                type="button"
+                onClick={async () => {
+                  const url = typeof window !== 'undefined' ? `${window.location.origin}/api/whatsapp/webhook` : '/api/whatsapp/webhook';
+                  await navigator.clipboard.writeText(url);
+                  setCopiedKey('modal_webhook');
+                  setTimeout(() => setCopiedKey(null), 2500);
+                  showToast?.('URL do Webhook copiada com sucesso!', 'success');
+                }}
+                className="text-xs text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1 cursor-pointer bg-white px-2.5 py-1 rounded-lg border border-emerald-300 shadow-2xs"
+              >
+                {copiedKey === 'modal_webhook' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedKey === 'modal_webhook' ? 'Copiado!' : 'Copiar Webhook'}</span>
+              </button>
+            </div>
+
+            <p className="text-[11px] text-emerald-800 leading-relaxed">
+              Aponte este Webhook no painel da sua Evolution API marcando os eventos <strong className="text-emerald-950">MESSAGES_UPSERT</strong> (recepção da cliente) e <strong className="text-emerald-950">CONNECTION_UPDATE</strong> (status do chip):
+            </p>
+
+            <div className="p-2.5 bg-slate-900 rounded-xl text-emerald-300 font-mono text-[11px] break-all select-all flex items-center justify-between gap-2">
+              <span>{typeof window !== 'undefined' ? `${window.location.origin}/api/whatsapp/webhook` : 'https://sua-clinica.app/api/whatsapp/webhook'}</span>
+            </div>
+          </div>
 
           {/* Configurações de Servidor Evolution Remoto (Opcional para quem tem VPS Docker/Coolify) */}
           <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/60 space-y-3">

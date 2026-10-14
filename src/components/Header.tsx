@@ -11,7 +11,8 @@ import {
   Wrench,
   Tv,
   Plus,
-  Smartphone
+  Smartphone,
+  Sparkles
 } from 'lucide-react';
 import { TabType, UsuarioEquipe, UserRole, ClinicaConfig } from '../types';
 import { isUserAdminTotal } from '../services/firebaseService';
@@ -316,6 +317,21 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="hidden sm:inline">Instalar App</span>
             </button>
           )}
+
+          {/* Botão Ver Site Oficial da Clínica & Área do Cliente */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('portal_paciente')}
+            className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 text-xs font-semibold ${
+              activeTab === 'portal_paciente'
+                ? 'bg-amber-100 border-amber-300 text-amber-950 font-bold shadow-2xs'
+                : 'border-amber-200 bg-amber-50/80 hover:bg-amber-100 text-amber-900'
+            }`}
+            title="Visualizar o Site Oficial da Clínica & Agendamento Online"
+          >
+            <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+            <span className="hidden sm:inline">Site da Clínica</span>
+          </button>
 
           {/* User & Role Switcher Dropdown Button */}
           <div className="relative">

@@ -147,12 +147,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ]
       },
       {
-        title: 'Comunicação',
+        title: 'Comunicação & Web',
         items: [
           {
             id: 'portal_paciente' as TabType,
-            label: 'Portal do Paciente',
+            label: 'Site & Área do Cliente',
             icon: Globe,
+            badge: 'Site Oficial',
+            badgeColor: 'bg-amber-100 text-amber-900 font-bold',
           },
           {
             id: 'quadro_avisos' as TabType,
@@ -181,13 +183,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
         items: [
           ...(isAdminTotal ? [
             {
+              id: 'site_admin' as TabType,
+              label: 'Site: Fotos & Depoimentos',
+              icon: Sparkles,
+              badge: 'Super Admin',
+              badgeColor: 'bg-amber-100 text-amber-900 font-bold',
+            },
+            {
               id: 'banco_dados' as TabType,
               label: 'Banco de Dados',
               icon: Database,
             },
             {
               id: 'permissoes' as TabType,
-              label: 'Permissões',
+              label: 'Permissões & Layout',
               icon: Lock,
             }
           ] : []),

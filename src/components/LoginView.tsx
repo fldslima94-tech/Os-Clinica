@@ -32,12 +32,14 @@ interface LoginViewProps {
   usuarios: UsuarioEquipe[];
   onLoginSuccess: (usuario: UsuarioEquipe) => void;
   clinicaConfig?: ClinicaConfig;
+  onOpenPublicSite?: () => void;
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({
   usuarios,
   onLoginSuccess,
   clinicaConfig,
+  onOpenPublicSite,
 }) => {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
@@ -454,23 +456,49 @@ export const LoginView: React.FC<LoginViewProps> = ({
             <span>Entrar com a Conta Google</span>
           </button>
 
-          {/* Dedicated Patient / Client Portal Quick Button */}
-          <div className="mb-4 p-3.5 bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 rounded-xl border border-indigo-100 flex items-center justify-between gap-3 shadow-xs">
-            <div className="min-w-0">
-              <span className="text-xs font-bold text-indigo-950 block">É Cliente do Studio?</span>
-              <span className="text-[11px] text-indigo-700 leading-tight block">Acesse a vitrine, consulte procedimentos e solicite orçamentos.</span>
+          {/* Dedicated Patient / Client Portal & Official Website Access */}
+          <div className="mb-4 p-4 bg-gradient-to-r from-amber-50 via-amber-100/60 to-amber-50 rounded-2xl border border-amber-200/90 shadow-sm space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs font-black text-amber-950 uppercase tracking-wider">Site Oficial & Área do Cliente</span>
+              </div>
+              <span className="text-[10px] bg-amber-600 text-white font-bold px-2 py-0.5 rounded-full">Público</span>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setClientError(null);
-                setIsClientModalOpen(true);
-              }}
-              disabled={isLoading}
-              className="px-3 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer shadow-sm hover:shadow-md"
-            >
-              Área do Cliente
-            </button>
+
+            <p className="text-xs text-amber-900/90 leading-snug">
+              Consulte procedimentos com valores transparentes, faça simulações de orçamento VIP e agende consultas online.
+            </p>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenPublicSite) {
+                    onOpenPublicSite();
+                  } else {
+                    setClientError(null);
+                    setIsClientModalOpen(true);
+                  }
+                }}
+                className="py-2.5 px-3 bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 hover:from-amber-700 hover:to-amber-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer text-center"
+              >
+                <span>🌐 Visitar Site</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setClientError(null);
+                  setIsClientModalOpen(true);
+                }}
+                disabled={isLoading}
+                className="py-2.5 px-3 bg-white hover:bg-amber-50 border border-amber-300 text-amber-950 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
+              >
+                <span>Minha Conta</span>
+              </button>
+            </div>
           </div>
 
           <div className="relative flex py-1 items-center mb-4">

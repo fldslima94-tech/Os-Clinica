@@ -36,14 +36,17 @@ import {
   Layers,
   LayoutGrid,
   User,
-  Briefcase
+  Briefcase,
+  Globe
 } from 'lucide-react';
 import { 
   UsuarioEquipe, 
   UserRole, 
   PermissoesCustomizadas, 
   ConfiguracaoCampos,
-  CampoPersonalizado
+  CampoPersonalizado,
+  ClinicaConfig,
+  ProcedimentoClinico
 } from '../types';
 import { 
   salvarPermissoesUsuario, 
@@ -56,6 +59,7 @@ import {
   SystemFieldDefinition 
 } from '../data/systemFields';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
+import { SuperAdminWebsiteEditor } from './SuperAdminWebsiteEditor';
 
 interface PermissionsManagementViewProps {
   usuarios: UsuarioEquipe[];
@@ -64,6 +68,11 @@ interface PermissionsManagementViewProps {
   onUpdateUserPermissions: (userId: string, permissoes: PermissoesCustomizadas, role?: UserRole) => void;
   onUpdateFieldConfig: (config: ConfiguracaoCampos) => void;
   onDeleteUser?: (userId: string) => void;
+  clinicaConfig?: ClinicaConfig;
+  onSaveClinicaConfig?: (newConfig: ClinicaConfig) => void;
+  procedimentos?: ProcedimentoClinico[];
+  onPreviewSite?: () => void;
+  initialSubTab?: 'permissoes' | 'campos' | 'site_home';
 }
 
 const DEFAULT_PRESETS: Record<string, PermissoesCustomizadas> = {
@@ -112,8 +121,19 @@ export const PermissionsManagementView: React.FC<PermissionsManagementViewProps>
   onUpdateUserPermissions,
   onUpdateFieldConfig,
   onDeleteUser,
+  clinicaConfig,
+  onSaveClinicaConfig,
+  procedimentos,
+  onPreviewSite,
+  initialSubTab
 }) => {
-  const [activeTab, setActiveTab] = useState<'permissoes' | 'campos'>('campos');
+  const [activeTab, setActiveTab] = useState<'permissoes' | 'campos' | 'site_home'>(initialSubTab || 'campos');
+
+  useEffect(() => {
+    if (initialSubTab) {
+      setActiveTab(initialSubTab);
+    }
+  }, [initialSubTab]);
   const [selectedUser, setSelectedUser] = useState<UsuarioEquipe | null>(null);
   const [activePresetRole, setActivePresetRole] = useState<UserRole>('recepcao');
   const [customPerms, setCustomPerms] = useState<PermissoesCustomizadas>(
@@ -605,6 +625,19 @@ export const PermissionsManagementView: React.FC<PermissionsManagementViewProps>
           >
             <ShieldCheck className="w-4 h-4" />
             <span>Matriz de Permissões</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('site_home')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'site_home'
+                ? 'bg-amber-500 text-slate-950 font-extrabold shadow-md'
+                : 'text-amber-300 hover:text-white hover:bg-slate-700/50'
+            }`}
+          >
+            <Globe className="w-4 h-4 text-amber-400" />
+            <span>Site AuraEstética: Fotos & Depoimentos</span>
           </button>
         </div>
       </div>
@@ -1378,6 +1411,18 @@ export const PermissionsManagementView: React.FC<PermissionsManagementViewProps>
           </div>
 
         </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* TAB 3: GESTÃO DO SITE OFICIAL (FOTOS & DEPOIMENTOS) */}
+      {/* ======================================================== */}
+      {activeTab === 'site_home' && clinicaConfig && onSaveClinicaConfig && (
+        <SuperAdminWebsiteEditor
+          clinicaConfig={clinicaConfig}
+          onSaveClinicaConfig={onSaveClinicaConfig}
+          procedimentos={procedimentos}
+          onPreviewSite={onPreviewSite}
+        />
       )}
 
       {/* ======================================================== */}
