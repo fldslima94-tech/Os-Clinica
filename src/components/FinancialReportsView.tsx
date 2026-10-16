@@ -642,13 +642,14 @@ export const FinancialReportsView: React.FC<FinancialReportsViewProps> = ({
                       boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
                       fontSize: '12px',
                     }}
-                    formatter={(val: any, name: string) => {
+                    formatter={(val: any, name?: any) => {
                       const labels: Record<string, string> = {
                         entradas: 'Faturamento (Receita)',
                         saidas: 'Despesas / Saídas',
                         lucroLiquido: 'Lucro Líquido',
                       };
-                      return [formatCurrency(Number(val) || 0), labels[name] || name];
+                      const key = String(name || '');
+                      return [formatCurrency(Number(val) || 0), labels[key] || key];
                     }}
                   />
                   <Legend
@@ -786,8 +787,8 @@ export const FinancialReportsView: React.FC<FinancialReportsViewProps> = ({
                         border: '1px solid #e2e8f0',
                         fontSize: '12px',
                       }}
-                      formatter={(val: any, name: string) => {
-                        const label = name === 'faturamento' ? 'Faturamento' : 'Lucro Estimado';
+                      formatter={(val: any, name?: any) => {
+                        const label = String(name) === 'faturamento' ? 'Faturamento' : 'Lucro Estimado';
                         return [formatCurrency(Number(val)), label];
                       }}
                     />
@@ -906,8 +907,8 @@ export const FinancialReportsView: React.FC<FinancialReportsViewProps> = ({
                         border: '1px solid #e2e8f0',
                         fontSize: '12px',
                       }}
-                      formatter={(val: any, name: string) => {
-                        if (name === 'faturamento') return [formatCurrency(Number(val)), 'Faturamento'];
+                      formatter={(val: any, name?: any) => {
+                        if (String(name) === 'faturamento') return [formatCurrency(Number(val)), 'Faturamento'];
                         return [`${val} atendimentos`, 'Volume de Sessões'];
                       }}
                     />

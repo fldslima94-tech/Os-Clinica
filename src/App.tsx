@@ -37,6 +37,7 @@ import {
   BemAtivo,
   ConfiguracaoCampos,
   PermissoesCustomizadas,
+  PermissoesUsuario,
   Fornecedor,
   AnamneseCompleta,
   FichaRetornoEvolucao
@@ -2166,7 +2167,11 @@ export default function App() {
   };
 
   // User Management Handlers
-  const handleSaveUser = async (novo: Omit<UsuarioEquipe, 'id' | 'created_at'>) => {
+  const handleSaveUser = async (novo: Partial<UsuarioEquipe> | Omit<UsuarioEquipe, 'id' | 'created_at'>) => {
+    if (!novo.nome || !novo.role) {
+      showToast('Nome e perfil de acesso são obrigatórios.', 'warning');
+      return;
+    }
     // Validação estrita de hierarquia:
     // Apenas o Super Admin pode criar outro Super Admin; os demais apenas igual ou inferior.
     if (!canUserAssignRole(currentUser, novo.role)) {
@@ -2175,12 +2180,27 @@ export default function App() {
     }
 
     const cleanEmail = (novo.email || '').trim().toLowerCase();
+    const defaultPermissoes: PermissoesUsuario = {
+      ver_financeiro_completo: novo.role === 'admin_master' || novo.role === 'admin_total' || novo.role === 'admin_local',
+      emitir_recibo: true,
+      editar_prontuario_clinico: novo.role !== 'cliente',
+      gerenciar_estoque_custos: novo.role === 'admin_master' || novo.role === 'admin_total' || novo.role === 'admin_local',
+      configuracoes_sistema: novo.role === 'admin_master' || novo.role === 'admin_total',
+      visualizar_bens_ativos: novo.role !== 'cliente',
+    };
+
     const created: UsuarioEquipe = {
-      ...novo,
+      nome: novo.nome,
       email: cleanEmail,
+      cargo: novo.cargo || 'Profissional / Atendimento',
+      role: novo.role,
+      status: novo.status || 'ativo',
+      telefone: novo.telefone || '',
+      avatar_url: novo.avatar_url || '',
       id: `usr-${Date.now()}`,
       created_at: new Date().toISOString(),
       ultimo_acesso: 'Agora',
+      permissoes: novo.permissoes || defaultPermissoes,
     };
     setUsuarios(prev => [created, ...prev]);
     try {
@@ -3312,24 +3332,26 @@ export default function App() {
         />
       </ErrorBoundary>
 
-      <TreatmentPackagesModal
-        isOpen={!!patientForPackages}
-        onClose={() => setPatientForPackages(null)}
-        paciente={patientForPackages}
-        procedimentos={procedimentos}
-        onUpdatePaciente={handleUpdatePacienteObj}
-        onScheduleSession={(sessaoInfo) => {
-          setPatientForPackages(null);
-          setAppointmentInitialData({
-            paciente_id: sessaoInfo.pacienteId,
-            procedimento: sessaoInfo.procedimento,
-            observacoes: sessaoInfo.observacoes,
-            valor_estimado: sessaoInfo.valor,
-          });
-          setIsNewAppointmentOpen(true);
-        }}
-        currentUser={currentUser}
-      />
+      {patientForPackages && (
+        <TreatmentPackagesModal
+          isOpen={!!patientForPackages}
+          onClose={() => setPatientForPackages(null)}
+          paciente={patientForPackages}
+          procedimentos={procedimentos}
+          onUpdatePaciente={handleUpdatePacienteObj}
+          onScheduleSession={(sessaoInfo) => {
+            setPatientForPackages(null);
+            setAppointmentInitialData({
+              paciente_id: sessaoInfo.pacienteId,
+              procedimento: sessaoInfo.procedimento,
+              observacoes: sessaoInfo.observacoes,
+              valor_estimado: sessaoInfo.valor,
+            });
+            setIsNewAppointmentOpen(true);
+          }}
+          currentUser={currentUser}
+        />
+      )}
 
       <CompleteProcedureModal
         isOpen={!!appointmentToComplete}

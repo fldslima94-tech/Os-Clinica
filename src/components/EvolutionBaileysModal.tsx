@@ -316,7 +316,7 @@ export const EvolutionBaileysModal: React.FC<EvolutionBaileysModalProps> = ({
             <div className="p-6 bg-slate-900 text-white rounded-3xl border border-slate-800 flex flex-col sm:flex-row items-center gap-6 shadow-xl">
               <div className="p-3 bg-white rounded-2xl shadow-md shrink-0 flex items-center justify-center">
                 <img
-                  src={evolutionData.status.qrCodeBase64}
+                  src={evolutionData?.status?.qrCodeBase64 || ''}
                   alt="QR Code WhatsApp Baileys"
                   className="w-56 h-56 object-contain rounded-xl"
                 />

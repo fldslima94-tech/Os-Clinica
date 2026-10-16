@@ -69,19 +69,19 @@ export const ExportAppointmentModal: React.FC<ExportAppointmentModalProps> = ({
 
   const handleOpenGoogleCalendar = () => {
     if (!agendamento) return;
-    const url = getGoogleCalendarWebUrl(agendamento, paciente, clinicaConfig);
+    const url = getGoogleCalendarWebUrl(agendamento, paciente || undefined, clinicaConfig);
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const handleOpenOutlook = () => {
     if (!agendamento) return;
-    const url = getOutlookWebUrl(agendamento, paciente, clinicaConfig);
+    const url = getOutlookWebUrl(agendamento, paciente || undefined, clinicaConfig);
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const handleCopySummary = async () => {
     if (!agendamento) return;
-    const text = getAppointmentShareSummary(agendamento, paciente, clinicaConfig);
+    const text = getAppointmentShareSummary(agendamento, paciente || undefined, clinicaConfig);
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);

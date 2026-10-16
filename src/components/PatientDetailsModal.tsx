@@ -480,7 +480,7 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
       paciente_id: paciente.id,
       paciente_nome: paciente.nome,
       data: new Date().toISOString().split('T')[0],
-      profissional_id: currentUser?.id,
+      profissional_id: currentUser?.id || 'prof-responsavel',
       profissional_nome: evoProfissionalNome,
       procedimento_nome: evoProcedimento.trim(),
       numero_sessao: Number(evoNumeroSessao),

@@ -164,6 +164,30 @@ export interface ClinicaConfig {
   quem_sou_diferenciais?: string[];
   quem_sou_anos_experiencia?: string;
   quem_sou_profissionais?: ProfissionalQuemSouEu[];
+  // Galeria de Casos Reais & Transformações (Antes e Depois)
+  casos_transformacoes?: CasoTransformacaoClinica[];
+  // Seção Tire Todas as Suas Dúvidas (FAQ)
+  faq_itens?: FaqItemClinica[];
+}
+
+export interface CasoTransformacaoClinica {
+  id: string;
+  categoria: 'facial' | 'labios' | 'pele' | 'rejuvenescimento' | string;
+  categoriaLabel: string;
+  titulo: string;
+  subtitulo: string;
+  procedimento_nome: string;
+  foto_antes: string;
+  foto_depois: string;
+  intervalo: string;
+  destaque: string;
+}
+
+export interface FaqItemClinica {
+  id: string;
+  pergunta: string;
+  resposta: string;
+  categoria?: string;
 }
 
 export interface ProfissionalQuemSouEu {

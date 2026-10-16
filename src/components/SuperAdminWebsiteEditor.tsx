@@ -27,11 +27,29 @@ import {
   Heart,
   User,
   Video,
-  GraduationCap,
-  Instagram
+  Instagram,
+  Edit,
+  ChevronDown,
+  Search
 } from 'lucide-react';
-import { ClinicaConfig, DepoimentoCliente, ProcedimentoClinico, ProfissionalQuemSouEu } from '../types';
+import { 
+  ClinicaConfig, 
+  DepoimentoCliente, 
+  ProcedimentoClinico, 
+  ProfissionalQuemSouEu,
+  CasoTransformacaoClinica,
+  FaqItemClinica
+} from '../types';
 import { compressImageFile } from '../lib/image-utils';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
+
+const CATEGORIAS_CASOS = [
+  { id: 'todos', label: 'Todos os Casos' },
+  { id: 'labios', label: '💋 Lábios & Hidratação' },
+  { id: 'facial', label: '✨ Contorno Facial' },
+  { id: 'rejuvenescimento', label: '🌿 Rejuvenescimento' },
+  { id: 'pele', label: '💧 Bioestimulador & Pele' },
+];
 
 interface SuperAdminWebsiteEditorProps {
   clinicaConfig: ClinicaConfig;
@@ -90,13 +108,11 @@ const DEFAULT_PROFISSIONAIS: ProfissionalQuemSouEu[] = [
     id: 'prof-1',
     nome: 'Drª Mariana Albuquerque',
     titulo: 'Biomédica Esteta & Especialista em Rejuvenescimento Facial',
-    registro: 'CRBM 34.891 • Sociedade Brasileira de Biomedicina Estética',
     bio: 'Minha paixão é realçar sua beleza natural com sofisticação, precisão anatômica e segurança absoluta. Cada paciente possui proporções e expressões singulares: desenvolvo planos de tratamento individualizados, utilizando os melhores biomateriais do mundo com registro ANVISA para resultados sutis, elegantes e rejuvenescedores.',
     foto_url: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=800&auto=format&fit=crop&q=80',
     video_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
     tipo_midia: 'foto',
     instagram: '@dra.mariana.estetica',
-    anos_experiencia: '+8 Anos',
     diferenciais: ['Membro SBBM', 'Pós-Graduação em Harmonização', 'Speaker Nacional'],
     servicos_ids: [],
     ativo: true,
@@ -105,13 +121,11 @@ const DEFAULT_PROFISSIONAIS: ProfissionalQuemSouEu[] = [
     id: 'prof-2',
     nome: 'Drª Beatriz Mendonça',
     titulo: 'Dermatologia Estética & Cosmiatria Avançada',
-    registro: 'CRM 142.890 • RQE 78.432',
     bio: 'Especialista em saúde cutânea, estímulo biológico de colágeno e tecnologias a laser de última geração. Atuação focada em sustentação dérmica, gerenciamento do envelhecimento e recuperação do viço natural da pele.',
     foto_url: 'https://images.unsplash.com/photo-1594824813637-2808b8bdf218?w=800&auto=format&fit=crop&q=80',
     video_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
     tipo_midia: 'foto',
     instagram: '@dra.beatriz.dermatologia',
-    anos_experiencia: '+10 Anos',
     diferenciais: ['Membro SBD', 'Fellowship em Lasers', 'Preceptora Médica'],
     servicos_ids: [],
     ativo: true,
@@ -120,13 +134,11 @@ const DEFAULT_PROFISSIONAIS: ProfissionalQuemSouEu[] = [
     id: 'prof-3',
     nome: 'Enfª Camila Vasconcelos',
     titulo: 'Enfermeira Esteta & Especialista em Injetáveis e Lábios',
-    registro: 'COREN 289.412-SP',
     bio: 'Dedicação exclusiva a técnicas labiais de alta definição, microagulhamento robótico e peelings de renovação celular. Proporciono uma experiência acolhedora e livre de desconforto em cada sessão.',
     foto_url: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=800&auto=format&fit=crop&q=80',
     video_url: '',
     tipo_midia: 'foto',
     instagram: '@enfa.camilavasconcelos',
-    anos_experiencia: '+6 Anos',
     diferenciais: ['Técnica Labial Russa', 'Pós-Graduação SOBECCE'],
     servicos_ids: [],
     ativo: true,
@@ -140,12 +152,23 @@ export const SuperAdminWebsiteEditor: React.FC<SuperAdminWebsiteEditorProps> = (
   onPreviewSite
 }) => {
   // Navigation inside the editor
-  const [activeTab, setActiveTab] = useState<'fotos' | 'depoimentos' | 'quem_sou_eu' | 'preview'>('fotos');
+  // Navigation inside the editor
+  const [activeTab, setActiveTab] = useState<'fotos' | 'depoimentos' | 'quem_sou_eu' | 'casos_reais' | 'faq' | 'preview'>('fotos');
 
   // Multi-professionals state (supports up to 10 professionals)
   const [profissionaisQuemSou, setProfissionaisQuemSou] = useState<ProfissionalQuemSouEu[]>(() => {
-    if (clinicaConfig.quem_sou_profissionais && clinicaConfig.quem_sou_profissionais.length > 0) {
+    if (clinicaConfig.quem_sou_profissionais && clinicaConfig.quem_sou_profissionais.length > 1) {
       return [...clinicaConfig.quem_sou_profissionais];
+    }
+    if (clinicaConfig.quem_sou_profissionais && clinicaConfig.quem_sou_profissionais.length === 1) {
+      const savedFirst = clinicaConfig.quem_sou_profissionais[0];
+      return [
+        savedFirst,
+        ...DEFAULT_PROFISSIONAIS.slice(1).map((d, i) => ({
+          ...d,
+          id: d.id || `prof-${i + 2}`
+        }))
+      ];
     }
     if (clinicaConfig.quem_sou_nome) {
       return [
@@ -153,13 +176,11 @@ export const SuperAdminWebsiteEditor: React.FC<SuperAdminWebsiteEditorProps> = (
           id: 'prof-1',
           nome: clinicaConfig.quem_sou_nome,
           titulo: clinicaConfig.quem_sou_titulo || 'Biomédica Esteta & Especialista Facial',
-          registro: clinicaConfig.quem_sou_registro || 'CRBM 34.891 • Sociedade Brasileira de Biomedicina Estética',
           bio: clinicaConfig.quem_sou_bio || 'Minha paixão é realçar sua beleza natural com sofisticação, precisão anatômica e segurança absoluta.',
           foto_url: clinicaConfig.quem_sou_foto_url || 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=800&auto=format&fit=crop&q=80',
           video_url: clinicaConfig.quem_sou_video_url || 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
           tipo_midia: clinicaConfig.quem_sou_tipo_midia || 'foto',
           instagram: clinicaConfig.quem_sou_instagram || '@dra.mariana.estetica',
-          anos_experiencia: clinicaConfig.quem_sou_anos_experiencia || '+8 Anos',
           servicos_ids: clinicaConfig.quem_sou_servicos_ids || [],
           diferenciais: clinicaConfig.quem_sou_diferenciais || ['Certificada ANVISA', 'Atendimento Humanizado'],
           ativo: true,
@@ -218,6 +239,58 @@ export const SuperAdminWebsiteEditor: React.FC<SuperAdminWebsiteEditorProps> = (
         ];
   });
 
+  // Casos Reais (Transformações / Antes e Depois)
+  const [casosTransformacoes, setCasosTransformacoes] = useState<CasoTransformacaoClinica[]>(() => {
+    return (clinicaConfig.casos_transformacoes && clinicaConfig.casos_transformacoes.length > 0)
+      ? [...clinicaConfig.casos_transformacoes]
+      : [
+          {
+            id: 'case-1',
+            categoria: 'labios',
+            categoriaLabel: 'Lábios & Hidratação',
+            titulo: 'Preenchimento Labial com Ácido Hialurônico',
+            subtitulo: 'Técnica de eversão suave, contorno de arco do cupido e hidratação profunda sem efeito artificial.',
+            procedimento_nome: 'Preenchimento Labial 1ml',
+            foto_antes: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&auto=format&fit=crop&q=80',
+            foto_depois: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80',
+            intervalo: 'Resultado consolidado após 21 dias',
+            destaque: 'Volume sutil & Simetria'
+          },
+          {
+            id: 'case-2',
+            categoria: 'facial',
+            categoriaLabel: 'Contorno Facial',
+            titulo: 'Harmonização do Terço Inferior & Mento',
+            subtitulo: 'Definição do ângulo mandibular e projeção milimétrica do queixo para alongar o perfil facial.',
+            procedimento_nome: 'Harmonização Facial Full Face',
+            foto_antes: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&auto=format&fit=crop&q=80',
+            foto_depois: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=600&auto=format&fit=crop&q=80',
+            intervalo: 'Imediatamente após a aplicação',
+            destaque: 'Linha de mandíbula marcante'
+          }
+        ];
+  });
+
+  // Tire Todas as Suas Dúvidas (FAQ)
+  const [faqItens, setFaqItens] = useState<FaqItemClinica[]>(() => {
+    return (clinicaConfig.faq_itens && clinicaConfig.faq_itens.length > 0)
+      ? [...clinicaConfig.faq_itens]
+      : [
+          {
+            id: 'faq-1',
+            categoria: 'Procedimentos & Conforto',
+            pergunta: 'Os procedimentos estéticos injetáveis doem ou precisam de anestesia?',
+            resposta: 'Nossos protocolos prezam pelo máximo conforto. Utilizamos pomadas anestésicas tópicas dermatológicas de alta potência aplicadas de 20 a 30 minutos antes da sessão, além de dispositivos vibratórios e gelo terapêutico que bloqueiam a sensação de picada.'
+          },
+          {
+            id: 'faq-2',
+            categoria: 'Durabilidade',
+            pergunta: 'Quanto tempo dura o efeito do Botox, Preenchimento e Bioestimuladores?',
+            resposta: 'A durabilidade varia conforme o metabolismo: Botox dura de 4 a 6 meses; Preenchimento de 10 a 18 meses; e Bioestimuladores sustentam a pele por até 24 meses.'
+          }
+        ];
+  });
+
   // Sync from props if external config updates
   useEffect(() => {
     if (clinicaConfig.fotos_ambiente && clinicaConfig.fotos_ambiente.length > 0) {
@@ -232,10 +305,31 @@ export const SuperAdminWebsiteEditor: React.FC<SuperAdminWebsiteEditorProps> = (
   }, [clinicaConfig.depoimentos]);
 
   useEffect(() => {
-    if (clinicaConfig.quem_sou_profissionais && clinicaConfig.quem_sou_profissionais.length > 0) {
+    if (clinicaConfig.quem_sou_profissionais && clinicaConfig.quem_sou_profissionais.length > 1) {
       setProfissionaisQuemSou(clinicaConfig.quem_sou_profissionais);
+    } else if (clinicaConfig.quem_sou_profissionais && clinicaConfig.quem_sou_profissionais.length === 1) {
+      const savedFirst = clinicaConfig.quem_sou_profissionais[0];
+      setProfissionaisQuemSou([
+        savedFirst,
+        ...DEFAULT_PROFISSIONAIS.slice(1).map((d, i) => ({
+          ...d,
+          id: d.id || `prof-${i + 2}`
+        }))
+      ]);
     }
   }, [clinicaConfig.quem_sou_profissionais]);
+
+  useEffect(() => {
+    if (clinicaConfig.casos_transformacoes && clinicaConfig.casos_transformacoes.length > 0) {
+      setCasosTransformacoes(clinicaConfig.casos_transformacoes);
+    }
+  }, [clinicaConfig.casos_transformacoes]);
+
+  useEffect(() => {
+    if (clinicaConfig.faq_itens && clinicaConfig.faq_itens.length > 0) {
+      setFaqItens(clinicaConfig.faq_itens);
+    }
+  }, [clinicaConfig.faq_itens]);
 
   // Saving state & feedback
   const [isSaving, setIsSaving] = useState(false);
@@ -260,15 +354,43 @@ export const SuperAdminWebsiteEditor: React.FC<SuperAdminWebsiteEditorProps> = (
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Modais de Casos Reais
+  const [isCasoModalOpen, setIsCasoModalOpen] = useState(false);
+  const [editingCasoId, setEditingCasoId] = useState<string | null>(null);
+  const [casoFormTitulo, setCasoFormTitulo] = useState('');
+  const [casoFormSubtitulo, setCasoFormSubtitulo] = useState('');
+  const [casoFormProcedimento, setCasoFormProcedimento] = useState('');
+  const [casoFormCategoria, setCasoFormCategoria] = useState<string>('labios');
+  const [casoFormFotoAntes, setCasoFormFotoAntes] = useState('');
+  const [casoFormFotoDepois, setCasoFormFotoDepois] = useState('');
+  const [casoFormIntervalo, setCasoFormIntervalo] = useState('');
+  const [casoFormDestaque, setCasoFormDestaque] = useState('');
+  const [isUploadingAntes, setIsUploadingAntes] = useState(false);
+  const [isUploadingDepois, setIsUploadingDepois] = useState(false);
+  const antesInputRef = useRef<HTMLInputElement>(null);
+  const depoisInputRef = useRef<HTMLInputElement>(null);
+  const [casoToDelete, setCasoToDelete] = useState<CasoTransformacaoClinica | null>(null);
+
+  // Modais de FAQ
+  const [isFaqModalOpen, setIsFaqModalOpen] = useState(false);
+  const [editingFaqId, setEditingFaqId] = useState<string | null>(null);
+  const [faqFormPergunta, setFaqFormPergunta] = useState('');
+  const [faqFormResposta, setFaqFormResposta] = useState('');
+  const [faqFormCategoria, setFaqFormCategoria] = useState('');
+  const [faqToDelete, setFaqToDelete] = useState<FaqItemClinica | null>(null);
+
   // Delete confirmation
   const [itemToDelete, setItemToDelete] = useState<{ type: 'foto' | 'depoimento'; idOrIndex: string | number } | null>(null);
+  const [profToDelete, setProfToDelete] = useState<{ index: number; nome: string } | null>(null);
 
   // Helper to persist everything directly to Firestore
   const persistToFirestore = async (
     updatedPhotos: string[],
     updatedTestimonials: DepoimentoCliente[],
     successMessage: string,
-    updatedProfissionais?: ProfissionalQuemSouEu[]
+    updatedProfissionais?: ProfissionalQuemSouEu[],
+    updatedCasos?: CasoTransformacaoClinica[],
+    updatedFaq?: FaqItemClinica[]
   ) => {
     setIsSaving(true);
     setSaveSuccessMsg(null);
@@ -277,6 +399,8 @@ export const SuperAdminWebsiteEditor: React.FC<SuperAdminWebsiteEditorProps> = (
     try {
       const profsToSave = updatedProfissionais || profissionaisQuemSou;
       const primaryProf: Partial<ProfissionalQuemSouEu> = profsToSave[0] || {};
+      const casosToSave = updatedCasos !== undefined ? updatedCasos : casosTransformacoes;
+      const faqToSave = updatedFaq !== undefined ? updatedFaq : faqItens;
 
       const updatedConfig: ClinicaConfig = {
         ...clinicaConfig,
@@ -285,14 +409,14 @@ export const SuperAdminWebsiteEditor: React.FC<SuperAdminWebsiteEditorProps> = (
         quem_sou_profissionais: profsToSave,
         quem_sou_nome: primaryProf.nome || '',
         quem_sou_titulo: primaryProf.titulo || '',
-        quem_sou_registro: primaryProf.registro || '',
         quem_sou_bio: primaryProf.bio || '',
         quem_sou_foto_url: primaryProf.foto_url || '',
         quem_sou_video_url: primaryProf.video_url || '',
         quem_sou_tipo_midia: primaryProf.tipo_midia || 'foto',
         quem_sou_instagram: primaryProf.instagram || '',
-        quem_sou_anos_experiencia: primaryProf.anos_experiencia || '+8 Anos',
         quem_sou_servicos_ids: primaryProf.servicos_ids || [],
+        casos_transformacoes: casosToSave,
+        faq_itens: faqToSave,
       };
 
       await onSaveClinicaConfig(updatedConfig);
@@ -510,13 +634,11 @@ export const SuperAdminWebsiteEditor: React.FC<SuperAdminWebsiteEditorProps> = (
       id: `prof-${Date.now()}`,
       nome: `Profissional ${newIndex}`,
       titulo: 'Especialista em Estética & Rejuvenescimento',
-      registro: 'CRBM / CRM / COREN',
       bio: 'Dedicação total ao cuidado estético humanizado, atuando com as técnicas mais modernas e seguras do mercado.',
       foto_url: 'https://images.unsplash.com/photo-1594824813637-2808b8bdf218?w=800&auto=format&fit=crop&q=80',
       video_url: '',
       tipo_midia: 'foto',
       instagram: '@dra.estetica',
-      anos_experiencia: '+5 Anos',
       servicos_ids: [],
       diferenciais: ['Biossegurança Ouro', 'Atendimento Humanizado'],
       ativo: true,
@@ -527,19 +649,35 @@ export const SuperAdminWebsiteEditor: React.FC<SuperAdminWebsiteEditorProps> = (
     await persistToFirestore(fotosAmbiente, depoimentos, 'Nova profissional adicionada com sucesso no Firestore!', updated);
   };
 
-  const handleDeleteProfissional = async (indexToDelete: number) => {
-    if (profissionaisQuemSou.length <= 1) {
-      alert('É necessário manter pelo menos 1 profissional cadastrada na clínica.');
-      return;
+  const handlePromptDeleteProfissional = (indexToDelete: number) => {
+    const profName = profissionaisQuemSou[indexToDelete]?.nome || `Profissional #${indexToDelete + 1}`;
+    setProfToDelete({ index: indexToDelete, nome: profName });
+  };
+
+  const handleConfirmDeleteProfissional = async () => {
+    if (!profToDelete) return;
+    const { index, nome } = profToDelete;
+    let updated = profissionaisQuemSou.filter((_, idx) => idx !== index);
+    if (updated.length === 0) {
+      updated = [{
+        id: `prof-${Date.now()}`,
+        nome: 'Nova Especialista',
+        titulo: 'Especialista Facial & Corporal',
+        bio: '',
+        foto_url: '',
+        video_url: '',
+        tipo_midia: 'foto',
+        instagram: '',
+        diferenciais: ['Atendimento Humanizado'],
+        servicos_ids: [],
+        ativo: true
+      }];
     }
-    const profName = profissionaisQuemSou[indexToDelete]?.nome || 'Profissional';
-    if (!window.confirm(`Tem certeza que deseja remover ${profName} da aba Quem Sou Eu?`)) {
-      return;
-    }
-    const updated = profissionaisQuemSou.filter((_, idx) => idx !== indexToDelete);
+    const newIdx = Math.max(0, Math.min(activeProfIndex >= updated.length ? updated.length - 1 : activeProfIndex, updated.length - 1));
     setProfissionaisQuemSou(updated);
-    setActiveProfIndex(Math.max(0, indexToDelete - 1));
-    await persistToFirestore(fotosAmbiente, depoimentos, `${profName} removida com sucesso.`, updated);
+    setActiveProfIndex(newIdx);
+    setProfToDelete(null);
+    await persistToFirestore(fotosAmbiente, depoimentos, `Ficha de "${nome}" excluída com sucesso.`, updated);
   };
 
   const handleToggleServicoForActiveProf = (procId: string) => {
@@ -617,6 +755,195 @@ export const SuperAdminWebsiteEditor: React.FC<SuperAdminWebsiteEditorProps> = (
         quemSouFileInputRef.current.value = '';
       }
     }
+  };
+
+  // --- CASOS REAIS MANAGEMENT HANDLERS ---
+  const handleOpenAddCaso = () => {
+    setEditingCasoId(null);
+    setCasoFormTitulo('');
+    setCasoFormSubtitulo('');
+    setCasoFormProcedimento(procedimentos[0]?.nome || 'Preenchimento Labial');
+    setCasoFormCategoria('labios');
+    setCasoFormFotoAntes('https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&auto=format&fit=crop&q=80');
+    setCasoFormFotoDepois('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80');
+    setCasoFormIntervalo('Resultado consolidado após 21 dias');
+    setCasoFormDestaque('Volume natural & Simetria');
+    setIsCasoModalOpen(true);
+  };
+
+  const handleOpenEditCaso = (caso: CasoTransformacaoClinica) => {
+    setEditingCasoId(caso.id);
+    setCasoFormTitulo(caso.titulo);
+    setCasoFormSubtitulo(caso.subtitulo || '');
+    setCasoFormProcedimento(caso.procedimento_nome || '');
+    setCasoFormCategoria(caso.categoria || 'labios');
+    setCasoFormFotoAntes(caso.foto_antes);
+    setCasoFormFotoDepois(caso.foto_depois);
+    setCasoFormIntervalo(caso.intervalo || '');
+    setCasoFormDestaque(caso.destaque || '');
+    setIsCasoModalOpen(true);
+  };
+
+  const handleSaveCaso = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!casoFormTitulo.trim() || !casoFormFotoAntes.trim() || !casoFormFotoDepois.trim()) {
+      alert('Preencha o título, a foto de antes e a foto de depois.');
+      return;
+    }
+
+    const catObj = CATEGORIAS_CASOS.find(c => c.id === casoFormCategoria);
+    const catLabel = catObj ? catObj.label.replace(/^[^\w\s]+\s*/, '') : 'Estética Facial';
+
+    const newCaso: CasoTransformacaoClinica = {
+      id: editingCasoId || `case-${Date.now()}`,
+      titulo: casoFormTitulo.trim(),
+      subtitulo: casoFormSubtitulo.trim(),
+      procedimento_nome: casoFormProcedimento.trim(),
+      categoria: casoFormCategoria,
+      categoriaLabel: catLabel,
+      foto_antes: casoFormFotoAntes.trim(),
+      foto_depois: casoFormFotoDepois.trim(),
+      intervalo: casoFormIntervalo.trim() || 'Resultado pós-sessão',
+      destaque: casoFormDestaque.trim() || 'Naturalidade',
+    };
+
+    let updatedList: CasoTransformacaoClinica[];
+    if (editingCasoId) {
+      updatedList = casosTransformacoes.map(c => c.id === editingCasoId ? newCaso : c);
+    } else {
+      updatedList = [newCaso, ...casosTransformacoes];
+    }
+
+    setCasosTransformacoes(updatedList);
+    setIsCasoModalOpen(false);
+    await persistToFirestore(
+      fotosAmbiente, 
+      depoimentos, 
+      editingCasoId ? 'Caso clínico atualizado no Firestore!' : 'Novo caso clínico adicionado ao Firestore!',
+      profissionaisQuemSou,
+      updatedList,
+      faqItens
+    );
+  };
+
+  const handleDeleteCaso = async (id: string) => {
+    const updatedList = casosTransformacoes.filter(c => c.id !== id);
+    setCasosTransformacoes(updatedList);
+    setCasoToDelete(null);
+    await persistToFirestore(
+      fotosAmbiente,
+      depoimentos,
+      'Caso clínico removido da galeria!',
+      profissionaisQuemSou,
+      updatedList,
+      faqItens
+    );
+  };
+
+  const handleAntesFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setIsUploadingAntes(true);
+      const compressed = await compressImageFile(file, {
+        maxWidth: 700,
+        maxHeight: 700,
+        quality: 0.8,
+        targetMaxKB: 35,
+        mimeType: 'image/webp'
+      });
+      setCasoFormFotoAntes(compressed);
+    } catch (err) {
+      alert('Erro ao comprimir foto de antes.');
+    } finally {
+      setIsUploadingAntes(false);
+      if (antesInputRef.current) antesInputRef.current.value = '';
+    }
+  };
+
+  const handleDepoisFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setIsUploadingDepois(true);
+      const compressed = await compressImageFile(file, {
+        maxWidth: 700,
+        maxHeight: 700,
+        quality: 0.8,
+        targetMaxKB: 35,
+        mimeType: 'image/webp'
+      });
+      setCasoFormFotoDepois(compressed);
+    } catch (err) {
+      alert('Erro ao comprimir foto de depois.');
+    } finally {
+      setIsUploadingDepois(false);
+      if (depoisInputRef.current) depoisInputRef.current.value = '';
+    }
+  };
+
+  // --- FAQ MANAGEMENT HANDLERS ---
+  const handleOpenAddFaq = () => {
+    setEditingFaqId(null);
+    setFaqFormPergunta('');
+    setFaqFormResposta('');
+    setFaqFormCategoria('Procedimentos & Conforto');
+    setIsFaqModalOpen(true);
+  };
+
+  const handleOpenEditFaq = (faq: FaqItemClinica) => {
+    setEditingFaqId(faq.id);
+    setFaqFormPergunta(faq.pergunta);
+    setFaqFormResposta(faq.resposta);
+    setFaqFormCategoria(faq.categoria || 'Dúvidas Frequentes');
+    setIsFaqModalOpen(true);
+  };
+
+  const handleSaveFaq = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!faqFormPergunta.trim() || !faqFormResposta.trim()) {
+      alert('Preencha a pergunta e a resposta.');
+      return;
+    }
+
+    const newFaq: FaqItemClinica = {
+      id: editingFaqId || `faq-${Date.now()}`,
+      pergunta: faqFormPergunta.trim(),
+      resposta: faqFormResposta.trim(),
+      categoria: faqFormCategoria.trim() || 'Dúvidas Frequentes',
+    };
+
+    let updatedList: FaqItemClinica[];
+    if (editingFaqId) {
+      updatedList = faqItens.map(f => f.id === editingFaqId ? newFaq : f);
+    } else {
+      updatedList = [newFaq, ...faqItens];
+    }
+
+    setFaqItens(updatedList);
+    setIsFaqModalOpen(false);
+    await persistToFirestore(
+      fotosAmbiente,
+      depoimentos,
+      editingFaqId ? 'Pergunta atualizada no Firestore!' : 'Nova pergunta adicionada ao FAQ!',
+      profissionaisQuemSou,
+      casosTransformacoes,
+      updatedList
+    );
+  };
+
+  const handleDeleteFaq = async (id: string) => {
+    const updatedList = faqItens.filter(f => f.id !== id);
+    setFaqItens(updatedList);
+    setFaqToDelete(null);
+    await persistToFirestore(
+      fotosAmbiente,
+      depoimentos,
+      'Pergunta removida do FAQ no Firestore!',
+      profissionaisQuemSou,
+      casosTransformacoes,
+      updatedList
+    );
   };
 
   return (
@@ -722,7 +1049,33 @@ export const SuperAdminWebsiteEditor: React.FC<SuperAdminWebsiteEditorProps> = (
             }`}
           >
             <User className="w-4 h-4 text-rose-600" />
-            <span>Aba &quot;Quem Sou Eu&quot; ({profissionaisQuemSou.length}/10 Profissionais)</span>
+            <span>Quem Sou Eu ({profissionaisQuemSou.length}/10)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('casos_reais')}
+            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-2 transition-all cursor-pointer ${
+              activeTab === 'casos_reais'
+                ? 'bg-white text-slate-900 shadow-sm border border-slate-200/80'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-amber-500" />
+            <span>Casos Reais ({casosTransformacoes.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('faq')}
+            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-2 transition-all cursor-pointer ${
+              activeTab === 'faq'
+                ? 'bg-white text-slate-900 shadow-sm border border-slate-200/80'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+            }`}
+          >
+            <HelpCircle className="w-4 h-4 text-emerald-600" />
+            <span>Dúvidas FAQ ({faqItens.length})</span>
           </button>
 
           <button
@@ -1107,13 +1460,11 @@ export const SuperAdminWebsiteEditor: React.FC<SuperAdminWebsiteEditorProps> = (
           id: 'prof-1',
           nome: 'Profissional',
           titulo: '',
-          registro: '',
           bio: '',
           foto_url: '',
           video_url: '',
           tipo_midia: 'foto',
           instagram: '',
-          anos_experiencia: '+5 Anos',
           servicos_ids: [],
           diferenciais: [],
           ativo: true
@@ -1178,40 +1529,53 @@ export const SuperAdminWebsiteEditor: React.FC<SuperAdminWebsiteEditorProps> = (
                   {profissionaisQuemSou.map((prof, idx) => {
                     const isSelected = idx === activeProfIndex;
                     return (
-                      <button
-                        key={prof.id || idx}
-                        type="button"
-                        onClick={() => setActiveProfIndex(idx)}
-                        className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col gap-2 relative ${
-                          isSelected
-                            ? 'bg-amber-50/90 border-amber-500 ring-2 ring-amber-500/30 shadow-sm'
-                            : 'bg-slate-50 hover:bg-slate-100 border-slate-200'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-200 border border-slate-300 shrink-0">
-                            {prof.foto_url ? (
-                              <img src={prof.foto_url} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-slate-400">
-                                <User className="w-5 h-5" />
-                              </div>
-                            )}
+                      <div key={prof.id || idx} className="relative group">
+                        <button
+                          type="button"
+                          onClick={() => setActiveProfIndex(idx)}
+                          className={`w-full p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col gap-2 ${
+                            isSelected
+                              ? 'bg-amber-50/90 border-amber-500 ring-2 ring-amber-500/30 shadow-sm'
+                              : 'bg-slate-50 hover:bg-slate-100 border-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-200 border border-slate-300 shrink-0">
+                              {prof.foto_url ? (
+                                <img src={prof.foto_url} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                  <User className="w-5 h-5" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1 pr-4">
+                              <span className="text-[10px] font-bold text-amber-800 block">
+                                #{idx + 1} {idx === 0 && '• Principal'}
+                              </span>
+                              <span className="font-extrabold text-xs text-slate-900 block truncate">
+                                {prof.nome || `Profissional ${idx + 1}`}
+                              </span>
+                            </div>
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <span className="text-[10px] font-bold text-amber-800 block">
-                              #{idx + 1} {idx === 0 && '• Principal'}
-                            </span>
-                            <span className="font-extrabold text-xs text-slate-900 block truncate">
-                              {prof.nome || `Profissional ${idx + 1}`}
-                            </span>
-                          </div>
-                        </div>
 
-                        <span className="text-[10px] text-slate-500 truncate block">
-                          {prof.titulo || 'Especialista'}
-                        </span>
-                      </button>
+                          <span className="text-[10px] text-slate-500 truncate block">
+                            {prof.titulo || 'Especialista'}
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePromptDeleteProfissional(idx);
+                          }}
+                          title={`Remover ${prof.nome || `Profissional #${idx + 1}`}`}
+                          className="absolute top-2 right-2 p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -1241,16 +1605,14 @@ export const SuperAdminWebsiteEditor: React.FC<SuperAdminWebsiteEditorProps> = (
                     </div>
                   </div>
 
-                  {profissionaisQuemSou.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteProfissional(activeProfIndex)}
-                      className="px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-xl font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Remover esta Profissional</span>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => handlePromptDeleteProfissional(activeProfIndex)}
+                    className="px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-xl font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Remover esta Profissional</span>
+                  </button>
                 </div>
 
                 {/* Main Fields Grid */}
@@ -1278,32 +1640,6 @@ export const SuperAdminWebsiteEditor: React.FC<SuperAdminWebsiteEditorProps> = (
                       value={currProf.titulo || ''}
                       onChange={(e) => handleUpdateActiveProf('titulo', e.target.value)}
                       placeholder="Ex: Biomédica Esteta & Especialista Facial"
-                      className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-slate-900"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-slate-700">
-                      Registro Profissional / Conselho
-                    </label>
-                    <input
-                      type="text"
-                      value={currProf.registro || ''}
-                      onChange={(e) => handleUpdateActiveProf('registro', e.target.value)}
-                      placeholder="Ex: CRBM 34.891 • Sociedade Brasileira de Biomedicina Estética"
-                      className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-slate-900"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-slate-700">
-                      Anos de Experiência / Destaque
-                    </label>
-                    <input
-                      type="text"
-                      value={currProf.anos_experiencia || ''}
-                      onChange={(e) => handleUpdateActiveProf('anos_experiencia', e.target.value)}
-                      placeholder="Ex: +8 Anos"
                       className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-slate-900"
                     />
                   </div>
@@ -1497,7 +1833,7 @@ export const SuperAdminWebsiteEditor: React.FC<SuperAdminWebsiteEditorProps> = (
                           />
                           <div className="min-w-0 flex-1">
                             <span className="text-xs text-slate-900 block truncate">{p.nome}</span>
-                            <span className="text-[10px] text-slate-500">{p.categoria} • R$ {(p.valor_promocional || p.valor_tabela).toFixed(2)}</span>
+                            <span className="text-[10px] text-slate-500">{p.categoria} • R$ {(p.valor_promocional || p.valor_tabela || 0).toFixed(2)}</span>
                           </div>
                         </label>
                       );
@@ -1525,6 +1861,273 @@ export const SuperAdminWebsiteEditor: React.FC<SuperAdminWebsiteEditorProps> = (
           </div>
         );
       })()}
+
+      {/* ================= TAB: GALERIA DE CASOS REAIS (ANTES & DEPOIS) ================= */}
+      {activeTab === 'casos_reais' && (
+        <div className="space-y-8 animate-in fade-in duration-200">
+          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xs space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200 inline-block">
+                    Galeria Clínica & Transformações
+                  </span>
+                  <span className="text-[11px] font-extrabold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
+                    {casosTransformacoes.length} Casos Reais
+                  </span>
+                </div>
+                <h3 className="text-lg sm:text-xl font-extrabold text-slate-900">
+                  Gerenciar Galeria de Casos Reais (Antes & Depois)
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Adicione, edite e organize os casos clínicos com fotos de antes e depois, procedimentos associados e resultados reais no studio.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleOpenAddCaso}
+                  className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Adicionar Novo Caso Real</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isSaving}
+                  onClick={() => persistToFirestore(fotosAmbiente, depoimentos, 'Galeria de Casos Reais salva no Firestore!', profissionaisQuemSou, casosTransformacoes, faqItens)}
+                  className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-xl text-xs font-extrabold flex items-center gap-2 shadow-xs cursor-pointer transition-all"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Salvar no Firestore</span>
+                </button>
+              </div>
+            </div>
+
+            {casosTransformacoes.length === 0 ? (
+              <div className="p-12 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300 space-y-3">
+                <Sparkles className="w-10 h-10 text-amber-500 mx-auto" />
+                <h4 className="font-extrabold text-slate-800 text-sm">Nenhum Caso Real Cadastrado</h4>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  Apresente os resultados estéticos autênticos de suas clientes com fotos comparativas de antes e depois.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleOpenAddCaso}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs cursor-pointer"
+                >
+                  + Cadastrar Primeiro Caso
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {casosTransformacoes.map((caso) => (
+                  <div
+                    key={caso.id}
+                    className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between group"
+                  >
+                    <div>
+                      {/* Top Bar */}
+                      <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-3 bg-slate-50/50">
+                        <div className="min-w-0 flex-1">
+                          <span className="text-[10px] font-black text-amber-800 uppercase tracking-wider block">
+                            {caso.categoriaLabel || caso.categoria}
+                          </span>
+                          <h4 className="font-extrabold text-slate-900 text-sm truncate">
+                            {caso.titulo}
+                          </h4>
+                          {caso.procedimento_nome && (
+                            <span className="text-[11px] text-slate-500 block truncate">
+                              Procedimento: {caso.procedimento_nome}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="px-2 py-0.5 bg-amber-100 text-amber-900 rounded-md text-[10px] font-bold">
+                            {caso.destaque || 'Natural'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditCaso(caso)}
+                            title="Editar caso"
+                            className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCasoToDelete(caso)}
+                            title="Remover caso"
+                            className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Before / After Images */}
+                      <div className="p-4 bg-slate-50/30">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <div className="relative rounded-xl overflow-hidden aspect-4/5 bg-slate-200 border border-slate-300">
+                              <img src={caso.foto_antes} alt="Antes" className="w-full h-full object-cover" />
+                              <span className="absolute top-1.5 left-1.5 px-2 py-0.5 bg-slate-900/80 text-white text-[9px] font-black rounded">
+                                ANTES
+                              </span>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <div className="relative rounded-xl overflow-hidden aspect-4/5 bg-slate-200 border-2 border-amber-500/60">
+                              <img src={caso.foto_depois} alt="Depois" className="w-full h-full object-cover" />
+                              <span className="absolute top-1.5 left-1.5 px-2 py-0.5 bg-amber-600 text-white text-[9px] font-black rounded">
+                                DEPOIS
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {caso.subtitulo && (
+                          <p className="text-xs text-slate-600 mt-3 leading-relaxed">
+                            {caso.subtitulo}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-3 border-t border-slate-100 bg-white flex items-center justify-between text-[11px] text-slate-500">
+                      <span>⏱ {caso.intervalo || 'Resultado pós-sessão'}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditCaso(caso)}
+                        className="text-amber-800 font-bold hover:underline cursor-pointer"
+                      >
+                        Editar dados &rarr;
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ================= TAB: TIRE TODAS AS SUAS DÚVIDAS (FAQ) ================= */}
+      {activeTab === 'faq' && (
+        <div className="space-y-8 animate-in fade-in duration-200">
+          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xs space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 inline-block">
+                    Dúvidas & Orientações Clínicas
+                  </span>
+                  <span className="text-[11px] font-extrabold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
+                    {faqItens.length} Perguntas Cadastradas
+                  </span>
+                </div>
+                <h3 className="text-lg sm:text-xl font-extrabold text-slate-900">
+                  Gerenciar Tire Todas as Suas Dúvidas (FAQ)
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Adicione e edite perguntas e respostas sobre dor, biossegurança, anestésicos, marcas de bioestimuladores e formas de pagamento.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleOpenAddFaq}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Adicionar Nova Pergunta</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isSaving}
+                  onClick={() => persistToFirestore(fotosAmbiente, depoimentos, 'FAQ salvo no Firestore!', profissionaisQuemSou, casosTransformacoes, faqItens)}
+                  className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-xl text-xs font-extrabold flex items-center gap-2 shadow-xs cursor-pointer transition-all"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Salvar no Firestore</span>
+                </button>
+              </div>
+            </div>
+
+            {faqItens.length === 0 ? (
+              <div className="p-12 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300 space-y-3">
+                <HelpCircle className="w-10 h-10 text-emerald-500 mx-auto" />
+                <h4 className="font-extrabold text-slate-800 text-sm">Nenhuma Pergunta no FAQ</h4>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  Cadastre as dúvidas mais frequentes de suas pacientes para transmitir segurança e clareza no atendimento.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleOpenAddFaq}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs cursor-pointer"
+                >
+                  + Cadastrar Primeira Pergunta
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {faqItens.map((item, idx) => (
+                  <div
+                    key={item.id}
+                    className="p-5 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 transition-all shadow-2xs space-y-3"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3 min-w-0 flex-1">
+                        <span className="w-7 h-7 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-black flex items-center justify-center shrink-0 mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          {item.categoria && (
+                            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-block mb-1">
+                              {item.categoria}
+                            </span>
+                          )}
+                          <h4 className="font-extrabold text-slate-900 text-sm leading-snug">
+                            {item.pergunta}
+                          </h4>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditFaq(item)}
+                          title="Editar pergunta"
+                          className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFaqToDelete(item)}
+                          title="Remover pergunta"
+                          className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="pl-10 text-xs text-slate-600 leading-relaxed border-t border-slate-100 pt-3">
+                      <p>{item.resposta}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ================= TAB: PRÉVIA AO VIVO NA HOME ================= */}
       {activeTab === 'preview' && (
@@ -1865,6 +2468,362 @@ export const SuperAdminWebsiteEditor: React.FC<SuperAdminWebsiteEditorProps> = (
             </div>
           </div>
         </div>
+      )}
+
+      {profToDelete && (
+        <DeleteConfirmModal
+          isOpen={Boolean(profToDelete)}
+          onClose={() => setProfToDelete(null)}
+          onConfirm={handleConfirmDeleteProfissional}
+          title="Excluir Profissional da Seção Quem Sou Eu"
+          itemName={profToDelete.nome}
+          itemType="Ficha de Profissional"
+          description={`Tem certeza que deseja excluir a ficha de "${profToDelete.nome}" da seção Quem Sou Eu? Esta alteração será sincronizada no Firestore imediatamente.`}
+        />
+      )}
+
+      {/* ================= MODAL: ADICIONAR / EDITAR CASO REAL ================= */}
+      {isCasoModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 animate-in zoom-in-95 max-h-[92vh] overflow-y-auto space-y-6">
+            
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 bg-amber-100 text-amber-800 rounded-2xl">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base sm:text-lg">
+                    {editingCasoId ? 'Editar Caso Real & Transformação' : 'Adicionar Novo Caso Real'}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Apresente os resultados com fotos de Antes & Depois e parâmetros clínicos
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCasoModalOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCaso} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Título do Caso *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={casoFormTitulo}
+                    onChange={(e) => setCasoFormTitulo(e.target.value)}
+                    placeholder="Ex: Preenchimento Labial com Ácido Hialurônico"
+                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500/20"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Categoria da Transformação *
+                  </label>
+                  <select
+                    value={casoFormCategoria}
+                    onChange={(e) => setCasoFormCategoria(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white text-slate-900 focus:outline-hidden"
+                  >
+                    <option value="labios">💋 Lábios & Hidratação</option>
+                    <option value="facial">✨ Contorno Facial</option>
+                    <option value="rejuvenescimento">🌿 Rejuvenescimento</option>
+                    <option value="pele">💧 Bioestimulador & Pele</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Procedimento Realizado
+                  </label>
+                  <input
+                    type="text"
+                    value={casoFormProcedimento}
+                    onChange={(e) => setCasoFormProcedimento(e.target.value)}
+                    placeholder="Ex: Preenchimento Labial 1ml ou Bioestimulador"
+                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white text-slate-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Destaque Clínico (Selo)
+                  </label>
+                  <input
+                    type="text"
+                    value={casoFormDestaque}
+                    onChange={(e) => setCasoFormDestaque(e.target.value)}
+                    placeholder="Ex: Volume natural & Simetria"
+                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white text-slate-900"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Subtítulo / Descrição da Metodologia
+                </label>
+                <textarea
+                  rows={2}
+                  value={casoFormSubtitulo}
+                  onChange={(e) => setCasoFormSubtitulo(e.target.value)}
+                  placeholder="Descreva a técnica aplicada, cânulas ou cuidados para atingir esse resultado sutil..."
+                  className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white text-slate-900"
+                />
+              </div>
+
+              {/* Photos Comparison Inputs */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                
+                {/* Foto ANTES */}
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                      <span className="px-2 py-0.5 bg-slate-900 text-white rounded text-[10px]">ANTES</span>
+                      Foto Pré-Procedimento *
+                    </span>
+                    <input
+                      type="file"
+                      ref={antesInputRef}
+                      accept="image/*"
+                      onChange={handleAntesFileUpload}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      disabled={isUploadingAntes}
+                      onClick={() => antesInputRef.current?.click()}
+                      className="px-2.5 py-1 bg-slate-800 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    >
+                      <Upload className="w-3 h-3" />
+                      <span>{isUploadingAntes ? 'Processando...' : 'Upload'}</span>
+                    </button>
+                  </div>
+
+                  <input
+                    type="text"
+                    required
+                    value={casoFormFotoAntes}
+                    onChange={(e) => setCasoFormFotoAntes(e.target.value)}
+                    placeholder="Cole a URL direta da foto de Antes..."
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl text-slate-900"
+                  />
+
+                  {casoFormFotoAntes && (
+                    <div className="relative aspect-4/3 rounded-xl overflow-hidden bg-slate-200 border border-slate-300">
+                      <img src={casoFormFotoAntes} alt="Preview Antes" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Foto DEPOIS */}
+                <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-200 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-amber-900 flex items-center gap-1.5">
+                      <span className="px-2 py-0.5 bg-amber-600 text-white rounded text-[10px]">DEPOIS</span>
+                      Foto Pós-Procedimento *
+                    </span>
+                    <input
+                      type="file"
+                      ref={depoisInputRef}
+                      accept="image/*"
+                      onChange={handleDepoisFileUpload}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      disabled={isUploadingDepois}
+                      onClick={() => depoisInputRef.current?.click()}
+                      className="px-2.5 py-1 bg-amber-600 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    >
+                      <Upload className="w-3 h-3" />
+                      <span>{isUploadingDepois ? 'Processando...' : 'Upload'}</span>
+                    </button>
+                  </div>
+
+                  <input
+                    type="text"
+                    required
+                    value={casoFormFotoDepois}
+                    onChange={(e) => setCasoFormFotoDepois(e.target.value)}
+                    placeholder="Cole a URL direta da foto de Depois..."
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl text-slate-900"
+                  />
+
+                  {casoFormFotoDepois && (
+                    <div className="relative aspect-4/3 rounded-xl overflow-hidden bg-slate-200 border border-amber-300">
+                      <img src={casoFormFotoDepois} alt="Preview Depois" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                </div>
+
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Intervalo do Resultado (Tempo Decorrido)
+                </label>
+                <input
+                  type="text"
+                  value={casoFormIntervalo}
+                  onChange={(e) => setCasoFormIntervalo(e.target.value)}
+                  placeholder="Ex: Resultado consolidado após 21 dias"
+                  className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white text-slate-900"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsCasoModalOpen(false)}
+                  className="px-4 py-2.5 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black flex items-center gap-2 shadow-sm cursor-pointer"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{editingCasoId ? 'Salvar Alterações' : 'Salvar no Firestore'}</span>
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: ADICIONAR / EDITAR FAQ ================= */}
+      {isFaqModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 animate-in zoom-in-95 max-h-[92vh] overflow-y-auto space-y-6">
+            
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 bg-emerald-100 text-emerald-800 rounded-2xl">
+                  <HelpCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base sm:text-lg">
+                    {editingFaqId ? 'Editar Pergunta do FAQ' : 'Adicionar Pergunta ao FAQ'}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Responda às dúvidas comuns das pacientes de forma acolhedora e precisa
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsFaqModalOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveFaq} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Categoria da Pergunta
+                </label>
+                <input
+                  type="text"
+                  value={faqFormCategoria}
+                  onChange={(e) => setFaqFormCategoria(e.target.value)}
+                  placeholder="Ex: Procedimentos & Conforto, Durabilidade, Formas de Pagamento"
+                  className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Pergunta da Paciente *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={faqFormPergunta}
+                  onChange={(e) => setFaqFormPergunta(e.target.value)}
+                  placeholder="Ex: Os procedimentos estéticos injetáveis doem?"
+                  className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Resposta Esclarecedora *
+                </label>
+                <textarea
+                  rows={4}
+                  required
+                  value={faqFormResposta}
+                  onChange={(e) => setFaqFormResposta(e.target.value)}
+                  placeholder="Explique com detalhes técnicos simples, pomadas anestésicas, produtos com selo ANVISA, etc..."
+                  className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white text-slate-900"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsFaqModalOpen(false)}
+                  className="px-4 py-2.5 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm cursor-pointer"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{editingFaqId ? 'Salvar Alterações' : 'Salvar no FAQ'}</span>
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: EXCLUSÃO DE CASO REAL ================= */}
+      {casoToDelete && (
+        <DeleteConfirmModal
+          isOpen={Boolean(casoToDelete)}
+          onClose={() => setCasoToDelete(null)}
+          onConfirm={() => handleDeleteCaso(casoToDelete.id)}
+          title="Excluir Caso Real da Galeria"
+          itemName={casoToDelete.titulo}
+          itemType="Caso Clínico"
+          description={`Tem certeza que deseja remover este caso clínico e suas fotos de antes e depois da galeria do site? Esta alteração será refletida no Firestore imediatamente.`}
+        />
+      )}
+
+      {/* ================= MODAL: EXCLUSÃO DE PERGUNTA FAQ ================= */}
+      {faqToDelete && (
+        <DeleteConfirmModal
+          isOpen={Boolean(faqToDelete)}
+          onClose={() => setFaqToDelete(null)}
+          onConfirm={() => handleDeleteFaq(faqToDelete.id)}
+          title="Excluir Dúvida do FAQ"
+          itemName={faqToDelete.pergunta}
+          itemType="Pergunta do FAQ"
+          description={`Tem certeza que deseja remover esta dúvida do site? A resposta não será mais exibida para as visitantes.`}
+        />
       )}
 
     </div>
